@@ -1,0 +1,62 @@
+.dictation-container {
+  width: 100%;
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: text;
+  position: relative;
+}
+
+.feedback-display {
+  font-family: var(--font-mono);
+  font-size: 2rem;
+  line-height: 1.5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  letter-spacing: 0.05em;
+  transition: opacity 0.2s ease;
+}
+
+.feedback-display.hidden {
+  opacity: 0;
+}
+
+.char {
+  transition: color 0.2s ease, transform 0.1s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.char.pending {
+  color: var(--pending-color);
+  border-bottom-color: rgba(0,0,0,0.1);
+}
+
+.char.correct {
+  color: var(--correct-color);
+}
+
+.char.incorrect {
+  color: var(--incorrect-color);
+  background: rgba(231, 76, 60, 0.1);
+  border-radius: 4px;
+  animation: shake 0.2s ease-in-out;
+}
+
+.hidden-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}

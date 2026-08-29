@@ -1,0 +1,130 @@
+.app-layout {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4rem;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.lang-toggle {
+  background: white;
+  border: 1px solid rgba(0,0,0,0.1);
+  padding: 0.5rem 1.2rem;
+  border-radius: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.app-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stats-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.stats-row > div {
+  min-width: 180px;
+  padding: 0.8rem 1rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+.visibility-toggle {
+  margin-bottom: 1rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.05);
+  color: #0f172a;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.visibility-toggle:hover {
+  background: rgba(15, 23, 42, 0.08);
+  border-color: rgba(15, 23, 42, 0.28);
+}
+
+.stat-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--pending-color);
+}
+
+.stats-row strong {
+  font-size: 1.35rem;
+  line-height: 1.2;
+  color: #2c3e50;
+  font-weight: 700;
+}
+
+.time-limit-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.time-limit-control input {
+  width: 62px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: rgba(255, 255, 255, 0.28);
+  color: #1f2937;
+  border-radius: 8px;
+  padding: 0.3rem 0.4rem;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.time-limit-control span {
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.status-badge {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--pending-color);
+  margin-bottom: 1rem;
+}
+
+.app-footer {
+  text-align: center;
+  padding: 2rem 0;
+  color: var(--pending-color);
+  font-size: 0.9rem;
+}
