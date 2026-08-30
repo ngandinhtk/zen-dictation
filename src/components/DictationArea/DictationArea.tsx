@@ -73,6 +73,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
 
     if (isComplete && onNext) {
       e.preventDefault();
+      soundService.playSuccess();
       onNext();
     }
   };

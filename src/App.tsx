@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { speechService } from './services/speechService';
+import { soundService } from './services/soundService';
 import type { VoiceLanguage } from './services/speechService';
 import DictationArea from './components/DictationArea/DictationArea';
 import Controls from './components/Controls/Controls';
@@ -40,6 +41,7 @@ function App() {
   const [isSentenceHidden, setIsSentenceHidden] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const speakTimeoutRef = useRef<number | null>(null);
+  const timeUpSoundPlayedRef = useRef(false);
 
   const currentSentence = SAMPLE_SENTENCES[LANG][difficulty][currentIndex];
 
@@ -143,6 +145,16 @@ function App() {
     const intervalId = window.setInterval(tick, 250);
     return () => window.clearInterval(intervalId);
   }, [correctChars, hasStartedTyping, startedAt, timeLimit]);
+
+  useEffect(() => {
+    if (isTimeUp && !timeUpSoundPlayedRef.current) {
+      soundService.playTimeUp();
+      timeUpSoundPlayedRef.current = true;
+    }
+    if (!isTimeUp) {
+      timeUpSoundPlayedRef.current = false;
+    }
+  }, [isTimeUp]);
 
   const handleNext = () => {
     setCurrentIndex(getRandomSentenceIndex(difficulty, currentIndex));

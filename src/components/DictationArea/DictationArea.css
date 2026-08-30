@@ -75,7 +75,7 @@
 .typing-signal {
   position: absolute;
   left: 50%;
-  bottom: 1rem;
+  bottom: 0.6rem;
   transform: translateX(-50%);
   display: inline-flex;
   align-items: center;

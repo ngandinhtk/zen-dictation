@@ -43,6 +43,20 @@ class SoundService {
       window.setTimeout(() => this.playTone(210, 0.16, 'triangle', 0.03), 150);
     }
   }
+
+  public playSuccess() {
+    // Ascending tones for a satisfying completion sound
+    this.playTone(523, 0.1, 'sine', 0.04);
+    window.setTimeout(() => this.playTone(659, 0.1, 'sine', 0.04), 110);
+    window.setTimeout(() => this.playTone(784, 0.15, 'sine', 0.05), 220);
+  }
+
+  public playTimeUp() {
+    // Descending alert sound for time running out
+    this.playTone(800, 0.12, 'sine', 0.05);
+    window.setTimeout(() => this.playTone(600, 0.12, 'sine', 0.05), 130);
+    window.setTimeout(() => this.playTone(400, 0.2, 'sine', 0.06), 260);
+  }
 }
 
 export const soundService = new SoundService();
