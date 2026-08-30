@@ -25,7 +25,7 @@ const Controls: React.FC<ControlsProps> = ({ onReplay, speed, onSpeedChange, onN
       </div>
       <div className="main-actions">
         <button className="action-btn replay" onClick={onReplay}>
-          Listen Again
+          Listen Again (Ctrl)
         </button>
         <button className="action-btn next" onClick={onNext}>
           Next Sentence

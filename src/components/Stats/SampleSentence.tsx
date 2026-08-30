@@ -1,15 +1,12 @@
-
 const SAMPLE_SENTENCES = {
   'en-US': [
-    "The quick brown fox jumps over the lazy dog",
     "Practice makes perfect when it comes to language learning",
-    "Success is not final, failure is not fatal: it is the courage to continue that counts",
     "Technology is best when it brings people together",
     "In the middle of difficulty lies opportunity",
     "Life is what happens when you're busy making other plans",
     "The only limit to our realization of tomorrow is our doubts of today",
-    "Do not go where the path may lead, go instead where there is no path and leave a trail",   
-    "To be yourself in a world that is constantly trying to make you something else is the greatest accomplishment",    
+    "Do not go where the path may lead, go instead where there is no path and leave a trail",
+    "To be yourself in a world that is constantly trying to make you something else is the greatest accomplishment",
     "I have not failed. I've just found 10,000 ways that won't work",
     "The best way to predict the future is to invent it",
     "It does not matter how slowly you go as long as you do not stop",
@@ -21,10 +18,10 @@ const SAMPLE_SENTENCES = {
     "Believe you can and you're halfway there",
     "The only thing we have to fear is fear itself",
     "Do what you can, with what you have, where you are",
-    "Success usually comes to those who are too busy to be looking for it", 
+    "Success usually comes to those who are too busy to be looking for it",
     "Don't be afraid to give up the good to go for the great",
     "I find that the harder I work, the more luck I seem to have",
-    "The future belongs to those who believe in the beauty of their dreams", 
+    "The future belongs to those who believe in the beauty of their dreams",
     "It always seems impossible until it's done",
     "The best revenge is massive success",
     "The only place where success comes before work is in the dictionary",
@@ -32,12 +29,6 @@ const SAMPLE_SENTENCES = {
     "Don't let yesterday take up too much of today",
     "You can't cross the sea merely by standing and staring at the water",
   ],
-  'vi-VN': [
-    "Học thầy không tày học bạn",
-    "Kiến tha lâu cũng đầy tổ",
-    "Ăn quả nhớ kẻ trồng cây",
-    "Không có gì quý hơn độc lập tự do"
-  ]
 };
 
 export default SAMPLE_SENTENCES;

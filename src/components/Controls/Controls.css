@@ -1,33 +1,42 @@
+/* Minimalist Controls Style */
 .controls-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
-  margin-top: 2rem;
+  gap: 1.75rem;
+  margin-top: 0.5rem;
+  width: 100%;
 }
 
 .speed-selector {
   display: flex;
-  gap: 0.5rem;
-  background: rgba(0, 0, 0, 0.05);
-  padding: 0.4rem;
-  border-radius: 30px;
+  gap: 0.2rem;
+  background: var(--hover-bg);
+  padding: 0.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
 }
 
 .speed-btn {
   border: none;
   background: transparent;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.speed-btn:hover:not(.active) {
   color: var(--text-color);
-  transition: all 0.2s;
+  background: var(--hover-bg);
 }
 
 .speed-btn.active {
-  background: var(--primary-color);
-  color: white;
+  background: var(--text-color);
+  color: var(--bg-color);
 }
 
 .main-actions {
@@ -36,24 +45,40 @@
 }
 
 .action-btn {
-  border: none;
-  padding: 0.8rem 2rem;
-  border-radius: 8px;
-  font-weight: 600;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  padding: 0.55rem 1.6rem;
+  border-radius: 999px;
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: var(--text-color);
   cursor: pointer;
-  transition: transform 0.1s, opacity 0.2s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  letter-spacing: 0.01em;
+}
+
+.action-btn:hover {
+  background: var(--hover-bg);
+  border-color: var(--text-color);
 }
 
 .action-btn:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
+}
+
+/* Subtly highlight primary action */
+.action-btn.next {
+  border-color: var(--text-color);
+  background: var(--text-color);
+  color: var(--bg-color);
+}
+
+.action-btn.next:hover {
+  background: transparent;
+  color: var(--text-color);
+  border-color: var(--text-color);
 }
 
 .action-btn.replay {
-  background: var(--accent-color);
-  color: white;
-}
-
-.action-btn.next {
-  background: var(--correct-color);
-  color: white;
+  color: var(--text-color);
 }

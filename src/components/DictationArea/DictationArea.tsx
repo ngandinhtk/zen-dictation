@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { getFeedback } from '../../utils/textUtils';
-import type { CharFeedback } from '../../utils/textUtils';
 import './DictationArea.css';
 
 interface DictationAreaProps {
@@ -9,42 +8,42 @@ interface DictationAreaProps {
   onNext?: () => void;
   onTypingChange?: (value: string) => void;
   isHidden?: boolean;
+  disabled?: boolean;
 }
 
-const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, onNext, onTypingChange, isHidden = false }) => {
+const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, onNext, onTypingChange, isHidden = false, disabled = false }) => {
   const [userInput, setUserInput] = useState('');
-  const [feedback, setFeedback] = useState<CharFeedback[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const newFeedback = getFeedback(targetText, userInput);
-    setFeedback(newFeedback);
-
-    if (userInput.length === targetText.length && userInput.toLowerCase() === targetText.toLowerCase()) {
-      onComplete();
-    }
-  }, [userInput, targetText, onComplete]);
+  const feedback = useMemo(() => getFeedback(targetText, userInput), [targetText, userInput]);
+  const isComplete = userInput.length === targetText.length && userInput.toLowerCase() === targetText.toLowerCase();
+  const shouldHidePrompt = isHidden && !isComplete;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
     const value = e.target.value;
-    if (value.length <= targetText.length) {
-      setUserInput(value);
-      onTypingChange?.(value);
+    if (value.length > targetText.length) {
+      return;
+    }
+
+    setUserInput(value);
+    onTypingChange?.(value);
+
+    if (value.length === targetText.length && value.toLowerCase() === targetText.toLowerCase()) {
+      onComplete();
     }
   };
 
   const handleAreaClick = () => {
+    if (disabled) return;
     inputRef.current?.focus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== 'Enter') {
+    if (e.key !== 'Enter' || disabled) {
       return;
     }
 
-    const isCorrect = userInput.length === targetText.length && userInput.toLowerCase() === targetText.toLowerCase();
-
-    if (isCorrect && onNext) {
+    if (isComplete && onNext) {
       e.preventDefault();
       onNext();
     }
@@ -52,7 +51,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
 
   return (
     <div className="dictation-container" onClick={handleAreaClick}>
-      <div className={`feedback-display ${isHidden ? 'hidden' : ''}`}>
+      <div className={`feedback-display ${shouldHidePrompt ? 'hidden' : ''}`}>
         {feedback.map((item, index) => (
           <span 
             key={index} 
@@ -72,6 +71,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
         autoFocus
         spellCheck={false}
         autoComplete="off"
+        disabled={disabled}
       />
     </div>
   );

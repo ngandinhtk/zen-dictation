@@ -1,21 +1,47 @@
+/* Minimalist Zen Theme Variables & Global Resets */
 :root {
-  --bg-color: #fdfbfb;
-  --text-color: #2c3e50;
-  --primary-color: #3498db;
-  --correct-color: #27ae60;
-  --incorrect-color: #e74c3c;
-  --pending-color: #bdc3c7;
-  --accent-color: #9b59b6;
-  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --bg-color: #fcfbfa; /* Warm, soft off-white/cream */
+  --text-color: #1e1e20; /* Deep, elegant charcoal */
+  --text-muted: #8e8d8a; /* Soft medium grey for labels */
+  --primary-color: #5c5d60; /* Quiet grey for secondary actions */
+  --correct-color: #2e7d32; /* Rich, organic forest green */
+  --incorrect-color: #d32f2f; /* Deep, muted rust-red */
+  --pending-color: #cbcac7; /* Warm light grey for untyped text */
+  --accent-color: #6d597a; /* Subtle dusty mauve/violet */
+  --border-color: rgba(30, 30, 32, 0.08);
+  --hover-bg: rgba(30, 30, 32, 0.04);
+  
+  --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-color: #0f0f11; /* Soft, deep charcoal-black */
+    --text-color: #e3e3e6; /* Soft warm white */
+    --text-muted: #727376; /* Soft muted grey */
+    --primary-color: #929396; /* Muted silver grey */
+    --correct-color: #52b788; /* Soft calming mint green */
+    --incorrect-color: #f87171; /* Soft coral/red */
+    --pending-color: #3f4043; /* Dark grey for untyped characters */
+    --accent-color: #b39ddb; /* Soft pastel lavender */
+    --border-color: rgba(227, 227, 230, 0.08);
+    --hover-bg: rgba(227, 227, 230, 0.04);
+  }
+}
+
+/* Also support manual theme overrides if needed */
 [data-theme='dark'] {
-  --bg-color: #1a1a1a;
-  --text-color: #ecf0f1;
-  --correct-color: #2ecc71;
-  --incorrect-color: #e84118;
-  --pending-color: #7f8c8d;
+  --bg-color: #0f0f11;
+  --text-color: #e3e3e3;
+  --text-muted: #727376;
+  --primary-color: #929396;
+  --correct-color: #52b788;
+  --incorrect-color: #f87171;
+  --pending-color: #3f4043;
+  --accent-color: #b39ddb;
+  --border-color: rgba(227, 227, 230, 0.08);
+  --hover-bg: rgba(227, 227, 230, 0.04);
 }
 
 * {
@@ -25,9 +51,13 @@
 }
 
 body {
-  background: var(--bg-color);
+  background-color: var(--bg-color);
   color: var(--text-color);
   font-family: var(--font-main);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
   transition: background-color 0.3s ease, color 0.3s ease;
   min-height: 100vh;
   display: flex;
@@ -38,4 +68,11 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+/* Minimalist Focus Ring */
+button:focus-visible,
+input:focus-visible {
+  outline: 1.5px solid var(--accent-color);
+  outline-offset: 3px;
 }

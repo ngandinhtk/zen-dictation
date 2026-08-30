@@ -6,7 +6,7 @@ export const normalizeText = (text: string): string => {
   return text
     .trim()
     .toLowerCase()
-    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "") // Remove punctuation
+    .replace(new RegExp("[.,/#!$%^&*;:{}=\\-_`~()]", "g"), "") // Remove punctuation
     .replace(/\s{2,}/g, " "); // Remove extra spaces
 };
 

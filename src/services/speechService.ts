@@ -2,7 +2,7 @@
  * SpeechService - Wrapper for Web Speech API
  */
 
-export type VoiceLanguage = 'en-US' | 'vi-VN';
+export type VoiceLanguage = 'en-US';
 
 class SpeechService {
   private synth: SpeechSynthesis;
