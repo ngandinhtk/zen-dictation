@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { getFeedback } from '../../utils/textUtils';
+import { getFeedback, type CharFeedback } from '../../utils/textUtils';
+import { soundService } from '../../services/soundService';
 import './DictationArea.css';
 
 interface DictationAreaProps {
@@ -15,6 +16,23 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
   const [userInput, setUserInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const feedback = useMemo(() => getFeedback(targetText, userInput), [targetText, userInput]);
+  const wordGroups = useMemo(() => {
+    const groups: CharFeedback[][] = [];
+    let word: CharFeedback[] = [];
+
+    feedback.forEach(item => {
+      if (item.char === ' ') {
+        if (word.length > 0) groups.push(word);
+        groups.push([item]);
+        word = [];
+      } else {
+        word.push(item);
+      }
+    });
+
+    if (word.length > 0) groups.push(word);
+    return groups;
+  }, [feedback]);
   const isComplete = userInput.length === targetText.length && userInput.toLowerCase() === targetText.toLowerCase();
   const shouldHidePrompt = isHidden && !isComplete;
 
@@ -23,6 +41,16 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
     const value = e.target.value;
     if (value.length > targetText.length) {
       return;
+    }
+
+    if (value.length > userInput.length) {
+      soundService.playTyping();
+      const typedIndex = value.length - 1;
+      const typedChar = value[typedIndex];
+      const targetChar = targetText[typedIndex];
+      if (typedChar?.toLowerCase() !== targetChar?.toLowerCase()) {
+        soundService.playWrong();
+      }
     }
 
     setUserInput(value);
@@ -52,15 +80,26 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
   return (
     <div className="dictation-container" onClick={handleAreaClick}>
       <div className={`feedback-display ${shouldHidePrompt ? 'hidden' : ''}`}>
-        {feedback.map((item, index) => (
-          <span 
-            key={index} 
-            className={`char ${item.status} ${item.char === ' ' ? 'space' : ''}`}
-          >
-            {item.char === ' ' ? '\u00A0' : item.char}
-          </span>
-        ))}
+        {wordGroups.map((group, groupIndex) => {
+          return (
+            <span key={groupIndex} className={group.length === 1 && group[0].char === ' ' ? 'word-space' : 'word-group'}>
+              {group.map((item, index) => {
+                return (
+                  <span key={index} className={`char ${item.status} ${item.char === ' ' ? 'space' : ''}`}>
+                    {item.char === ' ' ? '\u00A0' : item.char}
+                  </span>
+                );
+              })}
+            </span>
+          );
+        })}
       </div>
+      {shouldHidePrompt && (
+        <div className="typing-signal" aria-live="polite">
+          <span className="typing-signal-dot" aria-hidden="true" />
+          {userInput.length > 0 ? `Typing… ${userInput.length} characters` : 'Start typing…'}
+        </div>
+      )}
       <input
         ref={inputRef}
         type="text"

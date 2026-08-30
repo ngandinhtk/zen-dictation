@@ -1,16 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { speechService } from './services/speechService';
 import type { VoiceLanguage } from './services/speechService';
 import DictationArea from './components/DictationArea/DictationArea';
 import Controls from './components/Controls/Controls';
 import './styles/globals.css';
 import './App.css';
-import SAMPLE_SENTENCES from './components/Stats/SampleSentence';
+import SAMPLE_SENTENCES, { type Difficulty } from './components/Stats/SampleSentence';
 
 const DEFAULT_TIME_LIMIT = 30;
 const LANG: VoiceLanguage = 'en-US';
-const getRandomSentenceIndex = (currentIndex?: number) => {
-  const sentenceCount = SAMPLE_SENTENCES[LANG].length;
+const DEFAULT_DIFFICULTY: Difficulty = 'easy';
+const SPEECH_SPEEDS = [0.5, 0.75, 1, 1.25];
+const getRandomSentenceIndex = (difficulty: Difficulty, currentIndex?: number) => {
+  const sentenceCount = SAMPLE_SENTENCES[LANG][difficulty].length;
   if (sentenceCount < 2) return 0;
 
   let nextIndex = Math.floor(Math.random() * sentenceCount);
@@ -21,8 +23,11 @@ const getRandomSentenceIndex = (currentIndex?: number) => {
 };
 
 function App() {
-  const [currentIndex, setCurrentIndex] = useState(() => getRandomSentenceIndex());
+  const [difficulty, setDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
+  const [currentIndex, setCurrentIndex] = useState(() => getRandomSentenceIndex(DEFAULT_DIFFICULTY));
   const [speed, setSpeed] = useState(1);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
   const [key, setKey] = useState(0);
   const [correctChars, setCorrectChars] = useState(0);
@@ -33,8 +38,41 @@ function App() {
   const [hasStartedTyping, setHasStartedTyping] = useState(false);
   const [isTimeUp, setIsTimeUp] = useState(false);
   const [isSentenceHidden, setIsSentenceHidden] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const speakTimeoutRef = useRef<number | null>(null);
 
-  const currentSentence = SAMPLE_SENTENCES[LANG][currentIndex];
+  const currentSentence = SAMPLE_SENTENCES[LANG][difficulty][currentIndex];
+
+  useEffect(() => {
+    const updateVoices = () => {
+      const availableVoices = speechService.getVoicesByLang(LANG);
+      setVoices(availableVoices);
+      setSelectedVoice(current => current || availableVoices.find(voice => voice.name === 'Google US English')?.name || '');
+    };
+    updateVoices();
+    return speechService.subscribeToVoices(updateVoices);
+  }, []);
+
+  useEffect(() => {
+    if (!isSettingsOpen) return;
+
+    const closeSettings = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.settings-panel, .settings-toggle')) {
+        setIsSettingsOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsSettingsOpen(false);
+    };
+
+    document.addEventListener('mousedown', closeSettings);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeSettings);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isSettingsOpen]);
 
   const resetStats = useCallback((nextTimeLimit = timeLimit) => {
     setCorrectChars(0);
@@ -45,11 +83,36 @@ function App() {
   }, [timeLimit]);
 
   const handleSpeak = useCallback(() => {
+    if (speakTimeoutRef.current !== null) {
+      window.clearTimeout(speakTimeoutRef.current);
+    }
     speechService.stop();
-    window.setTimeout(() => speechService.speak(currentSentence, LANG, speed), 120);
-  }, [currentSentence, speed]);
+    speakTimeoutRef.current = window.setTimeout(() => {
+      speechService.speak(currentSentence, LANG, speed, selectedVoice);
+      speakTimeoutRef.current = null;
+    }, 120);
+  }, [currentSentence, selectedVoice, speed]);
 
-  useEffect(() => { handleSpeak(); }, [handleSpeak]);
+  useEffect(() => {
+    if (speakTimeoutRef.current !== null) {
+      window.clearTimeout(speakTimeoutRef.current);
+    }
+    speechService.stop();
+    speakTimeoutRef.current = window.setTimeout(() => {
+      speechService.speak(currentSentence, LANG, speed, selectedVoice);
+      speakTimeoutRef.current = null;
+    }, 120);
+
+    return () => {
+      if (speakTimeoutRef.current !== null) {
+        window.clearTimeout(speakTimeoutRef.current);
+        speakTimeoutRef.current = null;
+      }
+    };
+    // Voice and speed changes should apply on the next manual replay,
+    // not trigger an automatic repeat of the current sentence.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSentence]);
 
   useEffect(() => {
     const handleControlKey = (event: KeyboardEvent) => {
@@ -82,7 +145,16 @@ function App() {
   }, [correctChars, hasStartedTyping, startedAt, timeLimit]);
 
   const handleNext = () => {
-    setCurrentIndex(getRandomSentenceIndex(currentIndex));
+    setCurrentIndex(getRandomSentenceIndex(difficulty, currentIndex));
+    setIsCompleted(false);
+    setIsTimeUp(timeLeft === 0);
+    setKey(prev => prev + 1);
+  };
+
+  const handleDifficultyChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextDifficulty = event.target.value as Difficulty;
+    setDifficulty(nextDifficulty);
+    setCurrentIndex(getRandomSentenceIndex(nextDifficulty));
     setIsCompleted(false);
     setIsTimeUp(timeLeft === 0);
     setKey(prev => prev + 1);
@@ -128,7 +200,44 @@ function App() {
     <div className="app-layout">
       <header className="app-header">
         <h1 className="logo">Zen Dictation</h1>
+        <button type="button" className="settings-toggle" onClick={() => setIsSettingsOpen(open => !open)} aria-expanded={isSettingsOpen} aria-controls="settings-menu">
+          <span aria-hidden="true">⚙</span> Settings
+        </button>
       </header>
+      {isSettingsOpen && (
+        <section id="settings-menu" className="settings-panel" aria-label="Settings">
+          <label className="settings-field">
+            <span>Level</span>
+            <select value={difficulty} onChange={handleDifficultyChange}>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </label>
+          <label className="settings-field">
+            <span>Voice</span>
+            <select value={selectedVoice} onChange={event => setSelectedVoice(event.target.value)} disabled={voices.length === 0}>
+              <option value="">Browser default voice</option>
+              {voices.map(voice => <option key={`${voice.name}-${voice.voiceURI}`} value={voice.name}>{voice.name}</option>)}
+            </select>
+          </label>
+          <div className="settings-field settings-speed-field">
+            <span>speed</span>
+            <div className="settings-speed-options">
+              {SPEECH_SPEEDS.map(option => (
+                <button
+                  key={option}
+                  type="button"
+                  className={speed === option ? 'active' : ''}
+                  onClick={() => setSpeed(option)}
+                >
+                  {option}x
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
       <main className="app-content">
         <div className="stats-row">
           <div className="time-limit-control" ><span className="stat-label">Typing speed</span><strong>{typingSpeed.toFixed(1)} WPM</strong></div>
@@ -142,8 +251,29 @@ function App() {
           
           </div>
         </div>
-        <div className="status-badge">{isCompleted ? '🎉 Done! Perfect!' : '🎧 Listen and type...'}</div>
-        {isTimeUp && <div className="time-up-notice" role="alert">Time is up! Click Reset to try again!</div>}
+      
+         {/* <div className="status-badge">{isCompleted ? '🎉 Done! Perfect!' : '🎧 Listen and type...' }</div> */}
+         <div className="status-badge">
+            {isTimeUp && !isCompleted ? (
+           <>
+                <span aria-hidden="true">⏰</span> <strong>Time’s up</strong> — Choose Reset Timer to try again.
+            </>
+           ) : isCompleted ? '🎉 Done! Perfect!' : '🎧 Listen and type...'}
+        </div>
+        {/* {isCompleted && isTimeUp && (
+          <div className="completion-notice" role="status">
+            <strong>Excellent work!</strong>
+            <span>You completed the sentence perfectly.</span>
+            <small>Typing speed: {typingSpeed.toFixed(1)} WPM</small>
+          </div>
+        )}
+        {isTimeUp && !isCompleted && (
+          <div className="time-up-notice" role="alert">
+            <strong>Time’s up</strong>
+            <span>Your sentence wasn’t completed.</span>
+            <small>Choose Reset Timer to try again.</small>
+          </div>
+        )} */}
         <button type="button" className="reset-timer-btn" onClick={handleResetTimer}>
                Reset Timer
            </button>
@@ -151,7 +281,7 @@ function App() {
           <button type="button" className="visibility-toggle" onClick={() => setIsSentenceHidden(prev => !prev)}>
           {isSentenceHidden ? 'Show sentence' : 'Hide sentence'}
         </button>
-        <Controls onReplay={handleSpeak} speed={speed} onSpeedChange={setSpeed} onNext={handleNext} />
+        <Controls onReplay={handleSpeak} onNext={handleNext} />
         
       </main>
       <footer className="app-footer"><p>Tip: Focus on the sounds, then the letters.</p></footer>

@@ -4,10 +4,10 @@
   --text-color: #1e1e20; /* Deep, elegant charcoal */
   --text-muted: #8e8d8a; /* Soft medium grey for labels */
   --primary-color: #5c5d60; /* Quiet grey for secondary actions */
-  --correct-color: #2e7d32; /* Rich, organic forest green */
-  --incorrect-color: #d32f2f; /* Deep, muted rust-red */
+  --correct-color: #29972e; /* Rich, organic forest green */
+  --incorrect-color: #cc3a3a; /* Deep, muted rust-red */
   --pending-color: #cbcac7; /* Warm light grey for untyped text */
-  --accent-color: #6d597a; /* Subtle dusty mauve/violet */
+  --accent-color: #8d6ea1; /* Subtle dusty mauve/violet */
   --border-color: rgba(30, 30, 32, 0.08);
   --hover-bg: rgba(30, 30, 32, 0.04);
   
