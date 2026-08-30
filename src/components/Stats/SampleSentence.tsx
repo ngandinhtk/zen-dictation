@@ -8,7 +8,7 @@ const createSentences = (subjects: string[], endings: string[], count: number) =
   });
 
 const cleanSentences = (sentences: string[]) =>
-  sentences.map(sentence => sentence.replace(/\.+$/, ''));
+  sentences.map(sentence => sentence.replace(/[.!?]+$/, ''));
 
 const easyGenerated = createSentences(
   [
@@ -121,16 +121,16 @@ const hardAdditional = createSentences(
     'A trustworthy system remains useful only when',
   ],
   [
-    'we distinguish what the evidence shows from what we merely expect.',
-    'we identify the limits of a method before applying it elsewhere.',
-    'we consider the long-term effects alongside the immediate benefits.',
-    'we make room for disagreement without turning it into personal conflict.',
-    'we revise our plans whenever new information changes the situation.',
-    'we explain not only what happened but also why it happened that way.',
-    'we protect essential principles while remaining open to practical change.',
-    'we test a promising idea against the conditions it must actually survive.',
-    'we acknowledge uncertainty instead of hiding it behind confident language.',
-    'we measure success by the value created for everyone affected by the outcome.',
+    'we distinguish what the evidence shows from what we merely expect',
+    'we identify the limits of a method before applying it elsewhere',
+    'we consider the long-term effects alongside the immediate benefits',
+    'we make room for disagreement without turning it into personal conflict',
+    'we revise our plans whenever new information changes the situation',
+    'we explain not only what happened but also why it happened that way',
+    'we protect essential principles while remaining open to practical change',
+    'we test a promising idea against the conditions it must actually survive',
+    'we acknowledge uncertainty instead of hiding it behind confident language',
+    'we measure success by the value created for everyone affected by the outcome',
   ],
   166,
 );
