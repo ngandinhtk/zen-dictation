@@ -1,0 +1,17 @@
+.account-panel { display: flex; flex-direction: column; gap: .8rem; }
+.account-form { margin-top: .2rem; }
+.account-form h2 { margin: .25rem 0; font-size: 1.05rem; font-weight: 600; }
+.account-form p { color: var(--text-muted); font-size: .72rem; }
+.account-form label { display: flex; flex-direction: column; gap: .3rem; color: var(--text-muted); font-size: .7rem; }
+.account-form input { padding: .55rem .65rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-color); color: var(--text-color); font: inherit; }
+.account-form label small { font-size: .62rem; }
+.account-submit { padding: .6rem; border: 0; border-radius: 999px; background: linear-gradient(135deg, #927dc0, #4479a7 48%, #71bd9c); color: #fff; cursor: pointer; font-size: .72rem; }
+.account-submit:disabled { cursor: wait; opacity: .6; }
+.account-switch, .account-signed-in button { border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .65rem; }
+.account-switch:hover, .account-signed-in button:hover { color: var(--text-color); }
+.account-error { color: var(--incorrect-color) !important; }
+.account-signed-in { flex-direction: row; align-items: center; }
+.account-signed-in > div { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.account-signed-in strong { overflow: hidden; text-overflow: ellipsis; font-size: .75rem; }
+.account-signed-in small { color: var(--text-muted); font-size: .65rem; }
+.account-avatar { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 50%; background: linear-gradient(135deg, #927dc0, #71bd9c); color: #fff; font-size: .8rem; font-weight: 600; }

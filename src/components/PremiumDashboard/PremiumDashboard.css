@@ -1,0 +1,48 @@
+.premium-page { min-height: 100vh; padding: 2rem max(2rem, calc((100vw - 900px) / 2)); background: var(--bg-color); color: var(--text-color); }
+.premium-page-header { display: flex; align-items: center; justify-content: space-between; max-width: 900px; margin: 0 auto; }
+.back-button { border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .75rem; }
+.back-button:hover { color: var(--text-color); }
+.premium-page-mark {
+  background: linear-gradient(135deg, #927dc0 0%, #4479a7 38%, #71bd9c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-family: var(--font-main);
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.premium-dashboard { max-width: 760px; margin: 7rem auto 3rem; }
+.dashboard-intro { max-width: 580px; }
+.dashboard-intro h1 { margin: .5rem 0; font-size: clamp(2rem, 6vw, 3.5rem); font-weight: 500; letter-spacing: -.04em; line-height: 1.05; }
+.dashboard-intro p { max-width: 500px; color: var(--text-muted); font-size: .95rem; }
+.dashboard-metrics, .benefits-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8rem; margin-top: 3rem; }
+.dashboard-metrics > div, .benefits-grid > div, .dashboard-card { padding: 1.25rem; border: 1px solid var(--border-color); border-radius: 16px; background: var(--hover-bg); }
+.dashboard-metrics span, .dashboard-metrics em { display: block; color: var(--text-muted); font-size: .7rem; font-style: normal; }
+.dashboard-metrics strong { display: block; margin: .55rem 0; font-family: var(--font-mono); font-size: 1.6rem; }
+.dashboard-metrics small { font-size: .7rem; }
+.dashboard-card { margin-top: .8rem; }
+.goal-card { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.dashboard-card h2, .benefits-grid h2 { margin: .35rem 0; font-size: 1rem; font-weight: 600; }
+.dashboard-card p, .benefits-grid p { color: var(--text-muted); font-size: .75rem; }
+.goal-card label { display: flex; align-items: center; gap: .5rem; color: var(--text-muted); font-size: .72rem; white-space: nowrap; }
+.goal-card input { width: 60px; padding: .45rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-color); color: var(--text-color); text-align: center; }
+.section-title { display: flex; align-items: baseline; justify-content: space-between; }
+.section-title span, .dashboard-empty, .dashboard-note { color: var(--text-muted); font-size: .7rem; }
+.dashboard-history { margin-top: .75rem; }
+.dashboard-history-row { display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; padding: .7rem 0; border-top: 1px solid var(--border-color); color: var(--text-muted); font-size: .72rem; }
+.dashboard-history-row strong { color: var(--text-color); }
+.premium-landing { margin-top: 9rem; }
+.benefits-grid { grid-template-columns: repeat(2, 1fr); margin-top: 2.5rem; }
+.benefits-grid > div > span { color: var(--accent-color); font-size: 1.2rem; }
+.dashboard-cta { margin-top: 2rem; padding: .7rem 1rem; border: 0; border-radius: 999px; background: linear-gradient(135deg, #927dc0, #4479a7 48%, #71bd9c); color: #fff; cursor: pointer; font-size: .75rem; }
+.dashboard-note { display: block; margin-top: .75rem; }
+@media (max-width: 640px) {
+  .premium-page { padding: 1.25rem; }
+  .premium-dashboard, .premium-landing { margin-top: 5rem; }
+  .dashboard-metrics { grid-template-columns: 1fr; margin-top: 2rem; }
+  .goal-card { align-items: flex-start; flex-direction: column; }
+  .dashboard-history-row { grid-template-columns: 1fr auto; }
+  .dashboard-history-row span:last-child { grid-column: 1 / -1; }
+}

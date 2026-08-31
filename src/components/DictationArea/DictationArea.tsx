@@ -5,14 +5,15 @@ import './DictationArea.css';
 
 interface DictationAreaProps {
   targetText: string;
-  onComplete: () => void;
+  onComplete: (value?: string, correctCharacters?: number) => void;
+  onFinish?: (value: string, correctCharacters: number, isComplete: boolean) => void;
   onNext?: () => void;
   onTypingChange?: (value: string) => void;
   isHidden?: boolean;
   disabled?: boolean;
 }
 
-const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, onNext, onTypingChange, isHidden = false, disabled = false }) => {
+const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, onFinish, onNext, onTypingChange, isHidden = false, disabled = false }) => {
   const [userInput, setUserInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const feedback = useMemo(() => getFeedback(targetText, userInput), [targetText, userInput]);
@@ -34,6 +35,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
     return groups;
   }, [feedback]);
   const isComplete = userInput.length === targetText.length && userInput.toLowerCase() === targetText.toLowerCase();
+  const isFinished = userInput.length === targetText.length;
   const shouldHidePrompt = isHidden && !isComplete;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,7 +59,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
     onTypingChange?.(value);
 
     if (value.length === targetText.length && value.toLowerCase() === targetText.toLowerCase()) {
-      onComplete();
+      onComplete(value, targetText.length);
     }
   };
 
@@ -71,15 +73,16 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
       return;
     }
 
-    if (isComplete && onNext) {
+    if (isFinished && onNext) {
       e.preventDefault();
-      soundService.playSuccess();
+      onFinish?.(userInput, feedback.filter(item => item.status === 'correct').length, isComplete);
+      if (isComplete) soundService.playSuccess();
       onNext();
     }
   };
 
   return (
-    <div className="dictation-container" onClick={handleAreaClick}>
+    <div className="dictation-container" onClick={handleAreaClick} role="group" aria-label="Dictation practice area">
       <div className={`feedback-display ${shouldHidePrompt ? 'hidden' : ''}`}>
         {wordGroups.map((group, groupIndex) => {
           return (
@@ -111,6 +114,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
         autoFocus
         spellCheck={false}
         autoComplete="off"
+        aria-label="Type the sentence you hear"
         disabled={disabled}
       />
     </div>

@@ -135,6 +135,96 @@ const hardAdditional = createSentences(
   166,
 );
 
+const grammarSentences: Record<Difficulty, string[]> = {
+  easy: [
+    'I am ready for my English lesson',
+    'She does not like noisy places',
+    'Do you practice English every day',
+    'We are learning new words together',
+    'He went to the library yesterday',
+    'They will visit their teacher tomorrow',
+    'There is a notebook on the table',
+    'There are three useful examples here',
+    'I have already finished my homework',
+    'She has lived here for two years',
+    'Please listen carefully before you answer',
+    'If you practice often, you will improve',
+  ],
+  medium: [
+    'I have been studying English since the beginning of the year',
+    'She was reading when her friend called',
+    'They had finished dinner before the movie started',
+    'If I had more time, I would read another book',
+    'The lesson was easier than I expected',
+    'This is the most useful exercise in the workbook',
+    'He asked me whether I understood the instructions',
+    'Although the weather was cold, we continued our walk',
+    'The project must be completed before Friday afternoon',
+    'People who read regularly often learn new words faster',
+    'I am not sure which answer the teacher prefers',
+    'By the time we arrived, the class had already begun',
+  ],
+  hard: [
+    'If the researchers had checked the data earlier, they might have avoided the error',
+    'The book, which was published last year, has already become a valuable reference',
+    'Having completed the experiment, the students carefully compared their results',
+    'The manager asked whether the revised proposal could be submitted before noon',
+    'Despite being exhausted after the journey, she continued working on the report',
+    'What matters most is how consistently we apply what we have learned',
+    'The more carefully you listen, the easier it becomes to recognize natural phrases',
+    'Unless the evidence changes, the committee is unlikely to revise its conclusion',
+    'The course encourages learners to explain ideas that they would normally avoid discussing',
+    'It is essential that every participant be given enough time to consider the question',
+    'The teacher explained that the assignment should have been completed before the meeting',
+    'Had we known about the delay, we would have chosen a different route',
+  ],
+};
+
+const vocabularySentences: Record<Difficulty, string[]> = {
+  easy: [
+    'The bright window made the small room feel welcoming',
+    'Please place the empty bottle beside the kitchen sink',
+    'The helpful guide showed us a quiet path through the park',
+    'A healthy breakfast gives you energy for the morning',
+    'The careful driver noticed a narrow bridge ahead',
+    'We packed a light jacket because the evening might be cool',
+    'The local market sells fresh fruit and handmade gifts',
+    'Her favorite hobby is painting colorful pictures',
+    'The simple recipe needs flour, eggs, and a little butter',
+    'A friendly neighbor offered useful advice',
+    'The train arrived at the busy station on time',
+    'Reading short stories is an enjoyable way to learn',
+  ],
+  medium: [
+    'The reliable equipment helped the team complete the difficult task',
+    'A flexible schedule makes it easier to balance work and study',
+    'The speaker gave a clear explanation of the unfamiliar process',
+    'Our neighborhood has several affordable restaurants near the river',
+    'The museum displays remarkable objects from ancient civilizations',
+    'A thoughtful response can prevent a small disagreement from becoming serious',
+    'The company introduced an efficient system for organizing customer requests',
+    'Regular exercise can improve concentration as well as physical health',
+    'The journalist confirmed the information with an independent source',
+    'A practical solution should be affordable, reliable, and easy to maintain',
+    'The students discussed the environmental impact of excessive packaging',
+    'The unfamiliar vocabulary became easier after we saw it in context',
+  ],
+  hard: [
+    'The architect proposed a sustainable design that would reduce the building’s energy consumption',
+    'The investigation revealed several inconsistencies in the original financial report',
+    'Effective collaboration depends on transparent communication and shared responsibility',
+    'The speaker presented a compelling argument supported by independent evidence',
+    'A sophisticated vocabulary is useful only when each word is used with precision',
+    'The expedition required careful preparation because the terrain was unpredictable',
+    'The policy aims to encourage innovation while protecting vulnerable communities',
+    'The scientist recorded a significant increase in biodiversity after the restoration project',
+    'A comprehensive review identified practical improvements to the organization’s workflow',
+    'The negotiation reached a temporary agreement despite considerable disagreement',
+    'The concept became more accessible after the professor provided a concrete example',
+    'Long-term sustainability requires investment, patience, and responsible decision-making',
+  ],
+};
+
 const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
   'en-US': {
     easy: cleanSentences([
@@ -155,6 +245,8 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       'Soon the little garden became a place for everyone',
       ...easyGenerated,
       ...easyAdditional,
+      ...grammarSentences.easy,
+      ...vocabularySentences.easy,
     ]),
     medium: cleanSentences([
       'Practice makes perfect when it comes to language learning',
@@ -174,6 +266,8 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       'After several weeks, the project was ready to share',
       ...mediumGenerated,
       ...mediumAdditional,
+      ...grammarSentences.medium,
+      ...vocabularySentences.medium,
     ]),
     hard: cleanSentences([
       'The only limit to our realization of tomorrow is our doubts of today',
@@ -193,6 +287,8 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       'Their patience ultimately produced a safer and more accurate account of the region',
       ...hardGenerated,
       ...hardAdditional,
+      ...grammarSentences.hard,
+      ...vocabularySentences.hard,
     ]),
   },
 };

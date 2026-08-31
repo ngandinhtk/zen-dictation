@@ -7,12 +7,12 @@ interface ControlsProps {
 
 const Controls: React.FC<ControlsProps> = ({ onReplay, onNext }) => {
   return (
-    <div className="controls-container">
+    <div className="controls-container" aria-label="Practice controls">
       <div className="main-actions">
-        <button className="action-btn replay" onClick={onReplay}>
+        <button type="button" className="action-btn replay" onClick={onReplay} aria-label="Listen to the sentence again">
           Listen Again (Ctrl)
         </button>
-        <button className="action-btn next" onClick={onNext}>
+        <button type="button" className="action-btn next" onClick={onNext} aria-label="Go to the next sentence">
           Next Sentence
         </button>
       </div>

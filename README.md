@@ -73,3 +73,12 @@ export default defineConfig([
 ])
 
 ```
+## Account backend
+
+The account API runs separately from the Vite frontend during development.
+
+Run \`npm run server\` in one terminal and \`npm run dev\` in another. The frontend proxies \`/api\` requests to \`http://localhost:3001\`.
+
+The backend currently provides account registration, login, logout, the current-user endpoint, and authenticated practice-session endpoints. User data is stored in \`server/data.json\`, which is ignored by Git.
+
+New accounts are Free by default. Premium entitlement and one-time payment will be connected after the account flow is verified.
