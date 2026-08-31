@@ -1,7 +1,7 @@
 .premium-page { min-height: 100vh; padding: 2rem max(2rem, calc((100vw - 900px) / 2)); background: var(--bg-color); color: var(--text-color); }
 .premium-page-header { display: flex; align-items: center; justify-content: space-between; max-width: 900px; margin: 0 auto; }
-.back-button { border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .75rem; }
-.back-button:hover { color: var(--text-color); }
+.back-button { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem .8rem; border: 1px solid var(--border-color); border-radius: 999px; background: linear-gradient(135deg, rgba(146, 125, 192, .1), rgba(68, 121, 167, .1) 48%, rgba(113, 189, 156, .1)); color: var(--text-muted); cursor: pointer; font-size: .72rem; transition: color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s ease, background .2s ease; }
+.back-button:hover { border-color: transparent; background: linear-gradient(135deg, #927dc0 0%, #4479a7 48%, #71bd9c 100%); color: #fff; box-shadow: 0 8px 20px rgba(77, 126, 168, .22); transform: translateX(-2px); }
 .premium-page-mark {
   background: linear-gradient(135deg, #927dc0 0%, #4479a7 38%, #71bd9c 100%);
   -webkit-background-clip: text;
@@ -37,6 +37,12 @@
 .benefits-grid { grid-template-columns: repeat(2, 1fr); margin-top: 2.5rem; }
 .benefits-grid > div > span { color: var(--accent-color); font-size: 1.2rem; }
 .dashboard-cta { margin-top: 2rem; padding: .7rem 1rem; border: 0; border-radius: 999px; background: linear-gradient(135deg, #927dc0, #4479a7 48%, #71bd9c); color: #fff; cursor: pointer; font-size: .75rem; }
+.license-form { display: flex; flex-direction: column; align-items: flex-start; gap: .6rem; margin-top: 2rem; }
+.license-form label { display: flex; flex-direction: column; gap: .35rem; color: var(--text-muted); font-size: .72rem; }
+.license-form input { width: min(280px, 80vw); padding: .65rem .75rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-color); color: var(--text-color); font: .8rem var(--font-mono); letter-spacing: .06em; }
+.license-form .dashboard-cta { margin-top: .2rem; }
+.license-form button:disabled { cursor: wait; opacity: .6; }
+.license-error { color: var(--incorrect-color); font-size: .7rem; }
 .dashboard-note { display: block; margin-top: .75rem; }
 @media (max-width: 640px) {
   .premium-page { padding: 1.25rem; }

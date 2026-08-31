@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { activatePremiumLicense } from '../../services/premiumAccess';
 import type { PracticeSession } from '../../services/premiumService';
 import './PremiumDashboard.css';
 
@@ -9,11 +11,31 @@ interface PremiumDashboardProps {
   practiceStreak: number;
   practiceHistory: PracticeSession[];
   onGoalChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onPremiumPreview: () => void;
+  onLicenseActivated: () => void;
   onBack: () => void;
 }
 
-const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practiceStreak, practiceHistory, onGoalChange, onPremiumPreview, onBack }: PremiumDashboardProps) => (
+const LicenseActivation = ({ onActivated }: { onActivated: () => void }) => {
+  const [licenseKey, setLicenseKey] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    setIsLoading(true);
+    try {
+      await activatePremiumLicense(licenseKey);
+      onActivated();
+    } catch (activationError) {
+      setError(activationError instanceof Error ? activationError.message : 'Unable to activate this key');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  return <form className="license-form" onSubmit={handleSubmit}><label>Premium license key<input value={licenseKey} onChange={event => setLicenseKey(event.target.value)} placeholder="ZEN-XXXX-XXXX" autoComplete="off" required /></label>{error && <p className="license-error" role="alert">{error}</p>}<button type="submit" className="dashboard-cta" disabled={isLoading}>{isLoading ? 'Checking key…' : 'Unlock Premium'}</button></form>;
+};
+
+const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practiceStreak, practiceHistory, onGoalChange, onLicenseActivated, onBack }: PremiumDashboardProps) => (
   <div className="premium-page">
     <header className="premium-page-header">
       <button type="button" className="back-button" onClick={onBack}>← Back to practice</button>
@@ -40,8 +62,8 @@ const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practi
           <div><span>◎</span><h2>Set personal goals</h2><p>Choose a WPM target that keeps your daily practice moving.</p></div>
           <div><span>✦</span><h2>Unlock Hard level</h2><p>Challenge yourself with longer and more complex sentences.</p></div>
         </section>
-        <button type="button" className="dashboard-cta" onClick={onPremiumPreview}>Explore Premium preview</button>
-        <small className="dashboard-note">One-time unlock coming soon · No payment required in preview</small>
+        <LicenseActivation onActivated={onLicenseActivated} />
+        <small className="dashboard-note">One-time unlock · No account required</small>
       </main>
     )}
   </div>

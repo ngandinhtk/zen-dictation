@@ -1,5 +1,6 @@
 class SoundService {
   private context: AudioContext | null = null;
+  private readonly masterVolume = 3;
 
   private getContext() {
     if (!this.context) {
@@ -19,7 +20,7 @@ class SoundService {
 
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(frequency, now);
-    gain.gain.setValueAtTime(volume, now);
+    gain.gain.setValueAtTime(volume * this.masterVolume, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
     oscillator.connect(gain);
     gain.connect(context.destination);

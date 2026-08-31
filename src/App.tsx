@@ -9,9 +9,10 @@ import './App.css';
 import SAMPLE_SENTENCES, { type Difficulty } from './components/Stats/SampleSentence';
 import { getGoalWpm, getPracticeHistory, getPracticeStreak, saveGoalWpm, savePracticeSession, type PracticeSession } from './services/premiumService';
 import PremiumDashboard from './components/PremiumDashboard/PremiumDashboard';
-import { getPremiumEntitlement, setPremiumPreview } from './services/premiumAccess';
-import { getCurrentAccount, logoutAccount, type AccountUser } from './services/accountService';
-import AccountPanel from './components/AccountPanel/AccountPanel';
+import { getPremiumStatus } from './services/premiumAccess';
+import { getAccountSessions, getCurrentAccount, saveAccountSession, type AccountUser } from './services/accountService';
+import Header from './components/Header/Header';
+import PaymentPage from './components/PaymentPage/PaymentPage';
 
 const DEFAULT_TIME_LIMIT = 30;
 const LANG: VoiceLanguage = 'en-US';
@@ -28,6 +29,16 @@ const getRandomSentenceIndex = (difficulty: Difficulty, currentIndex?: number) =
   return nextIndex;
 };
 
+const shuffleSentenceIndices = (difficulty: Difficulty, excludedIndex?: number) => {
+  const indices = Array.from({ length: SAMPLE_SENTENCES[LANG][difficulty].length }, (_, index) => index)
+    .filter(index => index !== excludedIndex);
+  for (let index = indices.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [indices[index], indices[swapIndex]] = [indices[swapIndex], indices[index]];
+  }
+  return indices;
+};
+
 function App() {
   const [difficulty, setDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
   const [currentIndex, setCurrentIndex] = useState(() => getRandomSentenceIndex(DEFAULT_DIFFICULTY));
@@ -38,6 +49,7 @@ function App() {
   const [key, setKey] = useState(0);
   const [correctChars, setCorrectChars] = useState(0);
   const [timeLimit, setTimeLimit] = useState(DEFAULT_TIME_LIMIT);
+  const [isUnlimitedTime, setIsUnlimitedTime] = useState(false);
   const [timeLeft, setTimeLeft] = useState(DEFAULT_TIME_LIMIT);
   const [typingSpeed, setTypingSpeed] = useState(0);
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -45,8 +57,9 @@ function App() {
   const [isTimeUp, setIsTimeUp] = useState(false);
   const [isSentenceHidden, setIsSentenceHidden] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isPremium, setIsPremium] = useState(() => getPremiumEntitlement().isPremium);
+  const [isPremium, setIsPremium] = useState(false);
   const [isPremiumOpen, setIsPremiumOpen] = useState(() => window.location.hash === '#premium');
+  const [isPaymentOpen, setIsPaymentOpen] = useState(() => window.location.hash === '#payment');
   const [goalWpm, setGoalWpm] = useState(getGoalWpm);
   const [practiceHistory, setPracticeHistory] = useState<PracticeSession[]>(getPracticeHistory);
   const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('zen-dictation-onboarding-seen') !== 'true');
@@ -60,10 +73,26 @@ function App() {
     window.history.pushState({}, '', window.location.pathname + window.location.search);
     setIsPremiumOpen(false);
   };
+  const openPaymentPage = () => {
+    window.history.pushState({}, '', '#payment');
+    setIsPaymentOpen(true);
+  };
+  const closePaymentPage = () => {
+    window.history.pushState({}, '', window.location.pathname + window.location.search);
+    setIsPaymentOpen(false);
+  };
   const speakTimeoutRef = useRef<number | null>(null);
   const timeUpSoundPlayedRef = useRef(false);
+  const sentenceDecksRef = useRef<Record<Difficulty, number[]>>({ easy: [], medium: [], hard: [] });
 
   const currentSentence = SAMPLE_SENTENCES[LANG][difficulty][currentIndex];
+  const getNextSentenceIndex = (nextDifficulty: Difficulty, previousIndex?: number) => {
+    let deck = sentenceDecksRef.current[nextDifficulty];
+    if (deck.length === 0) deck = shuffleSentenceIndices(nextDifficulty, previousIndex);
+    const nextIndex = deck.pop();
+    sentenceDecksRef.current[nextDifficulty] = deck;
+    return nextIndex ?? getRandomSentenceIndex(nextDifficulty, previousIndex);
+  };
 
   useEffect(() => {
     const updateVoices = () => {
@@ -77,6 +106,19 @@ function App() {
 
   useEffect(() => {
     getCurrentAccount().then(setAccountUser);
+  }, []);
+
+  useEffect(() => {
+    if (!accountUser) return;
+    getAccountSessions().then(remoteSessions => {
+      if (remoteSessions.length > 0) setPracticeHistory(remoteSessions);
+    }).catch(() => undefined);
+  }, [accountUser]);
+
+  useEffect(() => {
+    getPremiumStatus().then(entitlement => {
+      if (entitlement.isPremium) setIsPremium(true);
+    }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -152,7 +194,7 @@ function App() {
   }, [handleSpeak]);
 
   useEffect(() => {
-    if (!hasStartedTyping || !startedAt) return;
+    if (!hasStartedTyping || !startedAt || isUnlimitedTime) return;
     const tick = () => {
       const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
       const remainingSeconds = Math.max(0, timeLimit - elapsedSeconds);
@@ -168,7 +210,7 @@ function App() {
     tick();
     const intervalId = window.setInterval(tick, 250);
     return () => window.clearInterval(intervalId);
-  }, [correctChars, hasStartedTyping, startedAt, timeLimit]);
+  }, [correctChars, hasStartedTyping, isUnlimitedTime, startedAt, timeLimit]);
 
   useEffect(() => {
     if (isTimeUp && !timeUpSoundPlayedRef.current) {
@@ -181,9 +223,9 @@ function App() {
   }, [isTimeUp]);
 
   const handleNext = () => {
-    setCurrentIndex(getRandomSentenceIndex(difficulty, currentIndex));
+    setCurrentIndex(getNextSentenceIndex(difficulty, currentIndex));
     setIsCompleted(false);
-    setIsTimeUp(timeLeft === 0);
+    setIsTimeUp(!isUnlimitedTime && timeLeft === 0);
     setKey(prev => prev + 1);
   };
 
@@ -194,9 +236,9 @@ function App() {
       return;
     }
     setDifficulty(nextDifficulty);
-    setCurrentIndex(getRandomSentenceIndex(nextDifficulty));
+    setCurrentIndex(getNextSentenceIndex(nextDifficulty));
     setIsCompleted(false);
-    setIsTimeUp(timeLeft === 0);
+    setIsTimeUp(!isUnlimitedTime && timeLeft === 0);
     setKey(prev => prev + 1);
   };
 
@@ -209,6 +251,16 @@ function App() {
     setKey(prev => prev + 1);
   };
 
+  const handleUnlimitedTimeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextUnlimited = event.target.checked;
+    setIsUnlimitedTime(nextUnlimited);
+    const nextTimeLimit = nextUnlimited ? 0 : DEFAULT_TIME_LIMIT;
+    setTimeLimit(nextTimeLimit);
+    setIsTimeUp(false);
+    resetStats(nextTimeLimit);
+    setKey(prev => prev + 1);
+  };
+
   const handleResetTimer = () => {
     setIsCompleted(false);
     setIsTimeUp(false);
@@ -218,12 +270,14 @@ function App() {
 
   const recordPremiumSession = (completedText: string, correctCharacters: number) => {
     const elapsedMinutes = startedAt ? Math.max((Date.now() - startedAt) / 60000, 1 / 60) : 1 / 60;
-    setPracticeHistory(savePracticeSession({
+    const session = {
       date: new Date().toISOString(),
       difficulty,
       wpm: Math.round((completedText.length / 5) / elapsedMinutes),
       accuracy: Math.round((correctCharacters / Math.max(currentSentence.length, 1)) * 100),
-    }));
+    };
+    setPracticeHistory(savePracticeSession(session));
+    if (accountUser) void saveAccountSession(session);
   };
 
   const handlePremiumComplete = (completedText = currentSentence, correctCharacters = currentSentence.length) => {
@@ -233,19 +287,6 @@ function App() {
 
   const handlePremiumFinish = (completedText: string, correctCharacters: number, isCorrect: boolean) => {
     if (!isCorrect) recordPremiumSession(completedText, correctCharacters);
-  };
-
-  const handlePremiumPreview = () => {
-    const next = !isPremium;
-    setIsPremium(next);
-    setPremiumPreview(next);
-    if (!next && difficulty === 'hard') {
-      setDifficulty('medium');
-      setCurrentIndex(getRandomSentenceIndex('medium'));
-      setIsCompleted(false);
-      setIsTimeUp(false);
-      setKey(prev => prev + 1);
-    }
   };
 
   const handleGoalChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -267,8 +308,15 @@ function App() {
       practiceStreak={practiceStreak}
       practiceHistory={practiceHistory}
       onGoalChange={handleGoalChange}
-      onPremiumPreview={handlePremiumPreview}
+      onLicenseActivated={() => setIsPremium(true)}
       onBack={closePremiumDashboard}
+    />;
+  }
+
+  if (isPaymentOpen) {
+    return <PaymentPage
+      onBack={closePaymentPage}
+      onLicenseClick={() => { closePaymentPage(); openPremiumDashboard(); }}
     />;
   }
 
@@ -294,25 +342,18 @@ function App() {
 
   return (
     <div className="app-layout">
-      <header className="app-header">
-        <h1 className="logo">Zen Dictation</h1>
-        <div className="header-actions">
-          <button type="button" className="account-toggle" onClick={() => setIsAccountOpen(open => !open)} aria-expanded={isAccountOpen} aria-controls="account-menu">
-            {accountUser ? accountUser.email.split('@')[0] : 'Account'}
-          </button>
-          <button type="button" className={'premium-toggle ' + (isPremium ? 'active' : '')} onClick={openPremiumDashboard} aria-expanded={isPremiumOpen}>
-            <span aria-hidden="true">✦</span> {isPremium ? 'Premium' : 'Premium preview'}
-          </button>
-          <button type="button" className="settings-toggle" onClick={() => setIsSettingsOpen(open => !open)} aria-expanded={isSettingsOpen} aria-controls="settings-menu">
-          <span aria-hidden="true">⚙</span> Settings
-        </button>
-        </div>
-      </header>
-      {isAccountOpen && (
-        <section id="account-menu" className="account-menu" aria-label="Account">
-          <AccountPanel user={accountUser} onAuthenticated={user => { setAccountUser(user); setIsAccountOpen(false); }} onLogout={() => { void logoutAccount(); setAccountUser(null); }} />
-        </section>
-      )}
+      <Header
+        accountUser={accountUser}
+        isAccountOpen={isAccountOpen}
+        isPremium={isPremium}
+        isPremiumOpen={isPremiumOpen}
+        isSettingsOpen={isSettingsOpen}
+        onAccountToggle={() => setIsAccountOpen(open => !open)}
+        onAuthenticated={user => { setAccountUser(user); setIsAccountOpen(false); }}
+        onLoggedOut={() => setAccountUser(null)}
+        onPremiumOpen={openPaymentPage}
+        onSettingsToggle={() => setIsSettingsOpen(open => !open)}
+      />
       {showOnboarding && (
         <section className="onboarding-card" aria-label="How to practice">
           <div><span className="premium-kicker">Welcome to Zen Dictation</span><h2>Three quiet steps to better listening.</h2><p>Listen, type what you hear, then use the feedback to improve your accuracy and speed.</p></div>
@@ -333,7 +374,6 @@ function App() {
               <label className="goal-control">Daily speed goal <input type="number" min="10" max="200" value={goalWpm} onChange={handleGoalChange} /> WPM</label>
               <div className="history-heading"><span>Recent sessions</span><small>Saved on this device</small></div>
               {practiceHistory.length === 0 ? <p className="premium-empty">Complete a practice sentence to start your personal history.</p> : <div className="history-list">{practiceHistory.slice(0, 5).map(session => <div className="history-row" key={session.id}><span>{new Date(session.date).toLocaleDateString()} · {session.difficulty}</span><strong>{session.wpm} WPM · {session.accuracy}%</strong></div>)}</div>}
-              <button type="button" className="premium-secondary" onClick={handlePremiumPreview}>Turn off preview</button>
             </>
           ) : (
             <div className="premium-upsell">
@@ -346,8 +386,6 @@ function App() {
                 <div><span className="benefit-icon" aria-hidden="true">◎</span><span><strong>Set a goal that keeps you moving</strong><small>Choose a WPM target and make each session count.</small></span></div>
                 <div><span className="benefit-icon" aria-hidden="true">✦</span><span><strong>Make practice feel rewarding</strong><small>See your milestones in one calm, focused dashboard.</small></span></div>
               </div>
-              <button type="button" className="premium-cta" onClick={handlePremiumPreview}>Explore Premium preview</button>
-              <small className="premium-note">One-time unlock coming soon · No payment required in preview</small>
             </div>
           )}
         </section>
@@ -384,7 +422,6 @@ function App() {
               ))}
             </div>
           </div>
-          <label className="settings-field premium-preview-field"><span>Premium preview</span><input type="checkbox" checked={isPremium} onChange={handlePremiumPreview} /></label>
         </section>
       )}
       <main className="app-content">
@@ -393,19 +430,20 @@ function App() {
           <div>
             
             <div className="time-limit-control"> <span className="stat-label">Time limit</span>
-              <input type="number" min={10} max={180} step={5} value={timeLimit} onChange={handleTimeLimitChange} aria-label="Custom time limit in seconds" />
-              <span>s</span>
+              <input type="number" min={10} max={180} step={5} value={isUnlimitedTime ? '' : timeLimit} onChange={handleTimeLimitChange} aria-label="Custom time limit in seconds" disabled={isUnlimitedTime} />
+              <span>{isUnlimitedTime ? '∞' : 's'}</span>
+              <label className="unlimited-toggle"><input type="checkbox" checked={isUnlimitedTime} onChange={handleUnlimitedTimeChange} /> Unlimited</label>
             </div>
-            <strong>{hasStartedTyping ? `${timeLeft}s left` : 'Waiting...'}</strong>
+            <strong>{hasStartedTyping ? (isUnlimitedTime ? 'No time limit' : `${timeLeft}s left`) : 'Waiting...'}</strong>
           
           </div>
         </div>
       
          {/* <div className="status-badge">{isCompleted ? '🎉 Done! Perfect!' : '🎧 Listen and type...' }</div> */}
-         <div className="status-badge" role="status" aria-live="polite">
+         <div className={'status-badge ' + (isTimeUp ? 'status-error' : isCompleted ? 'status-success' : 'status-ready')} role="status" aria-live="polite">
             {isTimeUp && !isCompleted ? (
            <>
-                <span aria-hidden="true">⏰</span> <strong>Time’s up</strong> — Choose Reset Timer to try again.
+                <span aria-hidden="true">⏰</span> <strong>Time’s up</strong> — Hit Reset Timer to try again.
             </>
            ) : isCompleted ? '🎉 Done! Perfect!' : '🎧 Listen and type...'}
         </div>

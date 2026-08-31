@@ -5,6 +5,14 @@ export interface AccountUser {
   isPremium: boolean;
 }
 
+export interface AccountPracticeSession {
+  id: string;
+  date: string;
+  difficulty: string;
+  wpm: number;
+  accuracy: number;
+}
+
 const TOKEN_KEY = 'zen-dictation-account-token';
 
 const request = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
@@ -37,3 +45,6 @@ export const getCurrentAccount = async () => {
 export const logoutAccount = async () => {
   try { await request('/api/auth/logout', { method: 'POST' }); } finally { localStorage.removeItem(TOKEN_KEY); }
 };
+
+export const getAccountSessions = async () => (await request<{ sessions: AccountPracticeSession[] }>('/api/sessions')).sessions;
+export const saveAccountSession = async (session: Omit<AccountPracticeSession, 'id'>) => request<{ session: AccountPracticeSession }>('/api/sessions', { method: 'POST', body: JSON.stringify(session) });

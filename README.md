@@ -79,6 +79,8 @@ The account API runs separately from the Vite frontend during development.
 
 Run \`npm run server\` in one terminal and \`npm run dev\` in another. The frontend proxies \`/api\` requests to \`http://localhost:3001\`.
 
-The backend currently provides account registration, login, logout, the current-user endpoint, and authenticated practice-session endpoints. User data is stored in \`server/data.json\`, which is ignored by Git.
+The backend currently provides account registration, login, logout, the current-user endpoint, and authenticated practice-session endpoints. User data is stored in SQLite at \`server/zen-dictation.sqlite\`, which is ignored by Git. If an older \`server/data.json\` exists, it is migrated automatically on first start.
 
-New accounts are Free by default. Premium entitlement and one-time payment will be connected after the account flow is verified.
+New accounts are Free by default. Premium entitlement is granted only after a valid license key is activated; one-time payment will be connected later.
+
+For local license testing, start the API with a configured key, for example \`PREMIUM_LICENSE_KEYS=ZEN-DEMO-2026 npm run server\`. Users can enter that key from the Premium page without creating an account. In production, license keys should be created by the payment webhook rather than configured manually.
