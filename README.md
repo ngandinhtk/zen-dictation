@@ -1,4 +1,4 @@
-# React + TypeScript + Vite
+# Zen Dictation
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
@@ -73,14 +73,29 @@ export default defineConfig([
 ])
 
 ```
-## Account backend
+## Account and payment backend
 
 The account API runs separately from the Vite frontend during development.
 
-Run \`npm run server\` in one terminal and \`npm run dev\` in another. The frontend proxies \`/api\` requests to \`http://localhost:3001\`.
+Run \`npm run server\` in one terminal and \`npm run dev\` in another. The frontend proxies \`/api\` requests to \`http://localhost:3002\`.
 
 The backend currently provides account registration, login, logout, the current-user endpoint, and authenticated practice-session endpoints. User data is stored in SQLite at \`server/zen-dictation.sqlite\`, which is ignored by Git. If an older \`server/data.json\` exists, it is migrated automatically on first start.
 
-New accounts are Free by default. Premium entitlement is granted only after a valid license key is activated; one-time payment will be connected later.
+New accounts are Free by default. Premium entitlement is granted only after a valid license key is activated. The Premium payment screen now uses ZaloPay; the server creates orders and verifies ZaloPay callbacks before issuing a license.
 
 For local license testing, start the API with a configured key, for example \`PREMIUM_LICENSE_KEYS=ZEN-DEMO-2026 npm run server\`. Users can enter that key from the Premium page without creating an account. In production, license keys should be created by the payment webhook rather than configured manually.
+
+### ZaloPay configuration
+
+ZaloPay secrets must stay on the backend. Configure these environment variables before using the checkout:
+
+```text
+ZALOPAY_APP_ID=your_app_id
+ZALOPAY_KEY1=your_key1
+ZALOPAY_KEY2=your_key2
+ZALOPAY_CALLBACK_URL=https://your-public-api.example.com/api/payments/zalopay/callback
+PUBLIC_APP_URL=https://your-app.example.com
+PREMIUM_PRICE_VND=125000
+```
+
+Use ZaloPay Sandbox first. The callback URL must be reachable from ZaloPay; a localhost URL will not receive callbacks. After the user returns from ZaloPay, the backend stores the generated license against the payment order, ready for the payment-result screen or an email delivery step.

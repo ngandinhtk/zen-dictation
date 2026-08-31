@@ -142,6 +142,25 @@ function App() {
     };
   }, [isSettingsOpen]);
 
+  useEffect(() => {
+    if (!isAccountOpen) return;
+
+    const closeAccount = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.account-menu, .account-toggle')) setIsAccountOpen(false);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsAccountOpen(false);
+    };
+
+    document.addEventListener('mousedown', closeAccount);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeAccount);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isAccountOpen]);
+
   const resetStats = useCallback((nextTimeLimit = timeLimit) => {
     setCorrectChars(0);
     setTimeLeft(nextTimeLimit);
@@ -314,10 +333,20 @@ function App() {
   }
 
   if (isPaymentOpen) {
-    return <PaymentPage
-      onBack={closePaymentPage}
-      onLicenseClick={() => { closePaymentPage(); openPremiumDashboard(); }}
-    />;
+    if (isPremium) {
+      return <PremiumDashboard
+        isPremium={isPremium}
+        goalWpm={goalWpm}
+        bestWpm={bestWpm}
+        averageAccuracy={averageAccuracy}
+        practiceStreak={practiceStreak}
+        practiceHistory={practiceHistory}
+        onGoalChange={handleGoalChange}
+        onLicenseActivated={() => setIsPremium(true)}
+        onBack={closePaymentPage}
+      />;
+    }
+    return <PaymentPage onBack={closePaymentPage} onLicenseClick={() => { closePaymentPage(); openPremiumDashboard(); }} />;
   }
 
   const handleTypingChange = (nextValue: string) => {
@@ -351,7 +380,7 @@ function App() {
         onAccountToggle={() => setIsAccountOpen(open => !open)}
         onAuthenticated={user => { setAccountUser(user); setIsAccountOpen(false); }}
         onLoggedOut={() => setAccountUser(null)}
-        onPremiumOpen={openPaymentPage}
+        onPremiumOpen={isPremium ? openPremiumDashboard : openPaymentPage}
         onSettingsToggle={() => setIsSettingsOpen(open => !open)}
       />
       {showOnboarding && (
@@ -471,7 +500,7 @@ function App() {
         <Controls onReplay={handleSpeak} onNext={handleNext} />
         
       </main>
-      <footer className="app-footer"><p>Tip: Focus on the sounds, then the letters.</p></footer>
+      <footer className="app-footer"><p>Tip: Focus on the sounds, then the letters. Repeat three times for best results.</p></footer>
     </div>
   );
 }

@@ -249,7 +249,7 @@
   display: inline-flex;
   align-items: center;
   gap: .3rem;
-  margin-left: .6rem;
+  /* margin-left: .6rem; */
   color: var(--text-muted);
   cursor: pointer;
   font-family: var(--font-main);

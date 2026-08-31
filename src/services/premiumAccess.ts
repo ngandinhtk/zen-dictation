@@ -3,6 +3,12 @@ export interface PremiumEntitlement {
   source: 'license' | 'payment' | 'admin' | 'none';
 }
 
+export interface ZaloPayOrder {
+  orderUrl: string;
+  appTransId: string;
+  amount: number;
+}
+
 const DEVICE_KEY = 'zen-dictation-device-id';
 
 export const getDeviceId = () => {
@@ -13,12 +19,20 @@ export const getDeviceId = () => {
   return deviceId;
 };
 
-// Temporary local provider. Replace this implementation with an API-backed
-// provider when authentication and one-time payment are connected.
+const readApiResponse = async <T>(response: Response): Promise<T & { error?: string }> => {
+  const text = await response.text();
+  try {
+    return JSON.parse(text) as T & { error?: string };
+  } catch {
+    throw new Error('Cannot reach the Premium server. Start the backend on port 3002 and use the Vite dev server.');
+  }
+};
+
 export const getPremiumStatus = async (): Promise<PremiumEntitlement> => {
   const response = await fetch('/api/premium/status?deviceId=' + encodeURIComponent(getDeviceId()));
-  if (!response.ok) throw new Error('Premium status unavailable');
-  return response.json();
+  const result = await readApiResponse<PremiumEntitlement>(response);
+  if (!response.ok) throw new Error(result.error || 'Premium status unavailable');
+  return result;
 };
 
 export const activatePremiumLicense = async (licenseKey: string): Promise<PremiumEntitlement> => {
@@ -27,7 +41,18 @@ export const activatePremiumLicense = async (licenseKey: string): Promise<Premiu
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ licenseKey, deviceId: getDeviceId() }),
   });
-  const result = await response.json();
+  const result = await readApiResponse<PremiumEntitlement & { error?: string }>(response);
   if (!response.ok) throw new Error(result.error || 'Unable to activate license');
+  return result;
+};
+
+export const createZaloPayOrder = async (email = ''): Promise<ZaloPayOrder> => {
+  const response = await fetch('/api/payments/zalopay/create-order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, deviceId: getDeviceId() }),
+  });
+  const result = await readApiResponse<ZaloPayOrder & { error?: string }>(response);
+  if (!response.ok) throw new Error(result.error || 'Unable to start ZaloPay checkout');
   return result;
 };
