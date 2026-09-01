@@ -75,7 +75,7 @@ export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProp
 
   return <div className="payment-page">
     <header className="payment-header">
-      <button type="button" className="payment-back" onClick={onBack}>← Back to practice</button>
+      <button type="button" className="payment-back" onClick={onBack} aria-label="Back to practice" title="Back to practice">←</button>
       <span className="logo payment-logo">Zen Dictation</span>
     </header>
     <main className="payment-result-content">
@@ -116,7 +116,7 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
   if (isCheckoutOpen) {
     return <div className="payment-page">
       <header className="payment-header">
-        <button type="button" className="payment-back" onClick={() => setIsCheckoutOpen(false)}>← Back to pricing</button>
+        <button type="button" className="payment-back" onClick={() => setIsCheckoutOpen(false)} aria-label="Back to pricing" title="Back to pricing">←</button>
         <span className="logo payment-logo">Zen Dictation</span>
       </header>
       <main className="checkout-content">
@@ -138,7 +138,7 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
   return (
   <div className="payment-page">
     <header className="payment-header">
-      <button type="button" className="payment-back" onClick={onBack}>← Back to practice</button>
+      <button type="button" className="payment-back" onClick={onBack} aria-label="Back to practice" title="Back to practice">←</button>
       <span className="logo payment-logo">Zen Dictation</span>
     </header>
     <main className="payment-content">

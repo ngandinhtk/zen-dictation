@@ -9,6 +9,7 @@ import './App.css';
 import SAMPLE_SENTENCES, { VOCABULARY_SENTENCES, type Difficulty } from './components/Stats/SampleSentence';
 import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
 import { getDueReviewWords, getReviewSummary, recordWordAttempt } from './services/spacedRepetitionService';
+import { addPoints, getPoints, PERFECT_SENTENCE_POINTS } from './services/pointsService';
 import { getGoalWpm, getPracticeHistory, getPracticeStreak, saveGoalWpm, savePracticeSession, type PracticeSession } from './services/premiumService';
 import PremiumDashboard from './components/PremiumDashboard/PremiumDashboard';
 import { getPremiumStatus } from './services/premiumAccess';
@@ -53,6 +54,8 @@ function App() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [lastAttempt, setLastAttempt] = useState<AttemptAnalysis | null>(null);
   const [reviewSummary, setReviewSummary] = useState(getReviewSummary);
+  const [points, setPoints] = useState(getPoints);
+  // const [rewardMessage, setRewardMessage] = useState('');
   const [key, setKey] = useState(0);
   const [correctChars, setCorrectChars] = useState(0);
   const [timeLimit, setTimeLimit] = useState(DEFAULT_TIME_LIMIT);
@@ -68,6 +71,8 @@ function App() {
   const [isPremiumOpen, setIsPremiumOpen] = useState(() => window.location.hash === '#premium');
   const [isPaymentOpen, setIsPaymentOpen] = useState(() => window.location.hash === '#payment');
   const [isPaymentResultOpen, setIsPaymentResultOpen] = useState(() => window.location.hash === '#payment-result');
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [focusTimeLeft, setFocusTimeLeft] = useState(20 * 60);
   const [goalWpm, setGoalWpm] = useState(getGoalWpm);
   const [practiceHistory, setPracticeHistory] = useState<PracticeSession[]>(getPracticeHistory);
   const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('zen-dictation-onboarding-seen') !== 'true');
@@ -93,9 +98,32 @@ function App() {
     window.history.pushState({}, '', window.location.pathname + window.location.search);
     setIsPaymentResultOpen(false);
   };
+  const startFocusSession = (durationMinutes: number) => {
+    if (!isPremium) {
+      openPaymentPage();
+      return;
+    }
+    setFocusTimeLeft(durationMinutes * 60);
+    setIsFocusMode(true);
+    setIsPremiumOpen(false);
+    setIsSettingsOpen(false);
+    setIsAccountOpen(false);
+    window.history.pushState({}, '', '#focus');
+  };
+  const exitFocusMode = () => {
+    setIsFocusMode(false);
+    window.history.pushState({}, '', window.location.pathname + window.location.search);
+  };
   const speakTimeoutRef = useRef<number | null>(null);
   const timeUpSoundPlayedRef = useRef(false);
   const sentenceDecksRef = useRef<Record<string, number[]>>({});
+  const focusSessionComplete = isFocusMode && focusTimeLeft === 0;
+
+  useEffect(() => {
+    if (!isFocusMode || focusTimeLeft <= 0) return;
+    const timer = window.setTimeout(() => setFocusTimeLeft(value => Math.max(value - 1, 0)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [isFocusMode, focusTimeLeft]);
 
   const sentencePool = practiceFocus === 'vocabulary' ? VOCABULARY_SENTENCES[LANG][difficulty] : SAMPLE_SENTENCES[LANG][difficulty];
   const currentSentence = sentencePool[currentIndex] || sentencePool[0];
@@ -341,6 +369,13 @@ function App() {
     setIsCompleted(true);
   };
 
+  const handlePerfectComplete = (completedText = currentSentence, correctCharacters = currentSentence.length) => {
+    setPoints(addPoints(PERFECT_SENTENCE_POINTS));
+    // setRewardMessage(`+${PERFECT_SENTENCE_POINTS} points · Perfect sentence`);
+    if (isPremium) handlePremiumComplete(completedText, correctCharacters);
+    else setIsCompleted(true);
+  };
+
   const handlePremiumFinish = (completedText: string, correctCharacters: number, isCorrect: boolean) => {
     if (!isCorrect) recordPremiumSession(completedText, correctCharacters);
   };
@@ -372,6 +407,7 @@ function App() {
       practiceHistory={practiceHistory}
       onGoalChange={handleGoalChange}
       onLicenseActivated={() => setIsPremium(true)}
+      onStartFocus={startFocusSession}
       onBack={closePremiumDashboard}
     />;
   }
@@ -391,6 +427,7 @@ function App() {
         practiceHistory={practiceHistory}
         onGoalChange={handleGoalChange}
         onLicenseActivated={() => setIsPremium(true)}
+        onStartFocus={startFocusSession}
         onBack={closePaymentPage}
       />;
     }
@@ -419,8 +456,8 @@ function App() {
   };
 
   return (
-    <div className="app-layout">
-      <Header
+    <div className={`app-layout ${isFocusMode ? 'focus-mode' : ''}`}>
+      {!isFocusMode && <Header
         accountUser={accountUser}
         isAccountOpen={isAccountOpen}
         isPremium={isPremium}
@@ -431,15 +468,15 @@ function App() {
         onLoggedOut={() => setAccountUser(null)}
         onPremiumOpen={isPremium ? openPremiumDashboard : openPaymentPage}
         onSettingsToggle={() => setIsSettingsOpen(open => !open)}
-      />
-      {showOnboarding && (
+      />}
+      {!isFocusMode && showOnboarding && (
         <section className="onboarding-card" aria-label="How to practice">
           <div><span className="premium-kicker">Welcome to Zen Dictation</span><h2>Three quiet steps to better listening.</h2><p>Listen, type what you hear, then use the feedback to improve your accuracy and speed.</p></div>
           <div className="onboarding-steps"><span><b>1</b> Listen</span><span><b>2</b> Type</span><span><b>3</b> Improve</span></div>
           <button type="button" onClick={() => { localStorage.setItem('zen-dictation-onboarding-seen', 'true'); setShowOnboarding(false); }}>Start practicing</button>
         </section>
       )}
-      {isPremiumOpen && (
+      {!isFocusMode && isPremiumOpen && (
         <section className="premium-panel" aria-label="Premium features">
           {isPremium ? (
             <>
@@ -468,7 +505,7 @@ function App() {
           )}
         </section>
       )}
-      {isSettingsOpen && (
+      {!isFocusMode && isSettingsOpen && (
         <section id="settings-menu" className="settings-panel" aria-label="Settings">
           <label className="settings-field">
             <span>Level</span>
@@ -515,6 +552,8 @@ function App() {
           </div>
         </section>
       )}
+      {isFocusMode && <div className="focus-toolbar"><span><b>Focus mode</b><small>Distraction-free practice</small></span><strong>{Math.floor(focusTimeLeft / 60)}:{String(focusTimeLeft % 60).padStart(2, '0')}</strong><button type="button" onClick={exitFocusMode}>Exit focus</button></div>}
+      {isFocusMode && focusSessionComplete && <section className="focus-summary" role="status"><span className="premium-kicker">Session complete</span><h2>Well done. You stayed focused.</h2><p>You practiced for this session with {typingSpeed.toFixed(1)} WPM on the last attempt.</p><button type="button" className="action-btn next" onClick={exitFocusMode}>Back to practice</button></section>}
       <main className="app-content">
         <div className="stats-row">
           <div className="time-limit-control" ><span className="stat-label">Typing speed</span><strong>{typingSpeed.toFixed(1)} WPM</strong></div>
@@ -528,6 +567,7 @@ function App() {
             <strong>{hasStartedTyping ? (isUnlimitedTime ? 'No time limit' : `${timeLeft}s left`) : 'Waiting...'}</strong>
           
           </div>
+          <div className="points-stat"><span className="stat-label">Points</span><strong>{points}</strong><small></small></div>
         </div>
       
          {/* <div className="status-badge">{isCompleted ? '🎉 Done! Perfect!' : '🎧 Listen and type...' }</div> */}
@@ -536,8 +576,9 @@ function App() {
            <>
                 <span aria-hidden="true">⏰</span> <strong>Time’s up</strong> — Hit Reset Timer to try again.
             </>
-           ) : isCompleted ? '🎉 Done! Perfect!' : '🎧 Listen and type...'}
+           ) : isCompleted ? '🎉 Done! +10 points perfect sentence' : '🎧 Listen and type...'}
         </div>
+        {/* {rewardMessage && <div className="point-reward" role="status" aria-live="polite">✦ {rewardMessage}</div>} */}
      
         {/* {isCompleted && isTimeUp && (
           <div className="completion-notice" role="status">
@@ -557,7 +598,7 @@ function App() {
                Reset Timer
            </button>
        
-        <DictationArea key={key} targetText={currentSentence} onComplete={isPremium ? handlePremiumComplete : () => setIsCompleted(true)} onFinish={handleAttemptFinish} onNext={handleNext} onTypingChange={handleTypingChange} isHidden={isSentenceHidden} disabled={isTimeUp} />
+        <DictationArea key={key} targetText={currentSentence} onComplete={handlePerfectComplete} onFinish={handleAttemptFinish} onNext={handleNext} onTypingChange={handleTypingChange} isHidden={isSentenceHidden} disabled={isTimeUp || (isFocusMode && focusSessionComplete)} />
           <button type="button" className="visibility-toggle" onClick={() => setIsSentenceHidden(prev => !prev)} aria-pressed={isSentenceHidden}>
           {isSentenceHidden ? 'Show sentence' : 'Hide sentence'}
         </button>
@@ -571,7 +612,7 @@ function App() {
         <Controls onReplay={handleSpeak} onNext={handleNext} />
         
       </main>
-      <footer className="app-footer"><p>Tip: Focus on the sounds, then the letters. Repeat three times for best results.</p></footer>
+      {!isFocusMode && <footer className="app-footer"><p>Tip: Focus on the sounds, then the letters. Repeat three times for best results.</p></footer>}
     </div>
   );
 }

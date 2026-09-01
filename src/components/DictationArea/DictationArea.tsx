@@ -16,6 +16,7 @@ interface DictationAreaProps {
 const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, onFinish, onNext, onTypingChange, isHidden = false, disabled = false }) => {
   const [userInput, setUserInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const perfectAttemptAwarded = useRef(false);
   const feedback = useMemo(() => getFeedback(targetText, userInput), [targetText, userInput]);
   const wordGroups = useMemo(() => {
     const groups: CharFeedback[][] = [];
@@ -58,7 +59,8 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
     setUserInput(value);
     onTypingChange?.(value);
 
-    if (value.length === targetText.length && value.toLowerCase() === targetText.toLowerCase()) {
+    if (value.length === targetText.length && value.toLowerCase() === targetText.toLowerCase() && !perfectAttemptAwarded.current) {
+      perfectAttemptAwarded.current = true;
       onComplete(value, targetText.length);
     }
   };
