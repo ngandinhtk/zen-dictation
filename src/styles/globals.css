@@ -72,7 +72,26 @@ body {
 
 /* Minimalist Focus Ring */
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
   outline: 1.5px solid var(--accent-color);
   outline-offset: 3px;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button,
+a,
+select,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgba(141, 110, 161, .22);
 }

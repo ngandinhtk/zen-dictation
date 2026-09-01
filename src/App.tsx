@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { speechService } from './services/speechService';
 import { soundService } from './services/soundService';
-import type { VoiceLanguage } from './services/speechService';
+import type { SpeechStatus, VoiceLanguage } from './services/speechService';
 import DictationArea from './components/DictationArea/DictationArea';
 import Controls from './components/Controls/Controls';
 import './styles/globals.css';
@@ -12,7 +12,7 @@ import PremiumDashboard from './components/PremiumDashboard/PremiumDashboard';
 import { getPremiumStatus } from './services/premiumAccess';
 import { getAccountSessions, getCurrentAccount, saveAccountSession, type AccountUser } from './services/accountService';
 import Header from './components/Header/Header';
-import PaymentPage from './components/PaymentPage/PaymentPage';
+import PaymentPage, { PaymentResultPage } from './components/PaymentPage/PaymentPage';
 
 const DEFAULT_TIME_LIMIT = 30;
 const LANG: VoiceLanguage = 'en-US';
@@ -44,6 +44,7 @@ function App() {
   const [currentIndex, setCurrentIndex] = useState(() => getRandomSentenceIndex(DEFAULT_DIFFICULTY));
   const [speed, setSpeed] = useState(1);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voiceStatus, setVoiceStatus] = useState<SpeechStatus>(() => speechService.getStatus());
   const [selectedVoice, setSelectedVoice] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
   const [key, setKey] = useState(0);
@@ -60,6 +61,7 @@ function App() {
   const [isPremium, setIsPremium] = useState(false);
   const [isPremiumOpen, setIsPremiumOpen] = useState(() => window.location.hash === '#premium');
   const [isPaymentOpen, setIsPaymentOpen] = useState(() => window.location.hash === '#payment');
+  const [isPaymentResultOpen, setIsPaymentResultOpen] = useState(() => window.location.hash === '#payment-result');
   const [goalWpm, setGoalWpm] = useState(getGoalWpm);
   const [practiceHistory, setPracticeHistory] = useState<PracticeSession[]>(getPracticeHistory);
   const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('zen-dictation-onboarding-seen') !== 'true');
@@ -81,6 +83,10 @@ function App() {
     window.history.pushState({}, '', window.location.pathname + window.location.search);
     setIsPaymentOpen(false);
   };
+  const closePaymentResult = () => {
+    window.history.pushState({}, '', window.location.pathname + window.location.search);
+    setIsPaymentResultOpen(false);
+  };
   const speakTimeoutRef = useRef<number | null>(null);
   const timeUpSoundPlayedRef = useRef(false);
   const sentenceDecksRef = useRef<Record<Difficulty, number[]>>({ easy: [], medium: [], hard: [] });
@@ -101,7 +107,12 @@ function App() {
       setSelectedVoice(current => current || availableVoices.find(voice => voice.name === 'Google US English')?.name || '');
     };
     updateVoices();
-    return speechService.subscribeToVoices(updateVoices);
+    const unsubscribeVoices = speechService.subscribeToVoices(updateVoices);
+    const unsubscribeStatus = speechService.subscribeToStatus(setVoiceStatus);
+    return () => {
+      unsubscribeVoices();
+      unsubscribeStatus();
+    };
   }, []);
 
   useEffect(() => {
@@ -244,7 +255,8 @@ function App() {
   const handleNext = () => {
     setCurrentIndex(getNextSentenceIndex(difficulty, currentIndex));
     setIsCompleted(false);
-    setIsTimeUp(!isUnlimitedTime && timeLeft === 0);
+    setIsTimeUp(false);
+    resetStats(isUnlimitedTime ? 0 : timeLimit);
     setKey(prev => prev + 1);
   };
 
@@ -257,7 +269,8 @@ function App() {
     setDifficulty(nextDifficulty);
     setCurrentIndex(getNextSentenceIndex(nextDifficulty));
     setIsCompleted(false);
-    setIsTimeUp(!isUnlimitedTime && timeLeft === 0);
+    setIsTimeUp(false);
+    resetStats(isUnlimitedTime ? 0 : timeLimit);
     setKey(prev => prev + 1);
   };
 
@@ -330,6 +343,10 @@ function App() {
       onLicenseActivated={() => setIsPremium(true)}
       onBack={closePremiumDashboard}
     />;
+  }
+
+  if (isPaymentResultOpen) {
+    return <PaymentResultPage onBack={closePaymentResult} onActivated={() => { setIsPaymentResultOpen(false); openPremiumDashboard(); }} />;
   }
 
   if (isPaymentOpen) {
@@ -431,10 +448,13 @@ function App() {
           </label>
           <label className="settings-field">
             <span>Voice</span>
-            <select value={selectedVoice} onChange={event => setSelectedVoice(event.target.value)} disabled={voices.length === 0}>
+            <select value={selectedVoice} onChange={event => setSelectedVoice(event.target.value)} disabled={voiceStatus === 'unsupported'}>
               <option value="">Browser default voice</option>
               {voices.map(voice => <option key={`${voice.name}-${voice.voiceURI}`} value={voice.name}>{voice.name}</option>)}
             </select>
+            <small className={`voice-status voice-status-${voiceStatus}`} role="status">
+              {voiceStatus === 'loading' ? 'Loading voices…' : voiceStatus === 'unsupported' ? 'Speech unavailable' : voiceStatus === 'speaking' ? 'Speaking' : voiceStatus === 'error' ? 'Try Again' : 'Ready'}
+            </small>
           </label>
           <div className="settings-field settings-speed-field">
             <span>speed</span>

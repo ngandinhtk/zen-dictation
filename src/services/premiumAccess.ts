@@ -9,6 +9,12 @@ export interface ZaloPayOrder {
   amount: number;
 }
 
+export interface ZaloPayPaymentStatus {
+  status: 'pending' | 'paid';
+  amount: number;
+  licenseKey: string | null;
+}
+
 const DEVICE_KEY = 'zen-dictation-device-id';
 
 export const getDeviceId = () => {
@@ -54,5 +60,12 @@ export const createZaloPayOrder = async (email = ''): Promise<ZaloPayOrder> => {
   });
   const result = await readApiResponse<ZaloPayOrder & { error?: string }>(response);
   if (!response.ok) throw new Error(result.error || 'Unable to start ZaloPay checkout');
+  return result;
+};
+
+export const getZaloPayPaymentStatus = async (appTransId: string): Promise<ZaloPayPaymentStatus> => {
+  const response = await fetch('/api/payments/zalopay/status?appTransId=' + encodeURIComponent(appTransId) + '&deviceId=' + encodeURIComponent(getDeviceId()));
+  const result = await readApiResponse<ZaloPayPaymentStatus & { error?: string }>(response);
+  if (!response.ok) throw new Error(result.error || 'Unable to check payment status');
   return result;
 };

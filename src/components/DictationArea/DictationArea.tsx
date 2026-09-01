@@ -35,7 +35,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
     return groups;
   }, [feedback]);
   const isComplete = userInput.length === targetText.length && userInput.toLowerCase() === targetText.toLowerCase();
-  const isFinished = userInput.length === targetText.length;
+  const hasInput = userInput.length > 0;
   const shouldHidePrompt = isHidden && !isComplete;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,7 +73,9 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
       return;
     }
 
-    if (isFinished && onNext) {
+    // Enter submits the attempt even when it is incomplete or contains typos.
+    // An empty attempt is ignored so an accidental Enter does not skip a sentence.
+    if (hasInput && onNext) {
       e.preventDefault();
       onFinish?.(userInput, feedback.filter(item => item.status === 'correct').length, isComplete);
       if (isComplete) soundService.playSuccess();
