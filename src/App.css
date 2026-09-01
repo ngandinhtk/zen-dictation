@@ -24,7 +24,7 @@
   position: absolute;
   z-index: 10;
   top: calc(3rem + 2.5rem);
-  right: max(2rem, calc((100vw - 800px) / 2));
+  right: clamp(1rem, 4vw, 3rem);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -76,6 +76,19 @@
 .voice-status-speaking { color: var(--correct-color); }
 .voice-status-error { color: var(--incorrect-color); }
 .review-status { width: 100%; margin-left: .2rem; color: var(--text-muted); font-size: .6rem; letter-spacing: normal; text-transform: none; }
+.review-words { width: 100%; margin: .15rem 0 .1rem; padding: .7rem; border: 1px solid var(--border-color); border-radius: 10px; background: var(--hover-bg); }
+.review-words-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .45rem; font-size: .68rem; }
+.review-words-heading small, .review-words-more { color: var(--text-muted); font-size: .58rem; font-weight: 400; }
+.review-words-list { display: flex; flex-direction: column; gap: .35rem; }
+.review-word { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; font-size: .65rem; }
+.review-word strong { color: var(--text-color); font-family: var(--font-mono); font-weight: 500; }
+.review-word span { color: var(--text-muted); font-size: .58rem; text-align: right; }
+.review-due-button { padding: 0; border: 0; background: transparent; color: var(--accent-color); cursor: pointer; font-size: .58rem; text-align: right; }
+.review-due-button:hover { color: var(--text-color); text-decoration: underline; }
+.review-words-more { display: block; margin-top: .45rem; }
+.review-words-button { align-self: flex-start; margin-top: .65rem; padding: .35rem .55rem; border: 1px solid var(--border-color); border-radius: 999px; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .62rem; }
+.review-words-button:hover { border-color: var(--accent-color); color: var(--text-color); }
+.settings-panel .review-words { display: none; }
 
 .settings-speed-field {
   gap: 0.65rem;
@@ -315,8 +328,8 @@
   .settings-panel {
     top: calc(3rem + 2.5rem);
     right: 1rem;
-    left: 1rem;
-    width: auto;
+    left: auto;
+    width: min(320px, calc(100vw - 2rem));
     flex-direction: column;
     align-items: center;
   }
@@ -411,6 +424,15 @@
 .attempt-summary { text-align: center !important; display: flex; align-items: center; flex-wrap: wrap; width: min(100%, 540px); gap: .65rem; margin: .8rem 0 1rem; padding: .45rem .7rem; border: 1px solid var(--border-color); border-radius: 14px; background: var(--hover-bg); color: var(--text-muted); font-size: .65rem; animation: feedbackPop .25s ease-out; }
 .attempt-summary strong { color: var(--accent-color); font-family: var(--font-mono); font-size: .68rem; }
 .attempt-summary small { display: block; flex-basis: 100%; width: 100%; max-width: 100%; color: var(--text-muted); font-size: .62rem; }
+.review-note-editor { display: flex; flex-basis: 100%; flex-direction: column; align-items: stretch; gap: .35rem; margin-top: .35rem; text-align: left; }
+.review-note-editor label { color: var(--text-color); font-size: .65rem; }
+.review-note-editor label small { display: inline; margin-left: .35rem; color: var(--text-muted); font-size: .58rem; }
+.review-note-editor textarea { width: 100%; min-height: 3.2rem; padding: .5rem .6rem; resize: vertical; border: 1px solid var(--border-color); border-radius: 8px; outline: none; background: var(--bg-color); color: var(--text-color); font: inherit; font-size: .65rem; }
+.review-note-editor textarea:focus { border-color: var(--accent-color); }
+.review-note-editor button { align-self: flex-start; padding: .35rem .6rem; border: 1px solid var(--border-color); border-radius: 999px; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .6rem; }
+.review-note-editor button:hover:not(:disabled) { border-color: var(--accent-color); color: var(--text-color); }
+.review-note-editor button:disabled { cursor: not-allowed; opacity: .45; }
+.review-note-editor > span { color: var(--correct-color); font-size: .6rem; }
 
 .reset-timer-btn { margin: 0 0 .4rem; padding: .5rem .85rem; }
 
@@ -428,7 +450,7 @@
 .visibility-toggle { margin: .8rem 0 .6rem; padding: .45rem .75rem; border-radius: 999px; }
 .visibility-toggle:hover { background: var(--hover-bg); }
 .controls-container { gap: 1.1rem; }
-.main-actions { width: min(100%, 500px); gap: .7rem; }
+.main-actions { width: min(100%, 500px); gap: .7rem; margin-top:10px }
 .action-btn { flex: 1; min-height: 2.7rem; padding: .6rem 1rem; }
 
 .onboarding-card {
@@ -572,7 +594,7 @@
   letter-spacing: 0.08em;
   cursor: pointer;
   padding: 0.25rem 0.5rem;
-  margin-bottom: 1rem;
+  /* margin-bottom: 1rem; */
   transition: color 0.2s, opacity 0.2s;
   opacity: 0.7;
 }

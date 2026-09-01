@@ -36,11 +36,11 @@ const LicenseActivation = ({ onActivated }: { onActivated: () => void }) => {
   return <form className="license-form" onSubmit={handleSubmit}><label>Premium license key<input value={licenseKey} onChange={event => setLicenseKey(event.target.value)} placeholder="ZEN-XXXX-XXXX" autoComplete="off" required /></label>{error && <p className="license-error" role="alert">{error}</p>}<button type="submit" className="dashboard-cta" disabled={isLoading}>{isLoading ? 'Checking key…' : 'Unlock Premium'}</button></form>;
 };
 
-const FocusLauncher = ({ onStartFocus }: { onStartFocus: (durationMinutes: number) => void }) => {
+const FocusLauncher = ({ isPremium, onStartFocus }: { isPremium: boolean; onStartFocus: (durationMinutes: number) => void }) => {
   const [duration, setDuration] = useState(20);
   return <section className="dashboard-card focus-launcher">
     <div><span className="premium-kicker">Focus mode</span><h2>Make space for better listening.</h2><p>Hide distractions and practice in one calm, timed session.</p></div>
-    <div className="focus-launcher-actions"><select value={duration} onChange={event => setDuration(Number(event.target.value))} aria-label="Focus session duration"><option value="10">10 minutes</option><option value="20">20 minutes</option><option value="30">30 minutes</option></select><button type="button" className="dashboard-cta" onClick={() => onStartFocus(duration)}>Start focus session</button></div>
+    <div className="focus-launcher-actions"><select value={duration} onChange={event => setDuration(Number(event.target.value))} aria-label="Focus session duration"><option value="10">10 minutes</option><option value="20">20 minutes</option><option value="30">30 minutes</option></select><button type="button" className="dashboard-cta" onClick={() => onStartFocus(duration)}>{isPremium ? 'Start focus session' : 'Unlock focus mode'}</button></div>
   </section>;
 };
 
@@ -61,7 +61,7 @@ const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practi
           <div><span>Current streak</span><strong>{practiceStreak}<small> days</small></strong><em>Keep the habit going</em></div>
         </section>
         <section className="dashboard-card goal-card"><div><span className="premium-kicker">Your next milestone</span><h2>Build your speed steadily</h2><p>Choose a target that feels challenging but achievable.</p><div className="goal-progress" role="progressbar" aria-label="Progress toward WPM goal" aria-valuemin={0} aria-valuemax={goalWpm} aria-valuenow={Math.min(bestWpm, goalWpm)}><span style={{ width: String(Math.min((bestWpm / Math.max(goalWpm, 1)) * 100, 100)) + '%' }} /></div><small className="goal-progress-label">{bestWpm ? String(bestWpm) + ' of ' + String(goalWpm) + ' WPM' : 'Set your first record · Goal ' + String(goalWpm) + ' WPM'}</small></div><label>Target WPM <input type="number" min="10" max="200" value={goalWpm} onChange={onGoalChange} /></label></section>
-        <FocusLauncher onStartFocus={onStartFocus} />
+        <FocusLauncher isPremium={isPremium} onStartFocus={onStartFocus} />
         <section className="dashboard-card"><div className="section-title"><h2>Recent sessions</h2><span>Last 30 results</span></div>{practiceHistory.length === 0 ? <p className="dashboard-empty">Complete a practice sentence to see your progress here.</p> : <div className="dashboard-history">{practiceHistory.map(session => <div className="dashboard-history-row" key={session.id}><span>{new Date(session.date).toLocaleDateString()} · {session.difficulty}</span><strong>{session.wpm} WPM</strong><span>{session.accuracy}% accuracy</span></div>)}</div>}</section>
       </main>
     ) : (
@@ -73,6 +73,7 @@ const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practi
           <div><span>◎</span><h2>Set personal goals</h2><p>Choose a WPM target that keeps your daily practice moving.</p></div>
           <div><span>✦</span><h2>Unlock Hard level</h2><p>Challenge yourself with longer and more complex sentences.</p></div>
         </section>
+        <FocusLauncher isPremium={isPremium} onStartFocus={onStartFocus} />
         <LicenseActivation onActivated={onLicenseActivated} />
         <small className="dashboard-note">One-time unlock · No account required</small>
       </main>

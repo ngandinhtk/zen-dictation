@@ -9,27 +9,35 @@ interface HeaderProps {
   isPremium: boolean;
   isPremiumOpen: boolean;
   isSettingsOpen: boolean;
+  isReviewOpen: boolean;
   onAccountToggle: () => void;
   onAuthenticated: (user: AccountUser) => void;
   onLoggedOut: () => void;
   onPremiumOpen: () => void;
   onSettingsToggle: () => void;
+  onReviewOpen: () => void;
 }
 
-const Header = ({ accountUser, isAccountOpen, isPremium, isPremiumOpen, isSettingsOpen, onAccountToggle, onAuthenticated, onLoggedOut, onPremiumOpen, onSettingsToggle }: HeaderProps) => (
+const Header = ({ accountUser, isAccountOpen, isPremium, isPremiumOpen, isSettingsOpen, isReviewOpen, onAccountToggle, onAuthenticated, onLoggedOut, onPremiumOpen, onSettingsToggle, onReviewOpen }: HeaderProps) => (
   <>
     <header className="app-header">
       <h1 className="logo">Zen Dictation</h1>
       <nav className="header-nav" aria-label="Primary navigation">
-        <a href="#account" className="account-toggle" onClick={event => { event.preventDefault(); onAccountToggle(); }} aria-expanded={isAccountOpen} aria-controls="account-menu">
-           {accountUser ? accountUser.email.split('@')[0] : 'Account'}
-        </a> 
-        <a href="#payment" className={'premium-toggle ' + (isPremium ? 'active' : '')} onClick={event => { event.preventDefault(); onPremiumOpen(); }} aria-expanded={isPremiumOpen}>
+        <a href="#review" className="review-toggle" onClick={event => { event.preventDefault(); onReviewOpen(); }} aria-expanded={isReviewOpen} aria-controls="review-page">
+          <span aria-hidden="true" style={{ color: '#4479a7' }}>✦</span> Review words
+        </a>
+           <a href="#payment" className={'premium-toggle ' + (isPremium ? 'active' : '')} onClick={event => { event.preventDefault(); onPremiumOpen(); }} aria-expanded={isPremiumOpen}>
           <span aria-hidden="true" style={{ color: '#1aac93c4' }}>✦</span> {isPremium ? 'Premium' : 'Unlock Premium'}
         </a>
+        
         <a href="#settings" className="settings-toggle" onClick={event => { event.preventDefault(); onSettingsToggle(); }} aria-expanded={isSettingsOpen} aria-controls="settings-menu">
-          <span aria-hidden="true" style={{ color: '#bb54ebbb' }} >⚙</span> Settings
+          <span aria-hidden="true"  >⚙</span> Settings
         </a>
+     
+       <a href="#account" className="account-toggle" onClick={event => { event.preventDefault(); onAccountToggle(); }} aria-expanded={isAccountOpen} aria-controls="account-menu">
+           {accountUser ? accountUser.email.split('@')[0] : 'Account'}
+        </a>  
+    
       </nav>
     </header>
     {isAccountOpen && (

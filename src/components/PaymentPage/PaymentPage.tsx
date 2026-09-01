@@ -153,11 +153,12 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
         <div className="price"><del>$19</del><strong>$3</strong><span>one-time</span></div>
         <span className="discount-badge">Save $16 · Limited offer</span>
         <ul className="price-features">
-          <li>Unlock Hard level</li>
+          <li>Unlock Medium and Hard level</li>
           <li>Personal progress dashboard</li>
           <li>Practice history and accuracy tracking</li>
           <li>Daily WPM goals and learning streaks</li>
           <li>No recurring subscription</li>
+          <li>Focus-Mode Accessible </li>
         </ul>
         <button type="button" className="checkout-button" onClick={() => setIsCheckoutOpen(true)}>Continue to checkout</button>
         <button type="button" className="license-button" onClick={onLicenseClick}>Already have a license key?</button>

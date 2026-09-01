@@ -1,13 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
   <title id="title">Zen Dictation</title>
   <defs>
-    <linearGradient id="background" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+    <linearGradient id="zenGradient" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
       <stop stop-color="#927dc0"/>
-      <stop offset="0.48" stop-color="#4479a7"/>
+      <stop offset="0.52" stop-color="#4479a7"/>
       <stop offset="1" stop-color="#71bd9c"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="18" fill="url(#background)"/>
-  <rect x="24" y="13" width="16" height="27" rx="8" fill="#fff"/>
-  <path d="M18 31a14 14 0 0 0 28 0M32 45v7M25 52h14" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="64" height="64" rx="18" fill="url(#zenGradient)"/>
+  <path d="M17 17h30v7L28 40h19v7H17v-7l19-16H17v-7Z" fill="#fff"/>
 </svg>

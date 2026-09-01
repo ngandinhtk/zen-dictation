@@ -8,10 +8,11 @@ import './styles/globals.css';
 import './App.css';
 import SAMPLE_SENTENCES, { VOCABULARY_SENTENCES, type Difficulty } from './components/Stats/SampleSentence';
 import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
-import { getDueReviewWords, getReviewSummary, recordWordAttempt } from './services/spacedRepetitionService';
+import { addReviewWord, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, saveReviewNoteForAttempt, type ReviewWord } from './services/spacedRepetitionService';
 import { addPoints, getPoints, PERFECT_SENTENCE_POINTS } from './services/pointsService';
 import { getGoalWpm, getPracticeHistory, getPracticeStreak, saveGoalWpm, savePracticeSession, type PracticeSession } from './services/premiumService';
 import PremiumDashboard from './components/PremiumDashboard/PremiumDashboard';
+import ReviewPage from './components/ReviewPage/ReviewPage';
 import { getPremiumStatus } from './services/premiumAccess';
 import { getAccountSessions, getCurrentAccount, saveAccountSession, type AccountUser } from './services/accountService';
 import Header from './components/Header/Header';
@@ -53,7 +54,13 @@ function App() {
   const [selectedVoice, setSelectedVoice] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
   const [lastAttempt, setLastAttempt] = useState<AttemptAnalysis | null>(null);
-  const [reviewSummary, setReviewSummary] = useState(getReviewSummary);
+  const [reviewSummary, setReviewSummary] = useState<ReturnType<typeof getReviewSummary>>(() => getReviewSummary());
+  const [reviewWords, setReviewWords] = useState<ReviewWord[]>(getReviewWords);
+  const [reviewNow] = useState(() => Date.now());
+  const [lastAttemptText, setLastAttemptText] = useState('');
+  const [lastAttemptTargetText, setLastAttemptTargetText] = useState('');
+  const [reviewNote, setReviewNote] = useState('');
+  const [isReviewNoteSaved, setIsReviewNoteSaved] = useState(false);
   const [points, setPoints] = useState(getPoints);
   // const [rewardMessage, setRewardMessage] = useState('');
   const [key, setKey] = useState(0);
@@ -72,6 +79,8 @@ function App() {
   const [isPaymentOpen, setIsPaymentOpen] = useState(() => window.location.hash === '#payment');
   const [isPaymentResultOpen, setIsPaymentResultOpen] = useState(() => window.location.hash === '#payment-result');
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [isReviewOpen, setIsReviewOpen] = useState(() => window.location.hash === '#review');
+  const [reviewWord, setReviewWord] = useState<string | undefined>();
   const [focusTimeLeft, setFocusTimeLeft] = useState(20 * 60);
   const [goalWpm, setGoalWpm] = useState(getGoalWpm);
   const [practiceHistory, setPracticeHistory] = useState<PracticeSession[]>(getPracticeHistory);
@@ -100,6 +109,7 @@ function App() {
   };
   const startFocusSession = (durationMinutes: number) => {
     if (!isPremium) {
+      setIsPremiumOpen(false);
       openPaymentPage();
       return;
     }
@@ -114,9 +124,49 @@ function App() {
     setIsFocusMode(false);
     window.history.pushState({}, '', window.location.pathname + window.location.search);
   };
+  const openReviewPage = (word?: string) => {
+    window.history.pushState({}, '', '#review');
+    setIsSettingsOpen(false);
+    setReviewWord(word);
+    setIsReviewOpen(true);
+  };
+  const closeReviewPage = () => {
+    window.history.pushState({}, '', window.location.pathname + window.location.search);
+    setReviewWord(undefined);
+    setIsReviewOpen(false);
+  };
+  const handleAddReviewWord = (word: string) => {
+    const nextWords = addReviewWord(word);
+    setReviewWords(nextWords.filter(review => review.mistakes > 0));
+    setReviewSummary(getReviewSummary());
+  };
+  const startDueWordPractice = (word: string) => {
+    const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const wordPattern = new RegExp(`\\b${escapedWord}\\b`, 'i');
+    const availableDifficulties: Difficulty[] = isPremium ? ['easy', 'medium', 'hard'] : ['easy'];
+    const matchingDifficulty = availableDifficulties.find(level => {
+      const pool = practiceFocus === 'vocabulary' ? VOCABULARY_SENTENCES[LANG][level] : SAMPLE_SENTENCES[LANG][level];
+      return pool.some(sentence => wordPattern.test(sentence));
+    });
+    const nextDifficulty = matchingDifficulty || difficulty;
+    const nextPool = practiceFocus === 'vocabulary' ? VOCABULARY_SENTENCES[LANG][nextDifficulty] : SAMPLE_SENTENCES[LANG][nextDifficulty];
+    const matchingIndex = nextPool.findIndex(sentence => wordPattern.test(sentence));
+    setDifficulty(nextDifficulty);
+    setCurrentIndex(matchingIndex >= 0 ? matchingIndex : getRandomSentenceIndex(nextPool));
+    setIsCompleted(false);
+    setIsTimeUp(false);
+    resetStats(isUnlimitedTime ? 0 : timeLimit);
+    setLastAttempt(null);
+    setIsReviewOpen(false);
+    setReviewWord(undefined);
+    setIsSettingsOpen(false);
+    window.history.pushState({}, '', window.location.pathname + window.location.search);
+    setKey(prev => prev + 1);
+  };
   const speakTimeoutRef = useRef<number | null>(null);
   const timeUpSoundPlayedRef = useRef(false);
   const sentenceDecksRef = useRef<Record<string, number[]>>({});
+  const recentSentenceIndicesRef = useRef<Record<string, number[]>>({});
   const focusSessionComplete = isFocusMode && focusTimeLeft === 0;
 
   useEffect(() => {
@@ -129,15 +179,40 @@ function App() {
   const currentSentence = sentencePool[currentIndex] || sentencePool[0];
   const getNextSentenceIndex = (nextDifficulty: Difficulty, previousIndex?: number) => {
     const nextPool = practiceFocus === 'vocabulary' ? VOCABULARY_SENTENCES[LANG][nextDifficulty] : SAMPLE_SENTENCES[LANG][nextDifficulty];
+    const deckKey = `${practiceFocus}-${nextDifficulty}`;
+    const recentIndices = recentSentenceIndicesRef.current[deckKey] || [];
+    const rememberSentence = (index: number) => {
+      recentSentenceIndicesRef.current[deckKey] = [...recentIndices.filter(value => value !== index), index].slice(-3);
+    };
     const dueWords = getDueReviewWords();
     const reviewCandidates = nextPool.map((sentence, index) => ({ sentence, index })).filter(item => dueWords.some(word => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(item.sentence)) && item.index !== previousIndex);
-    if (reviewCandidates.length > 0) return reviewCandidates[Math.floor(Math.random() * reviewCandidates.length)].index;
-    const deckKey = `${practiceFocus}-${nextDifficulty}`;
+    const freshReviewCandidates = reviewCandidates.filter(item => !recentIndices.includes(item.index));
+    if (freshReviewCandidates.length > 0 || reviewCandidates.length > 0) {
+      const candidates = freshReviewCandidates.length > 0 ? freshReviewCandidates : reviewCandidates;
+      const candidateIndex = getRandomSentenceIndex(candidates.map(item => item.sentence));
+      const nextIndex = candidates[candidateIndex].index;
+      rememberSentence(nextIndex);
+      return nextIndex;
+    }
     let deck = sentenceDecksRef.current[deckKey];
-    if (!deck || deck.length === 0) deck = shuffleSentenceIndices(nextPool, previousIndex);
-    const nextIndex = deck.pop();
+    if (!deck || deck.length === 0) deck = shuffleSentenceIndices(nextPool, previousIndex).filter(index => !recentIndices.includes(index));
+    let nextIndex: number | undefined;
+    while (deck.length > 0 && nextIndex === undefined) {
+      const candidate = deck.pop();
+      if (candidate !== undefined && !recentIndices.includes(candidate)) nextIndex = candidate;
+    }
     sentenceDecksRef.current[deckKey] = deck;
-    return nextIndex ?? getRandomSentenceIndex(nextPool, previousIndex);
+    if (nextIndex === undefined) {
+      const fallbackCandidates = nextPool.map((sentence, index) => ({ sentence, index })).filter(item => item.index !== previousIndex && !recentIndices.includes(item.index));
+      if (fallbackCandidates.length > 0) {
+        const fallbackIndex = getRandomSentenceIndex(fallbackCandidates.map(item => item.sentence));
+        nextIndex = fallbackCandidates[fallbackIndex].index;
+      } else {
+        nextIndex = getRandomSentenceIndex(nextPool, previousIndex);
+      }
+    }
+    rememberSentence(nextIndex);
+    return nextIndex;
   };
 
   useEffect(() => {
@@ -302,7 +377,7 @@ function App() {
 
   const handleDifficultyChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const nextDifficulty = event.target.value as Difficulty;
-    if (nextDifficulty === 'hard' && !isPremium) {
+    if (nextDifficulty !== 'easy' && !isPremium) {
       openPremiumDashboard();
       return;
     }
@@ -374,6 +449,9 @@ function App() {
     // setRewardMessage(`+${PERFECT_SENTENCE_POINTS} points · Perfect sentence`);
     if (isPremium) handlePremiumComplete(completedText, correctCharacters);
     else setIsCompleted(true);
+    setTypingSpeed(0);
+    setHasStartedTyping(false);
+    setStartedAt(null);
   };
 
   const handlePremiumFinish = (completedText: string, correctCharacters: number, isCorrect: boolean) => {
@@ -382,9 +460,21 @@ function App() {
 
   const handleAttemptFinish = (completedText: string, correctCharacters: number, isCorrect: boolean) => {
     setLastAttempt(analyzeAttempt(currentSentence, completedText));
+    setLastAttemptText(completedText);
+    setLastAttemptTargetText(currentSentence);
+    setReviewNote('');
+    setIsReviewNoteSaved(false);
     recordWordAttempt(currentSentence, completedText);
     setReviewSummary(getReviewSummary());
+    setReviewWords(getReviewWords());
     if (isPremium) handlePremiumFinish(completedText, correctCharacters, isCorrect);
+  };
+
+  const handleSaveReviewNote = () => {
+    saveReviewNoteForAttempt(lastAttemptTargetText, lastAttemptText, reviewNote);
+    setReviewWords(getReviewWords());
+    setReviewSummary(getReviewSummary());
+    setIsReviewNoteSaved(Boolean(reviewNote.trim()));
   };
 
   const handleGoalChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -396,6 +486,10 @@ function App() {
     ? Math.round(practiceHistory.reduce((total, session) => total + session.accuracy, 0) / practiceHistory.length)
     : 0;
   const practiceStreak = getPracticeStreak(practiceHistory);
+
+  if (isReviewOpen) {
+    return <ReviewPage words={reviewWords} onAddWord={handleAddReviewWord} onPracticeWord={startDueWordPractice} initialWord={reviewWord} onBack={closeReviewPage} />;
+  }
 
   if (isPremiumOpen) {
     return <PremiumDashboard
@@ -463,11 +557,13 @@ function App() {
         isPremium={isPremium}
         isPremiumOpen={isPremiumOpen}
         isSettingsOpen={isSettingsOpen}
+        isReviewOpen={isReviewOpen}
         onAccountToggle={() => setIsAccountOpen(open => !open)}
         onAuthenticated={user => { setAccountUser(user); setIsAccountOpen(false); }}
         onLoggedOut={() => setAccountUser(null)}
         onPremiumOpen={isPremium ? openPremiumDashboard : openPaymentPage}
         onSettingsToggle={() => setIsSettingsOpen(open => !open)}
+        onReviewOpen={() => openReviewPage()}
       />}
       {!isFocusMode && showOnboarding && (
         <section className="onboarding-card" aria-label="How to practice">
@@ -511,7 +607,7 @@ function App() {
             <span>Level</span>
             <select value={difficulty} onChange={handleDifficultyChange}>
               <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
+              <option value="medium" disabled={!isPremium}>Medium {isPremium ? '' : '(Premium)'}</option>
               <option value="hard" disabled={!isPremium}>Hard {isPremium ? '' : '(Premium)'}</option>
             </select>
           </label>
@@ -525,16 +621,19 @@ function App() {
               {reviewSummary.due > 0 ? `${reviewSummary.due} word${reviewSummary.due === 1 ? '' : 's'} ready to review` : `${reviewSummary.total} words tracked`}
             </small>
           </label>
-          <label className="settings-field">
-            <span>Voice</span>
-            <select value={selectedVoice} onChange={event => setSelectedVoice(event.target.value)} disabled={voiceStatus === 'unsupported'}>
-              <option value="">Browser default voice</option>
-              {voices.map(voice => <option key={`${voice.name}-${voice.voiceURI}`} value={voice.name}>{voice.name}</option>)}
-            </select>
-            <small className={`voice-status voice-status-${voiceStatus}`} role="status">
-              {voiceStatus === 'loading' ? 'Loading voices…' : voiceStatus === 'unsupported' ? 'Speech unavailable' : voiceStatus === 'speaking' ? 'Speaking' : voiceStatus === 'error' ? 'Try Again' : 'Ready'}
-            </small>
-          </label>
+          {reviewWords.length > 0 && (
+            <section className="review-words" aria-label="Words to review">
+              <div className="review-words-heading"><strong>Review words</strong><small>{reviewSummary.due} due now</small></div>
+              <div className="review-words-list">
+                {reviewWords.slice(0, 8).map(review => {
+                  const isDue = new Date(review.nextReviewAt).getTime() <= reviewNow;
+                  return <div className="review-word" key={review.word}><strong>{review.word}</strong>{isDue ? <button type="button" className="review-due-button" onClick={() => startDueWordPractice(review.word)}>{review.mistakes} mistake{review.mistakes === 1 ? '' : 's'} · Due now</button> : <span>{review.mistakes} mistake{review.mistakes === 1 ? '' : 's'} · Streak {review.correctStreak}</span>}</div>;
+                })}
+              </div>
+              {reviewWords.length > 8 && <small className="review-words-more">Showing 8 of {reviewWords.length} words</small>}
+              <button type="button" className="review-words-button" onClick={() => openReviewPage()}>Open review page</button>
+            </section>
+          )}
           <div className="settings-field settings-speed-field">
             <span>speed</span>
             <div className="settings-speed-options">
@@ -550,6 +649,17 @@ function App() {
               ))}
             </div>
           </div>
+          <label className="settings-field">
+            <span>Voice</span>
+            <select value={selectedVoice} onChange={event => setSelectedVoice(event.target.value)} disabled={voiceStatus === 'unsupported'}>
+              <option value="">Browser default voice</option>
+              {voices.map(voice => <option key={`${voice.name}-${voice.voiceURI}`} value={voice.name}>{voice.name}</option>)}
+            </select>
+            <small className={`voice-status voice-status-${voiceStatus}`} role="status">
+              {voiceStatus === 'loading' ? 'Loading voices…' : voiceStatus === 'unsupported' ? 'Speech unavailable' : voiceStatus === 'speaking' ? 'Speaking' : voiceStatus === 'error' ? 'Try Again' : 'Ready'}
+            </small>
+          </label>
+          
         </section>
       )}
       {isFocusMode && <div className="focus-toolbar"><span><b>Focus mode</b><small>Distraction-free practice</small></span><strong>{Math.floor(focusTimeLeft / 60)}:{String(focusTimeLeft % 60).padStart(2, '0')}</strong><button type="button" onClick={exitFocusMode}>Exit focus</button></div>}
@@ -605,14 +715,20 @@ function App() {
             {lastAttempt && (
           <div className="attempt-summary" role="status" aria-live="polite">
             <strong>{lastAttempt.accuracy}% accuracy</strong>
-            <span>{lastAttempt.incorrectCharacters} incorrect · {lastAttempt.missingCharacters} missed.</span> 
+            <span>{lastAttempt.incorrectCharacters} incorrect</span> 
             <p> <small>Grammar focus: {lastAttempt.grammarTip}</small></p>
+            {(lastAttempt.incorrectCharacters > 0 || lastAttempt.missingCharacters > 0) && <div className="review-note-editor">
+              <label htmlFor="practice-review-note">Note for review <small>Saved with the words you missed</small></label>
+              <textarea id="practice-review-note" value={reviewNote} onChange={event => { setReviewNote(event.target.value); setIsReviewNoteSaved(false); }} placeholder="e.g. Remember the spelling or meaning..." maxLength={240} />
+              <button type="button" onClick={handleSaveReviewNote} disabled={!reviewNote.trim()}>Save note</button>
+              {isReviewNoteSaved && <span role="status">Note saved to Review Words.</span>}
+            </div>}
           </div>
         )}
         <Controls onReplay={handleSpeak} onNext={handleNext} />
         
       </main>
-      {!isFocusMode && <footer className="app-footer"><p>Tip: Focus on the sounds, then the letters. Repeat three times for best results.</p></footer>}
+      {!isFocusMode && <footer className="app-footer"><p> <i> Tip: Focus on the sounds, then the letters. Repeat three times for best results. </i> </p>  </footer>}
     </div>
   );
 }
