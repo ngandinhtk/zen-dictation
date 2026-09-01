@@ -2,7 +2,7 @@ export type Difficulty = 'easy' | 'medium' | 'hard';
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const CAMBRIDGE_LEVELS: Record<Difficulty, { label: string; cefr: string; exams: string }> = {
-  easy: { label: 'Easy', cefr: 'A1–A2', exams: 'Starters · Movers · Flyers · A2 Key' },
+  easy: { label: 'Easy', cefr: 'A1–A2', exams: 'Starters · A2 Key' },
   medium: { label: 'Medium', cefr: 'B1–B2', exams: 'B1 Preliminary · B2 First' },
   hard: { label: 'Hard', cefr: 'C1–C2', exams: 'C1 Advanced · C2 Proficiency' },
 };

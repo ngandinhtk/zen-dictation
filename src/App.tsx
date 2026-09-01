@@ -619,7 +619,7 @@ function App() {
               <option value="medium" disabled={!isPremium}>Medium · B1–B2 {isPremium ? '' : '(Premium)'}</option>
               <option value="hard" disabled={!isPremium}>Hard · C1–C2 {isPremium ? '' : '(Premium)'}</option>
             </select>
-            <small className="level-guide" role="note">Cambridge {CAMBRIDGE_LEVELS[difficulty].cefr}: {CAMBRIDGE_LEVELS[difficulty].exams}</small>
+            <small className="level-guide" role="note">{CAMBRIDGE_LEVELS[difficulty].exams}</small>
           </label>
           <label className="settings-field">
             <span>Focus</span>

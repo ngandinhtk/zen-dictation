@@ -100,7 +100,7 @@
   border-bottom: 2.5px solid transparent;
 }
 
-.typing-cursor { display: inline-block; width: 4px; height: 1em; margin: 0 .08em -0.25em 0; border-radius: 4px; background: var(--accent-color); animation: typingCursorBlink .9s steps(1, end) infinite; }
+.typing-cursor { display: inline-block; width: 3px; height: 1em; margin: 0 .08em -0.25em 0; border-radius: 4px; background: var(--accent-color); animation: typingCursorBlink .9s steps(1, end) infinite; }
 @keyframes typingCursorBlink { 0%, 45% { opacity: 1; } 46%, 100% { opacity: 0; } }
 
 .char.pending {
