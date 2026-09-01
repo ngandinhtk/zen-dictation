@@ -89,11 +89,14 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
     <div className="dictation-container" onClick={handleAreaClick} role="group" aria-label="Dictation practice area">
       <div className={`feedback-display ${shouldHidePrompt ? 'hidden' : ''}`}>
         {wordGroups.map((group, groupIndex) => {
+          const groupStartIndex = wordGroups.slice(0, groupIndex).reduce((total, currentGroup) => total + currentGroup.length, 0);
           return (
             <span key={groupIndex} className={group.length === 1 && group[0].char === ' ' ? 'word-space' : 'word-group'}>
               {group.map((item, index) => {
+                const characterIndex = groupStartIndex + index;
                 return (
-                  <span key={index} className={`char ${item.status} ${item.char === ' ' ? 'space' : ''}`}>
+                <span key={index} className={`char ${item.status} ${item.char === ' ' ? 'space' : ''}`}>
+                    {characterIndex === userInput.length && <span className="typing-cursor" aria-hidden="true" />}
                     {item.char === ' ' ? '\u00A0' : item.char}
                   </span>
                 );
@@ -101,6 +104,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
             </span>
           );
         })}
+        {userInput.length === targetText.length && <span className="typing-cursor" aria-hidden="true" />}
       </div>
       {shouldHidePrompt && (
         <div className="typing-signal" aria-live="polite">

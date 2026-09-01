@@ -147,9 +147,9 @@ const hardAdditional = createSentences(
 
 const cambridgeGenerated: Record<Difficulty, string[]> = {
   easy: createCombinationSentences(
-    ['I', 'You', 'We', 'They', 'My brother', 'Her sister', 'The teacher', 'Our neighbor', 'A young student', 'The kind child'],
-    ['like', 'need', 'use', 'carry', 'clean', 'open', 'read', 'watch', 'visit', 'help'],
-    ['a small blue bag', 'the new classroom', 'some fresh fruit', 'an interesting book', 'the sunny garden', 'a warm cup of tea', 'our old family photo', 'the busy town center', 'a simple English story', 'the friendly dog'],
+    ['My brother', 'Her sister', 'The teacher', 'Our neighbor', 'A young student', 'The kind child', 'My father', 'Her mother', 'The new student', 'Our friendly guide'],
+    ['checks', 'reviews', 'updates', 'shares', 'prints', 'copies', 'saves', 'reads', 'writes', 'finishes'],
+    ['the daily plan', 'a shopping list', 'a short message', 'the class schedule', 'the weather report', 'the bus timetable', 'a homework note', 'a family recipe', 'the weekly schedule', 'a birthday card'],
   ),
   medium: createCombinationSentences(
     ['The research team', 'A careful manager', 'The local community', 'An experienced teacher', 'Several young adults', 'The small business', 'A responsible traveler', 'The health organization', 'Our university class', 'A reliable assistant'],

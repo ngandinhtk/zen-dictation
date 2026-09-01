@@ -175,6 +175,15 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [isFocusMode, focusTimeLeft]);
 
+  useEffect(() => {
+    if (!isFocusMode) return;
+    const handleFocusEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') exitFocusMode();
+    };
+    document.addEventListener('keydown', handleFocusEscape);
+    return () => document.removeEventListener('keydown', handleFocusEscape);
+  }, [isFocusMode]);
+
   const sentencePool = practiceFocus === 'vocabulary' ? VOCABULARY_SENTENCES[LANG][difficulty] : SAMPLE_SENTENCES[LANG][difficulty];
   const currentSentence = sentencePool[currentIndex] || sentencePool[0];
   const getNextSentenceIndex = (nextDifficulty: Difficulty, previousIndex?: number) => {
@@ -610,7 +619,7 @@ function App() {
               <option value="medium" disabled={!isPremium}>Medium · B1–B2 {isPremium ? '' : '(Premium)'}</option>
               <option value="hard" disabled={!isPremium}>Hard · C1–C2 {isPremium ? '' : '(Premium)'}</option>
             </select>
-            <small className="level-guide" role="note">Cambridge: {CAMBRIDGE_LEVELS[difficulty].exams}</small>
+            <small className="level-guide" role="note">Cambridge {CAMBRIDGE_LEVELS[difficulty].cefr}: {CAMBRIDGE_LEVELS[difficulty].exams}</small>
           </label>
           <label className="settings-field">
             <span>Focus</span>

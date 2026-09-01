@@ -43,4 +43,4 @@
 .review-empty-icon { display: block; margin-bottom: .45rem; color: var(--accent-color); font-size: 1.5rem; }
 .review-empty p { margin-top: .45rem; color: var(--text-muted); font-size: .75rem; }
 .review-primary-action { display: block; margin: 1.25rem auto 0; padding: .7rem 1rem; border: 0; border-radius: 999px; background: linear-gradient(135deg, #927dc0, #4479a7 48%, #71bd9c); color: #fff; cursor: pointer; font-size: .75rem; }
-@media (max-width: 640px) { .review-page { padding: 1.25rem; } .review-content { margin-top: 5rem; } .review-list-heading, .review-card { align-items: flex-start; flex-direction: column; } .review-card-status { align-items: flex-start; text-align: left; } }
+@media (max-width: 640px) { .review-page { padding: 1.25rem; } .review-content { margin-top: 5rem; } .review-list-heading, .review-card { align-items: flex-start; flex-direction: column; } .review-card-status { align-items: flex-start; text-align: left; } .review-add-form { max-width: none; } .review-add-form > div { align-items: stretch; flex-direction: column; } .review-add-form button { min-height: 2.5rem; } }

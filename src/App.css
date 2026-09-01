@@ -474,13 +474,17 @@
 .focus-summary h2 { font-size: 1.15rem; font-weight: 600; }
 .focus-summary p { color: var(--text-muted); font-size: .75rem; }
 .focus-summary .action-btn { flex: initial; margin-top: .4rem; }
+.focus-mode .stats-row,
+.focus-mode .status-badge,
+.focus-mode .reset-timer-btn,
+.focus-mode .attempt-summary { display: none; }
 
 @media (max-width: 640px) {
   .app-layout { padding: .75rem .75rem 1rem; }
-  .app-header { align-items: flex-start; gap: .7rem; padding: .7rem; }
+  .app-header { align-items: flex-start; flex-wrap: wrap; gap: .7rem; padding: .7rem; }
   .logo { font-size: .95rem; }
-  .header-nav { justify-content: flex-end; gap: .2rem; }
-  .header-nav a { padding: .38rem .42rem; font-size: .58rem; }
+  .header-nav { flex: 1 1 100%; justify-content: stretch; gap: .2rem; min-width: 0; flex-wrap: wrap; }
+  .header-nav a { flex: 1 1 auto; min-width: 0; padding: .38rem .42rem; font-size: .58rem; text-align: center; }
   .header-nav a span { display: none; }
   .app-content { margin-top: 2.3rem; }
   .stats-row { gap: .5rem; }
@@ -495,6 +499,15 @@
   .focus-toolbar { gap: .55rem; padding: .55rem; }
   .focus-toolbar strong { font-size: 1rem; }
   .focus-toolbar button { padding: .4rem .5rem; }
+  .settings-panel { max-height: calc(100vh - 6rem); overflow-y: auto; }
+  .account-menu { max-height: calc(100vh - 7rem); overflow-y: auto; }
+}
+
+@media (max-width: 400px) {
+  .header-nav a { flex-basis: calc(50% - .2rem); }
+  .focus-toolbar { align-items: flex-start; flex-wrap: wrap; }
+  .focus-toolbar strong { margin-left: auto; }
+  .focus-toolbar button { flex-basis: 100%; }
 }
 
 .status-badge {
