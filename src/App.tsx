@@ -6,7 +6,7 @@ import DictationArea from './components/DictationArea/DictationArea';
 import Controls from './components/Controls/Controls';
 import './styles/globals.css';
 import './App.css';
-import SAMPLE_SENTENCES, { VOCABULARY_SENTENCES, type Difficulty } from './components/Stats/SampleSentence';
+import SAMPLE_SENTENCES, { CAMBRIDGE_LEVELS, VOCABULARY_SENTENCES, type Difficulty } from './components/Stats/SampleSentence';
 import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
 import { addReviewWord, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, saveReviewNoteForAttempt, type ReviewWord } from './services/spacedRepetitionService';
 import { addPoints, getPoints, PERFECT_SENTENCE_POINTS } from './services/pointsService';
@@ -606,10 +606,11 @@ function App() {
           <label className="settings-field">
             <span>Level</span>
             <select value={difficulty} onChange={handleDifficultyChange}>
-              <option value="easy">Easy</option>
-              <option value="medium" disabled={!isPremium}>Medium {isPremium ? '' : '(Premium)'}</option>
-              <option value="hard" disabled={!isPremium}>Hard {isPremium ? '' : '(Premium)'}</option>
+              <option value="easy">Easy · A1–A2</option>
+              <option value="medium" disabled={!isPremium}>Medium · B1–B2 {isPremium ? '' : '(Premium)'}</option>
+              <option value="hard" disabled={!isPremium}>Hard · C1–C2 {isPremium ? '' : '(Premium)'}</option>
             </select>
+            <small className="level-guide" role="note">Cambridge: {CAMBRIDGE_LEVELS[difficulty].exams}</small>
           </label>
           <label className="settings-field">
             <span>Focus</span>

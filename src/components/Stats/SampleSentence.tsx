@@ -1,11 +1,21 @@
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
+// eslint-disable-next-line react-refresh/only-export-components
+export const CAMBRIDGE_LEVELS: Record<Difficulty, { label: string; cefr: string; exams: string }> = {
+  easy: { label: 'Easy', cefr: 'A1–A2', exams: 'Starters · Movers · Flyers · A2 Key' },
+  medium: { label: 'Medium', cefr: 'B1–B2', exams: 'B1 Preliminary · B2 First' },
+  hard: { label: 'Hard', cefr: 'C1–C2', exams: 'C1 Advanced · C2 Proficiency' },
+};
+
 const createSentences = (subjects: string[], endings: string[], count: number) =>
   Array.from({ length: count }, (_, index) => {
     const subject = subjects[Math.floor(index / endings.length) % subjects.length];
     const ending = endings[index % endings.length];
     return `${subject} ${ending}`;
   });
+
+const createCombinationSentences = (subjects: string[], actions: string[], details: string[]) =>
+  subjects.flatMap(subject => actions.flatMap(action => details.map(detail => `${subject} ${action} ${detail}`)));
 
 const cleanSentences = (sentences: string[]) =>
   sentences.map(sentence => sentence.replace(/[.!?]+$/, ''));
@@ -135,6 +145,24 @@ const hardAdditional = createSentences(
   166,
 );
 
+const cambridgeGenerated: Record<Difficulty, string[]> = {
+  easy: createCombinationSentences(
+    ['I', 'You', 'We', 'They', 'My brother', 'Her sister', 'The teacher', 'Our neighbor', 'A young student', 'The kind child'],
+    ['like', 'need', 'use', 'carry', 'clean', 'open', 'read', 'watch', 'visit', 'help'],
+    ['a small blue bag', 'the new classroom', 'some fresh fruit', 'an interesting book', 'the sunny garden', 'a warm cup of tea', 'our old family photo', 'the busy town center', 'a simple English story', 'the friendly dog'],
+  ),
+  medium: createCombinationSentences(
+    ['The research team', 'A careful manager', 'The local community', 'An experienced teacher', 'Several young adults', 'The small business', 'A responsible traveler', 'The health organization', 'Our university class', 'A reliable assistant'],
+    ['examined', 'developed', 'organized', 'compared', 'discussed', 'improved', 'recorded', 'prepared', 'evaluated', 'explained'],
+    ['the results of the recent survey', 'a practical response to the problem', 'the possible effects on local residents', 'a detailed plan for the following year', 'the information provided by several sources', 'a more efficient way to manage resources', 'the relationship between diet and exercise', 'the main reasons behind the decision', 'a useful example for new learners', 'the long-term value of regular practice'],
+  ),
+  hard: createCombinationSentences(
+    ['A comprehensive investigation', 'The independent committee', 'A sustainable development strategy', 'The revised academic framework', 'An experienced policy adviser', 'The international research project', 'A carefully designed experiment', 'The organization’s long-term plan', 'A nuanced interpretation of the evidence', 'The proposed institutional reform'],
+    ['demonstrates', 'challenges', 'examines', 'identifies', 'questions', 'clarifies', 'anticipates', 'establishes', 'illustrates', 'reassesses'],
+    ['how apparently minor decisions can produce substantial consequences over time', 'whether the available evidence is sufficient to support the proposed conclusion', 'the assumptions that have influenced the debate for several decades', 'why a flexible response is preferable to a rigid set of instructions', 'the extent to which economic growth can coexist with environmental responsibility', 'how competing priorities should be balanced during periods of uncertainty', 'the limitations of a method that appears reliable in controlled conditions', 'whether the original objectives remain relevant in the current context', 'the complex relationship between individual choices and collective outcomes', 'how a carefully reasoned alternative could address the underlying difficulty'],
+  ),
+};
+
 const grammarSentences: Record<Difficulty, string[]> = {
   easy: [
     'I am ready for my English lesson',
@@ -180,6 +208,105 @@ const grammarSentences: Record<Difficulty, string[]> = {
   ],
 };
 
+const dailyVocabularySentences: Record<Difficulty, string[]> = {
+  easy: [
+    'I usually wake up at seven and make my bed',
+    'Please turn off the light before you leave the room',
+    'My phone is charging on the table near the window',
+    'We need to buy milk bread and fresh vegetables today',
+    'She keeps her keys in a small bowl by the door',
+    'The bus is late so we may miss the first class',
+    'I left my coat at home because the weather is warm',
+    'He is washing the dishes after dinner',
+    'Can you send me the address by text message',
+    'The supermarket closes at nine on weekdays',
+    'My sister is waiting for a package this afternoon',
+    'We often cook rice and chicken for dinner',
+    'I drink a glass of water when I feel thirsty',
+    'The doctor told him to rest and take this medicine',
+    'Please put the clean towels in the bathroom',
+    'I walk to work when the traffic is busy',
+    'Her alarm rang early but she went back to sleep',
+    'The children are doing their homework at the kitchen table',
+    'I need a quiet place to read for thirty minutes',
+    'Our neighbor grows tomatoes in the garden',
+    'She forgot her umbrella and got wet on the way home',
+    'The coffee shop is next to the train station',
+    'I check my calendar before I make a plan',
+    'He bought a birthday card for his mother',
+    'Please wait here while I find the right size',
+    'The room feels cooler when we open the window',
+    'I usually listen to music while I clean the house',
+    'They invited us to dinner on Saturday evening',
+    'My jacket has a broken button near the pocket',
+    'We should leave now if we want to arrive on time',
+  ],
+  medium: [
+    'I made an appointment with the dentist for next Tuesday',
+    'The delivery was delayed because the address was incomplete',
+    'She checked the receipt before leaving the store',
+    'Our team uses a shared calendar to arrange weekly meetings',
+    'He forgot to renew his train card before the journey',
+    'The restaurant was crowded so we booked a table online',
+    'I keep a list of errands to finish after work',
+    'The landlord agreed to repair the broken heating system',
+    'She compared several phone plans before choosing one',
+    'We postponed the picnic because the forecast predicted heavy rain',
+    'The cashier explained how to return the damaged product',
+    'I have to collect a prescription from the pharmacy this evening',
+    'He prepared lunch in advance to save time during the week',
+    'The train platform changed while we were waiting for an announcement',
+    'She usually reviews her budget before making a large purchase',
+    'The meeting started late because the main speaker missed the bus',
+    'Please let me know if you need help with the application form',
+    'Our internet connection becomes unreliable during the evening',
+    'They replaced the old furniture after moving into the apartment',
+    'I forgot my password and had to reset it through the website',
+    'The hotel receptionist recommended a quiet place for breakfast',
+    'He apologized for the misunderstanding and offered a practical solution',
+    'We shared the cost of the taxi after the concert',
+    'She avoids processed food and prepares most meals at home',
+    'The mechanic found a small problem with the car battery',
+    'I saved the document in a folder so I could find it later',
+    'The local library offers free courses for adult learners',
+    'They adjusted the schedule to give everyone enough preparation time',
+    'I brought a reusable bottle instead of buying another one',
+    'The customer service agent answered my question clearly',
+  ],
+  hard: [
+    'The household budget became easier to manage after we reviewed our regular expenses',
+    'She negotiated a flexible working arrangement to reduce her daily commute',
+    'The pharmacy provided clear instructions about the dosage and possible side effects',
+    'He postponed the purchase until he had compared the long-term costs',
+    'The apartment required minor renovations before it was comfortable to live in',
+    'Our travel insurance covered the additional accommodation after the flight was cancelled',
+    'The customer requested a refund because the replacement product was also defective',
+    'She keeps digital copies of important documents in case the originals are lost',
+    'The neighborhood association introduced a recycling scheme for local households',
+    'He arranged a routine inspection after noticing an unusual noise from the engine',
+    'The appointment was rescheduled because the specialist was unexpectedly unavailable',
+    'They reduced unnecessary subscriptions after examining their monthly bank statement',
+    'The retailer offered a partial refund rather than replacing the item immediately',
+    'She prepared a concise explanation before discussing the complaint with the manager',
+    'The public transport network is convenient, although service interruptions remain common',
+    'He prioritizes essential tasks when an unexpected responsibility affects his schedule',
+    'The building manager notified residents that maintenance work would begin next month',
+    'We chose a slightly more expensive service because its cancellation policy was clearer',
+    'The doctor recommended regular exercise while acknowledging the patient\'s limited free time',
+    'The online booking system prevented us from selecting seats next to each other',
+    'She kept the conversation constructive despite receiving an unfair complaint',
+    'The repair was completed promptly, but the warranty did not cover the additional parts',
+    'He developed a reliable routine for balancing household responsibilities and personal study',
+    'The travel delay created practical difficulties for passengers with connecting flights',
+    'The company updated its privacy policy after customers raised concerns about personal data',
+    'A realistic schedule is more useful than an ambitious plan that cannot be maintained',
+    'She clarified the payment conditions before agreeing to the service contract',
+    'The community center provides accessible facilities for residents with different needs',
+    'He made a deliberate effort to reduce screen time before going to bed',
+    'The supplier confirmed that the replacement parts would arrive within three working days',
+  ],
+};
+
 const vocabularySentences: Record<Difficulty, string[]> = {
   easy: [
     'The bright window made the small room feel welcoming',
@@ -194,6 +321,7 @@ const vocabularySentences: Record<Difficulty, string[]> = {
     'A friendly neighbor offered useful advice',
     'The train arrived at the busy station on time',
     'Reading short stories is an enjoyable way to learn',
+    ...dailyVocabularySentences.easy,
   ],
   medium: [
     'The reliable equipment helped the team complete the difficult task',
@@ -208,6 +336,7 @@ const vocabularySentences: Record<Difficulty, string[]> = {
     'A practical solution should be affordable, reliable, and easy to maintain',
     'The students discussed the environmental impact of excessive packaging',
     'The unfamiliar vocabulary became easier after we saw it in context',
+    ...dailyVocabularySentences.medium,
   ],
   hard: [
     'The architect proposed a sustainable design that would reduce the building’s energy consumption',
@@ -222,6 +351,7 @@ const vocabularySentences: Record<Difficulty, string[]> = {
     'The negotiation reached a temporary agreement despite considerable disagreement',
     'The concept became more accessible after the professor provided a concrete example',
     'Long-term sustainability requires investment, patience, and responsible decision-making',
+    ...dailyVocabularySentences.hard,
   ],
 };
 
@@ -337,6 +467,7 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       'Soon the little garden became a place for everyone',
       ...easyGenerated,
       ...easyAdditional,
+      ...cambridgeGenerated.easy,
       ...grammarSentences.easy,
       ...vocabularySentences.easy,
       ...diverseSentenceBank.easy,
@@ -359,6 +490,7 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       'After several weeks, the project was ready to share',
       ...mediumGenerated,
       ...mediumAdditional,
+      ...cambridgeGenerated.medium,
       ...grammarSentences.medium,
       ...vocabularySentences.medium,
       ...diverseSentenceBank.medium,
@@ -381,6 +513,7 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       'Their patience ultimately produced a safer and more accurate account of the region',
       ...hardGenerated,
       ...hardAdditional,
+      ...cambridgeGenerated.hard,
       ...grammarSentences.hard,
       ...vocabularySentences.hard,
       ...diverseSentenceBank.hard,

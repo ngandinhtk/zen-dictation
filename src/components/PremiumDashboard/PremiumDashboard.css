@@ -141,6 +141,8 @@
 .section-title h2 { font-size: .95rem; }
 .dashboard-history-row { transition: background .2s ease; }
 .dashboard-history-row:hover { background: var(--hover-bg); }
+.load-more-sessions { display: block; margin: .9rem auto 0; padding: .45rem .75rem; border: 1px solid var(--border-color); border-radius: 999px; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .65rem; }
+.load-more-sessions:hover { border-color: var(--accent-color); color: var(--text-color); }
 
 .premium-landing { margin-top: 7rem; }
 .premium-landing .dashboard-intro { margin-bottom: 1rem; }

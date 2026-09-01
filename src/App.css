@@ -76,6 +76,7 @@
 .voice-status-speaking { color: var(--correct-color); }
 .voice-status-error { color: var(--incorrect-color); }
 .review-status { width: 100%; margin-left: .2rem; color: var(--text-muted); font-size: .6rem; letter-spacing: normal; text-transform: none; }
+.level-guide { width: 100%; margin-left: .2rem; color: var(--text-muted); font-size: .58rem; letter-spacing: normal; text-transform: none; }
 .review-words { width: 100%; margin: .15rem 0 .1rem; padding: .7rem; border: 1px solid var(--border-color); border-radius: 10px; background: var(--hover-bg); }
 .review-words-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .45rem; font-size: .68rem; }
 .review-words-heading small, .review-words-more { color: var(--text-muted); font-size: .58rem; font-weight: 400; }

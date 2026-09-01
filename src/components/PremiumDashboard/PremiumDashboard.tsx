@@ -62,7 +62,7 @@ const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practi
         </section>
         <section className="dashboard-card goal-card"><div><span className="premium-kicker">Your next milestone</span><h2>Build your speed steadily</h2><p>Choose a target that feels challenging but achievable.</p><div className="goal-progress" role="progressbar" aria-label="Progress toward WPM goal" aria-valuemin={0} aria-valuemax={goalWpm} aria-valuenow={Math.min(bestWpm, goalWpm)}><span style={{ width: String(Math.min((bestWpm / Math.max(goalWpm, 1)) * 100, 100)) + '%' }} /></div><small className="goal-progress-label">{bestWpm ? String(bestWpm) + ' of ' + String(goalWpm) + ' WPM' : 'Set your first record · Goal ' + String(goalWpm) + ' WPM'}</small></div><label>Target WPM <input type="number" min="10" max="200" value={goalWpm} onChange={onGoalChange} /></label></section>
         <FocusLauncher isPremium={isPremium} onStartFocus={onStartFocus} />
-        <section className="dashboard-card"><div className="section-title"><h2>Recent sessions</h2><span>Last 30 results</span></div>{practiceHistory.length === 0 ? <p className="dashboard-empty">Complete a practice sentence to see your progress here.</p> : <div className="dashboard-history">{practiceHistory.map(session => <div className="dashboard-history-row" key={session.id}><span>{new Date(session.date).toLocaleDateString()} · {session.difficulty}</span><strong>{session.wpm} WPM</strong><span>{session.accuracy}% accuracy</span></div>)}</div>}</section>
+        <RecentSessions practiceHistory={practiceHistory} />
       </main>
     ) : (
       <main className="premium-dashboard premium-landing">
@@ -80,5 +80,12 @@ const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practi
     )}
   </div>
 );
+
+const RecentSessions = ({ practiceHistory }: { practiceHistory: PracticeSession[] }) => {
+  const [visibleCount, setVisibleCount] = useState(10);
+  const visibleSessions = practiceHistory.slice(0, visibleCount);
+
+  return <section className="dashboard-card"><div className="section-title"><h2>Recent sessions</h2><span>Last 30 results</span></div>{practiceHistory.length === 0 ? <p className="dashboard-empty">Complete a practice sentence to see your progress here.</p> : <><div className="dashboard-history">{visibleSessions.map(session => <div className="dashboard-history-row" key={session.id}><span>{new Date(session.date).toLocaleDateString()} · {session.difficulty}</span><strong>{session.wpm} WPM</strong><span>{session.accuracy}% accuracy</span></div>)}</div>{visibleCount < practiceHistory.length && <button type="button" className="load-more-sessions" onClick={() => setVisibleCount(count => count + 10)}>Load more sessions</button>}</>}</section>;
+};
 
 export default PremiumDashboard;
