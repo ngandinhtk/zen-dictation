@@ -6,7 +6,9 @@ import DictationArea from './components/DictationArea/DictationArea';
 import Controls from './components/Controls/Controls';
 import './styles/globals.css';
 import './App.css';
-import SAMPLE_SENTENCES, { type Difficulty } from './components/Stats/SampleSentence';
+import SAMPLE_SENTENCES, { VOCABULARY_SENTENCES, type Difficulty } from './components/Stats/SampleSentence';
+import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
+import { getDueReviewWords, getReviewSummary, recordWordAttempt } from './services/spacedRepetitionService';
 import { getGoalWpm, getPracticeHistory, getPracticeStreak, saveGoalWpm, savePracticeSession, type PracticeSession } from './services/premiumService';
 import PremiumDashboard from './components/PremiumDashboard/PremiumDashboard';
 import { getPremiumStatus } from './services/premiumAccess';
@@ -18,8 +20,9 @@ const DEFAULT_TIME_LIMIT = 30;
 const LANG: VoiceLanguage = 'en-US';
 const DEFAULT_DIFFICULTY: Difficulty = 'easy';
 const SPEECH_SPEEDS = [0.5, 0.75, 1, 1.25];
-const getRandomSentenceIndex = (difficulty: Difficulty, currentIndex?: number) => {
-  const sentenceCount = SAMPLE_SENTENCES[LANG][difficulty].length;
+type PracticeFocus = 'mixed' | 'vocabulary';
+const getRandomSentenceIndex = (sentences: string[], currentIndex?: number) => {
+  const sentenceCount = sentences.length;
   if (sentenceCount < 2) return 0;
 
   let nextIndex = Math.floor(Math.random() * sentenceCount);
@@ -29,8 +32,8 @@ const getRandomSentenceIndex = (difficulty: Difficulty, currentIndex?: number) =
   return nextIndex;
 };
 
-const shuffleSentenceIndices = (difficulty: Difficulty, excludedIndex?: number) => {
-  const indices = Array.from({ length: SAMPLE_SENTENCES[LANG][difficulty].length }, (_, index) => index)
+const shuffleSentenceIndices = (sentences: string[], excludedIndex?: number) => {
+  const indices = Array.from({ length: sentences.length }, (_, index) => index)
     .filter(index => index !== excludedIndex);
   for (let index = indices.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(Math.random() * (index + 1));
@@ -41,12 +44,15 @@ const shuffleSentenceIndices = (difficulty: Difficulty, excludedIndex?: number) 
 
 function App() {
   const [difficulty, setDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
-  const [currentIndex, setCurrentIndex] = useState(() => getRandomSentenceIndex(DEFAULT_DIFFICULTY));
+  const [practiceFocus, setPracticeFocus] = useState<PracticeFocus>('mixed');
+  const [currentIndex, setCurrentIndex] = useState(() => getRandomSentenceIndex(SAMPLE_SENTENCES[LANG][DEFAULT_DIFFICULTY]));
   const [speed, setSpeed] = useState(1);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceStatus, setVoiceStatus] = useState<SpeechStatus>(() => speechService.getStatus());
   const [selectedVoice, setSelectedVoice] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
+  const [lastAttempt, setLastAttempt] = useState<AttemptAnalysis | null>(null);
+  const [reviewSummary, setReviewSummary] = useState(getReviewSummary);
   const [key, setKey] = useState(0);
   const [correctChars, setCorrectChars] = useState(0);
   const [timeLimit, setTimeLimit] = useState(DEFAULT_TIME_LIMIT);
@@ -89,15 +95,21 @@ function App() {
   };
   const speakTimeoutRef = useRef<number | null>(null);
   const timeUpSoundPlayedRef = useRef(false);
-  const sentenceDecksRef = useRef<Record<Difficulty, number[]>>({ easy: [], medium: [], hard: [] });
+  const sentenceDecksRef = useRef<Record<string, number[]>>({});
 
-  const currentSentence = SAMPLE_SENTENCES[LANG][difficulty][currentIndex];
+  const sentencePool = practiceFocus === 'vocabulary' ? VOCABULARY_SENTENCES[LANG][difficulty] : SAMPLE_SENTENCES[LANG][difficulty];
+  const currentSentence = sentencePool[currentIndex] || sentencePool[0];
   const getNextSentenceIndex = (nextDifficulty: Difficulty, previousIndex?: number) => {
-    let deck = sentenceDecksRef.current[nextDifficulty];
-    if (deck.length === 0) deck = shuffleSentenceIndices(nextDifficulty, previousIndex);
+    const nextPool = practiceFocus === 'vocabulary' ? VOCABULARY_SENTENCES[LANG][nextDifficulty] : SAMPLE_SENTENCES[LANG][nextDifficulty];
+    const dueWords = getDueReviewWords();
+    const reviewCandidates = nextPool.map((sentence, index) => ({ sentence, index })).filter(item => dueWords.some(word => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(item.sentence)) && item.index !== previousIndex);
+    if (reviewCandidates.length > 0) return reviewCandidates[Math.floor(Math.random() * reviewCandidates.length)].index;
+    const deckKey = `${practiceFocus}-${nextDifficulty}`;
+    let deck = sentenceDecksRef.current[deckKey];
+    if (!deck || deck.length === 0) deck = shuffleSentenceIndices(nextPool, previousIndex);
     const nextIndex = deck.pop();
-    sentenceDecksRef.current[nextDifficulty] = deck;
-    return nextIndex ?? getRandomSentenceIndex(nextDifficulty, previousIndex);
+    sentenceDecksRef.current[deckKey] = deck;
+    return nextIndex ?? getRandomSentenceIndex(nextPool, previousIndex);
   };
 
   useEffect(() => {
@@ -274,6 +286,18 @@ function App() {
     setKey(prev => prev + 1);
   };
 
+  const handleFocusChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextFocus = event.target.value as PracticeFocus;
+    const nextPool = nextFocus === 'vocabulary' ? VOCABULARY_SENTENCES[LANG][difficulty] : SAMPLE_SENTENCES[LANG][difficulty];
+    setPracticeFocus(nextFocus);
+    setCurrentIndex(getRandomSentenceIndex(nextPool));
+    setIsCompleted(false);
+    setIsTimeUp(false);
+    resetStats(isUnlimitedTime ? 0 : timeLimit);
+    setReviewSummary(getReviewSummary());
+    setKey(prev => prev + 1);
+  };
+
   const handleTimeLimitChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const nextValue = Number(event.target.value);
     const safeValue = Number.isFinite(nextValue) ? Math.min(Math.max(nextValue, 10), 180) : DEFAULT_TIME_LIMIT;
@@ -319,6 +343,13 @@ function App() {
 
   const handlePremiumFinish = (completedText: string, correctCharacters: number, isCorrect: boolean) => {
     if (!isCorrect) recordPremiumSession(completedText, correctCharacters);
+  };
+
+  const handleAttemptFinish = (completedText: string, correctCharacters: number, isCorrect: boolean) => {
+    setLastAttempt(analyzeAttempt(currentSentence, completedText));
+    recordWordAttempt(currentSentence, completedText);
+    setReviewSummary(getReviewSummary());
+    if (isPremium) handlePremiumFinish(completedText, correctCharacters, isCorrect);
   };
 
   const handleGoalChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -372,6 +403,7 @@ function App() {
       const targetChar = currentSentence[index];
       return count + (targetChar && char.toLowerCase() === targetChar.toLowerCase() ? 1 : 0);
     }, 0);
+    if (nextValue.length > 0) setLastAttempt(null);
     setCorrectChars(nextCorrectChars);
     if (nextValue.length > 0 && !hasStartedTyping) {
       setHasStartedTyping(true);
@@ -447,6 +479,16 @@ function App() {
             </select>
           </label>
           <label className="settings-field">
+            <span>Focus</span>
+            <select value={practiceFocus} onChange={handleFocusChange}>
+              <option value="mixed">Mixed practice</option>
+              <option value="vocabulary">Vocabulary</option>
+            </select>
+            <small className="review-status" role="status">
+              {reviewSummary.due > 0 ? `${reviewSummary.due} word${reviewSummary.due === 1 ? '' : 's'} ready to review` : `${reviewSummary.total} words tracked`}
+            </small>
+          </label>
+          <label className="settings-field">
             <span>Voice</span>
             <select value={selectedVoice} onChange={event => setSelectedVoice(event.target.value)} disabled={voiceStatus === 'unsupported'}>
               <option value="">Browser default voice</option>
@@ -489,13 +531,14 @@ function App() {
         </div>
       
          {/* <div className="status-badge">{isCompleted ? '🎉 Done! Perfect!' : '🎧 Listen and type...' }</div> */}
-         <div className={'status-badge ' + (isTimeUp ? 'status-error' : isCompleted ? 'status-success' : 'status-ready')} role="status" aria-live="polite">
+        <div className={'status-badge ' + (isTimeUp ? 'status-error' : isCompleted ? 'status-success' : 'status-ready')} role="status" aria-live="polite">
             {isTimeUp && !isCompleted ? (
            <>
                 <span aria-hidden="true">⏰</span> <strong>Time’s up</strong> — Hit Reset Timer to try again.
             </>
            ) : isCompleted ? '🎉 Done! Perfect!' : '🎧 Listen and type...'}
         </div>
+     
         {/* {isCompleted && isTimeUp && (
           <div className="completion-notice" role="status">
             <strong>Excellent work!</strong>
@@ -513,10 +556,18 @@ function App() {
         <button type="button" className="reset-timer-btn" onClick={handleResetTimer}>
                Reset Timer
            </button>
-        <DictationArea key={key} targetText={currentSentence} onComplete={isPremium ? handlePremiumComplete : () => setIsCompleted(true)} onFinish={isPremium ? handlePremiumFinish : undefined} onNext={handleNext} onTypingChange={handleTypingChange} isHidden={isSentenceHidden} disabled={isTimeUp} />
+       
+        <DictationArea key={key} targetText={currentSentence} onComplete={isPremium ? handlePremiumComplete : () => setIsCompleted(true)} onFinish={handleAttemptFinish} onNext={handleNext} onTypingChange={handleTypingChange} isHidden={isSentenceHidden} disabled={isTimeUp} />
           <button type="button" className="visibility-toggle" onClick={() => setIsSentenceHidden(prev => !prev)} aria-pressed={isSentenceHidden}>
           {isSentenceHidden ? 'Show sentence' : 'Hide sentence'}
         </button>
+            {lastAttempt && (
+          <div className="attempt-summary" role="status" aria-live="polite">
+            <strong>{lastAttempt.accuracy}% accuracy</strong>
+            <span>{lastAttempt.incorrectCharacters} incorrect · {lastAttempt.missingCharacters} missed.</span> 
+            <p> <small>Grammar focus: {lastAttempt.grammarTip}</small></p>
+          </div>
+        )}
         <Controls onReplay={handleSpeak} onNext={handleNext} />
         
       </main>

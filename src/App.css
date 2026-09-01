@@ -75,6 +75,7 @@
 .voice-status-loading { color: var(--accent-color); }
 .voice-status-speaking { color: var(--correct-color); }
 .voice-status-error { color: var(--incorrect-color); }
+.review-status { width: 100%; margin-left: .2rem; color: var(--text-muted); font-size: .6rem; letter-spacing: normal; text-transform: none; }
 
 .settings-speed-field {
   gap: 0.65rem;
@@ -405,6 +406,9 @@
 .stat-label { font-size: .6rem; }
 .status-badge { margin: 0 0 .8rem; padding: .42rem .8rem; font-size: .62rem; }
 .status-ready { background: linear-gradient(90deg, rgba(141, 110, 161, .08), rgba(68, 121, 167, .08)); color: var(--text-muted); }
+.attempt-summary { text-align: center !important; display: flex; align-items: center; flex-wrap: wrap; width: min(100%, 540px); gap: .65rem; margin: .8rem 0 1rem; padding: .45rem .7rem; border: 1px solid var(--border-color); border-radius: 14px; background: var(--hover-bg); color: var(--text-muted); font-size: .65rem; animation: feedbackPop .25s ease-out; }
+.attempt-summary strong { color: var(--accent-color); font-family: var(--font-mono); font-size: .68rem; }
+.attempt-summary small { display: block; flex-basis: 100%; width: 100%; max-width: 100%; color: var(--text-muted); font-size: .62rem; }
 
 .reset-timer-btn { margin: 0 0 .4rem; padding: .5rem .85rem; }
 
@@ -419,7 +423,7 @@
 }
 
 .feedback-display { font-size: clamp(1.35rem, 3.5vw, 2rem); }
-.visibility-toggle { margin: .15rem 0 1.4rem; padding: .45rem .75rem; border-radius: 999px; }
+.visibility-toggle { margin: .8rem 0 .6rem; padding: .45rem .75rem; border-radius: 999px; }
 .visibility-toggle:hover { background: var(--hover-bg); }
 .controls-container { gap: 1.1rem; }
 .main-actions { width: min(100%, 500px); gap: .7rem; }
@@ -448,6 +452,7 @@
   .unlimited-toggle { width: 100%; justify-content: center; margin-top: .2rem; }
   .dictation-container { min-height: 165px; padding: 2rem .8rem; }
   .main-actions { flex-direction: column-reverse; width: 100%; }
+  .attempt-summary { align-items: flex-start; flex-direction: column; gap: .25rem; border-radius: 14px; }
   .action-btn { width: 100%; }
   .onboarding-card { margin-top: .75rem; margin-bottom: -.8rem; }
 }
@@ -550,7 +555,7 @@
   letter-spacing: 0.08em;
   cursor: pointer;
   padding: 0.25rem 0.5rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
   transition: color 0.2s, opacity 0.2s;
   opacity: 0.7;
 }

@@ -225,6 +225,98 @@ const vocabularySentences: Record<Difficulty, string[]> = {
   ],
 };
 
+// Curated sentences add topic variety and natural language beyond the
+// generated practice patterns above.
+const diverseSentenceBank: Record<Difficulty, string[]> = {
+  easy: [
+    'The blue bus stops near my house every morning',
+    'Please bring an umbrella because the sky looks dark',
+    'My sister enjoys cooking simple meals for our family',
+    'The children are drawing pictures in the classroom',
+    'I usually drink water before I go for a walk',
+    'Our new neighbor has a friendly dog named Milo',
+    'The small bakery opens early and sells warm bread',
+    'We watched a funny movie after dinner last night',
+    'Put your keys on the shelf beside the front door',
+    'The doctor said that regular sleep is important',
+    'My phone battery is low, so I need a charger',
+    'She bought a train ticket for the weekend trip',
+    'The park is quiet when people leave their phones at home',
+    'I write three useful words in my notebook each day',
+    'Our teacher uses pictures to explain new ideas',
+    'The waiter brought us two glasses of cold water',
+    'He forgot his password but remembered the answer later',
+    'A short walk can improve your mood',
+    'The library has comfortable chairs near the window',
+    'We should recycle paper and plastic whenever possible',
+    'Her grandmother tells interesting stories about the village',
+    'The morning train was crowded but arrived on time',
+    'I keep a small plant beside my computer',
+    'They are planning a picnic if the weather stays sunny',
+    'The blue notebook contains all my travel plans',
+  ],
+  medium: [
+    'The customer changed the delivery address before the order was shipped',
+    'Our team meets every Friday to discuss progress and difficulties',
+    'The hotel recommended a quieter restaurant outside the city center',
+    'She chose a practical solution instead of waiting for perfect conditions',
+    'The article explains how small habits influence long-term health',
+    'Although the instructions were brief, everyone completed the task correctly',
+    'The museum offers guided tours for visitors who want more context',
+    'We postponed the meeting because several important documents were missing',
+    'A reliable calendar helps me balance work, study, and personal time',
+    'The engineer tested the device under several different conditions',
+    'People often remember stories more easily than isolated facts',
+    'The community created a garden where children could learn about nature',
+    'He apologized for the confusion and suggested a clearer explanation',
+    'The train was delayed, so we used the extra time to review our notes',
+    'Good feedback should identify a problem without discouraging the learner',
+    'The company reduced unnecessary packaging to lower its environmental impact',
+    'She looked for a course that matched her schedule and learning goals',
+    'The interview became more interesting when the guest described a personal challenge',
+    'Before making a decision, compare the benefits with the possible risks',
+    'The recipe can be adapted for people who avoid dairy products',
+    'Our guide explained why the old bridge was important to the local community',
+    'The software update improved performance but introduced a minor visual problem',
+    'A respectful disagreement can lead to a better idea',
+    'The students collected evidence before presenting their conclusions',
+    'She has worked remotely since the office moved to another neighborhood',
+  ],
+  hard: [
+    'The committee rejected the proposal because its long-term consequences had not been examined carefully',
+    'While the initial results appeared promising, a larger study produced a more complicated picture',
+    'A successful negotiation depends on understanding what the other side genuinely needs',
+    'The researchers developed a framework that allows different communities to share reliable data',
+    'Had the warning been taken seriously, the organization might have avoided the disruption',
+    'The policy was revised after independent reviewers identified several unintended effects',
+    'People are more likely to adopt sustainable habits when convenient alternatives are available',
+    'The lecture examined how language can influence the way a society understands responsibility',
+    'Although the evidence was incomplete, the investigators found enough information to continue',
+    'The project succeeded because every participant understood both the objective and the limitations',
+    'A persuasive argument should acknowledge reasonable objections before presenting its conclusion',
+    'The company introduced a flexible schedule so employees could manage different responsibilities',
+    'What distinguishes expert judgment is the ability to recognize uncertainty without becoming paralyzed',
+    'The translation was accurate in meaning but failed to preserve the tone of the original speech',
+    'Unless the data is interpreted within its context, the final comparison may be misleading',
+    'The expedition revealed that the region was changing faster than previous surveys had suggested',
+    'Effective leadership requires decisions that remain consistent even when circumstances become difficult',
+    'The novel explores whether technological progress can exist without weakening human connection',
+    'By examining several independent sources, the journalist avoided relying on a single unverified claim',
+    'The new regulations are intended to protect consumers while allowing small businesses to remain competitive',
+    'A solution that appears efficient today may create costs that are difficult to measure later',
+    'The professor encouraged students to question assumptions rather than simply memorize conclusions',
+    'The report provides a detailed account of how the crisis developed and why it lasted so long',
+    'Despite considerable pressure, the team refused to publish results that had not been verified',
+    'The quality of a decision depends not only on the available evidence but also on how it is evaluated',
+  ],
+};
+
+// Shared sentence data is intentionally exported for the Vocabulary focus.
+// eslint-disable-next-line react-refresh/only-export-components
+export const VOCABULARY_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
+  'en-US': vocabularySentences,
+};
+
 const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
   'en-US': {
     easy: cleanSentences([
@@ -247,6 +339,7 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       ...easyAdditional,
       ...grammarSentences.easy,
       ...vocabularySentences.easy,
+      ...diverseSentenceBank.easy,
     ]),
     medium: cleanSentences([
       'Practice makes perfect when it comes to language learning',
@@ -268,6 +361,7 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       ...mediumAdditional,
       ...grammarSentences.medium,
       ...vocabularySentences.medium,
+      ...diverseSentenceBank.medium,
     ]),
     hard: cleanSentences([
       'The only limit to our realization of tomorrow is our doubts of today',
@@ -289,6 +383,7 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       ...hardAdditional,
       ...grammarSentences.hard,
       ...vocabularySentences.hard,
+      ...diverseSentenceBank.hard,
     ]),
   },
 };

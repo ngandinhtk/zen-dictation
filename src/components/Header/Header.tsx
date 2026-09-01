@@ -22,13 +22,13 @@ const Header = ({ accountUser, isAccountOpen, isPremium, isPremiumOpen, isSettin
       <h1 className="logo">Zen Dictation</h1>
       <nav className="header-nav" aria-label="Primary navigation">
         <a href="#account" className="account-toggle" onClick={event => { event.preventDefault(); onAccountToggle(); }} aria-expanded={isAccountOpen} aria-controls="account-menu">
-          {accountUser ? accountUser.email.split('@')[0] : 'Account'}
-        </a>
+           {accountUser ? accountUser.email.split('@')[0] : 'Account'}
+        </a> 
         <a href="#payment" className={'premium-toggle ' + (isPremium ? 'active' : '')} onClick={event => { event.preventDefault(); onPremiumOpen(); }} aria-expanded={isPremiumOpen}>
-          <span aria-hidden="true">✦</span> {isPremium ? 'Premium' : 'Unlock Premium'}
+          <span aria-hidden="true" style={{ color: '#1aac93c4' }}>✦</span> {isPremium ? 'Premium' : 'Unlock Premium'}
         </a>
         <a href="#settings" className="settings-toggle" onClick={event => { event.preventDefault(); onSettingsToggle(); }} aria-expanded={isSettingsOpen} aria-controls="settings-menu">
-          <span aria-hidden="true">⚙</span> Settings
+          <span aria-hidden="true" style={{ color: '#bb54ebbb' }} >⚙</span> Settings
         </a>
       </nav>
     </header>
