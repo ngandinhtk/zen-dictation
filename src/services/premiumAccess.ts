@@ -35,7 +35,7 @@ const readApiResponse = async <T>(response: Response): Promise<T & { error?: str
 };
 
 export const getPremiumStatus = async (): Promise<PremiumEntitlement> => {
-  const response = await fetch('/api/premium/status?deviceId=' + encodeURIComponent(getDeviceId()));
+  const response = await fetch('/api/premium/status?deviceId=' + encodeURIComponent(getDeviceId()), { credentials: 'include' });
   const result = await readApiResponse<PremiumEntitlement>(response);
   if (!response.ok) throw new Error(result.error || 'Premium status unavailable');
   return result;
@@ -44,6 +44,7 @@ export const getPremiumStatus = async (): Promise<PremiumEntitlement> => {
 export const activatePremiumLicense = async (licenseKey: string): Promise<PremiumEntitlement> => {
   const response = await fetch('/api/premium/activate', {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ licenseKey, deviceId: getDeviceId() }),
   });
@@ -55,6 +56,7 @@ export const activatePremiumLicense = async (licenseKey: string): Promise<Premiu
 export const createZaloPayOrder = async (email = ''): Promise<ZaloPayOrder> => {
   const response = await fetch('/api/payments/zalopay/create-order', {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, deviceId: getDeviceId() }),
   });
@@ -64,7 +66,7 @@ export const createZaloPayOrder = async (email = ''): Promise<ZaloPayOrder> => {
 };
 
 export const getZaloPayPaymentStatus = async (appTransId: string): Promise<ZaloPayPaymentStatus> => {
-  const response = await fetch('/api/payments/zalopay/status?appTransId=' + encodeURIComponent(appTransId) + '&deviceId=' + encodeURIComponent(getDeviceId()));
+  const response = await fetch('/api/payments/zalopay/status?appTransId=' + encodeURIComponent(appTransId) + '&deviceId=' + encodeURIComponent(getDeviceId()), { credentials: 'include' });
   const result = await readApiResponse<ZaloPayPaymentStatus & { error?: string }>(response);
   if (!response.ok) throw new Error(result.error || 'Unable to check payment status');
   return result;

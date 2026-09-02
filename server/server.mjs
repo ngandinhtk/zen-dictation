@@ -191,6 +191,8 @@ const server = createServer(async (req, res) => {
 
     if (url.pathname === '/api/premium/status' && req.method === 'GET') {
       const deviceId = url.searchParams.get('deviceId') || '';
+      const user = await getAuthUser(req);
+      if (user?.is_premium) return send(res, 200, { isPremium: true, source: 'payment' });
       const license = deviceId.length <= 128 ? getDeviceLicense(deviceId) : null;
       return send(res, 200, { isPremium: Boolean(license), source: license ? 'license' : 'none', licenseLast4: license?.key_last4 || null });
     }
@@ -204,7 +206,9 @@ const server = createServer(async (req, res) => {
       if (!license) return send(res, 404, { error: 'This license key is not valid' });
       if (license.activated_by && license.activated_by !== deviceId) return send(res, 409, { error: 'This license key is already used on another device' });
       db.prepare('UPDATE licenses SET activated_by = ?, activated_at = ? WHERE id = ?').run(deviceId, new Date().toISOString(), license.id);
-      return send(res, 200, { isPremium: true, source: 'license', licenseLast4: license.key_last4 });
+      const user = await getAuthUser(req);
+      if (user) db.prepare('UPDATE users SET is_premium = 1 WHERE id = ?').run(user.id);
+      return send(res, 200, { isPremium: true, source: user ? 'payment' : 'license', licenseLast4: license.key_last4 });
     }
 
     if (url.pathname === '/api/payments/zalopay/create-order' && req.method === 'POST') {
