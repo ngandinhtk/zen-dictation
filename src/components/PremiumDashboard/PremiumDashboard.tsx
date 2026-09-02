@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { activatePremiumLicense } from '../../services/premiumAccess';
 import type { PracticeSession } from '../../services/premiumService';
+import type { Achievement, DailyTarget } from '../../services/pointsService';
 import './PremiumDashboard.css';
 
 interface PremiumDashboardProps {
@@ -10,6 +11,9 @@ interface PremiumDashboardProps {
   averageAccuracy: number;
   practiceStreak: number;
   practiceHistory: PracticeSession[];
+  totalPoints: number;
+  dailyTarget: DailyTarget;
+  achievements: Array<Achievement & { unlocked: boolean }>;
   onGoalChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onLicenseActivated: () => void;
   onStartFocus: (durationMinutes: number) => void;
@@ -44,7 +48,49 @@ const FocusLauncher = ({ isPremium, onStartFocus }: { isPremium: boolean; onStar
   </section>;
 };
 
-const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practiceStreak, practiceHistory, onGoalChange, onLicenseActivated, onStartFocus, onBack }: PremiumDashboardProps) => (
+const RewardsPanel = ({ totalPoints, dailyTarget }: { totalPoints: number; dailyTarget: DailyTarget }) => {
+  const progressPercent = Math.min((dailyTarget.progress / Math.max(dailyTarget.target, 1)) * 100, 100);
+  return (
+    <section className="dashboard-card rewards-card" aria-label="Rewards summary">
+      <div className="section-title" > <span className="premium-kicker">Rewards</span> <span>{dailyTarget.completed ? 'Target complete' : 'Daily challenge'}</span></div>
+      <div className="rewards-grid">
+        <div>
+          <span>Total points</span>
+          <strong>{totalPoints}</strong>
+          <em>Wallet balance</em>
+        </div>
+        <div>
+          <span>Daily target</span>
+          <strong>{Math.min(dailyTarget.progress, dailyTarget.target)}/{dailyTarget.target}</strong>
+          <em>{dailyTarget.completed ? `Reward claimed +${dailyTarget.rewardPoints}` : `Reward +${dailyTarget.rewardPoints}`}</em>
+        </div>
+      </div>
+      <div className="goal-progress" role="progressbar" aria-label="Daily reward progress" aria-valuemin={0} aria-valuemax={dailyTarget.target} aria-valuenow={Math.min(dailyTarget.progress, dailyTarget.target)}>
+        <span style={{ width: `${progressPercent}%` }} />
+      </div>
+      <small className="goal-progress-label">{dailyTarget.completed ? 'Daily target finished. Come back tomorrow for a fresh reward.' : `${dailyTarget.target - dailyTarget.progress} left to unlock today’s reward.`}</small>
+    </section>
+  );
+};
+
+const AchievementPanel = ({ achievements }: { achievements: Array<Achievement & { unlocked: boolean }> }) => (
+  <section className="dashboard-card achievements-card" aria-label="Achievement list">
+    <div className="section-title"><h2>Achievements</h2><span>{achievements.filter(achievement => achievement.unlocked).length}/{achievements.length} unlocked</span></div>
+    <div className="achievements-grid">
+      {achievements.map(achievement => (
+        <div key={achievement.id} className={`achievement-item ${achievement.unlocked ? 'unlocked' : 'locked'}`}>
+          <span className="achievement-badge" aria-hidden="true">{achievement.icon}</span>
+          <div>
+            <strong>{achievement.title}</strong>
+            <small>{achievement.description}</small>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+);
+
+const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practiceStreak, practiceHistory, totalPoints, dailyTarget, achievements, onGoalChange, onLicenseActivated, onStartFocus, onBack }: PremiumDashboardProps) => (
   <div className="premium-page">
     <header className="premium-page-header">
       <button type="button" className="back-button" onClick={onBack} aria-label="Back to practice" title="Back to practice">←</button>
@@ -54,14 +100,17 @@ const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practi
       <main className="premium-dashboard">
         <div className="dashboard-intro"><span className="premium-kicker">Premium dashboard</span><h1>Your progress, in focus.</h1><p>Every session is a small step forward. Keep going and let the numbers show your growth.</p></div>
         <div className="dashboard-status"><span>✦ Premium member</span><small>Progress saved on this device</small></div>
+<FocusLauncher isPremium={isPremium} onStartFocus={onStartFocus} />       
         <section className="dashboard-metrics" aria-label="Your progress">
           <div><span>Best speed</span><strong>{bestWpm || '—'} <small>WPM</small></strong><em>Personal record</em></div>
           <div><span>Average accuracy</span><strong>{averageAccuracy || '—'}<small>%</small></strong><em>Across completed sessions</em></div>
           <div><span>Completed sessions</span><strong>{practiceHistory.length}</strong><em>Saved on this device</em></div>
           <div><span>Current streak</span><strong>{practiceStreak}<small> days</small></strong><em>Keep the habit going</em></div>
         </section>
+        <RewardsPanel totalPoints={totalPoints} dailyTarget={dailyTarget} />
+        <AchievementPanel achievements={achievements} />
         <section className="dashboard-card goal-card"><div><span className="premium-kicker">Your next milestone</span><h2>Build your speed steadily</h2><p>Choose a target that feels challenging but achievable.</p><div className="goal-progress" role="progressbar" aria-label="Progress toward WPM goal" aria-valuemin={0} aria-valuemax={goalWpm} aria-valuenow={Math.min(bestWpm, goalWpm)}><span style={{ width: String(Math.min((bestWpm / Math.max(goalWpm, 1)) * 100, 100)) + '%' }} /></div><small className="goal-progress-label">{bestWpm ? String(bestWpm) + ' of ' + String(goalWpm) + ' WPM' : 'Set your first record · Goal ' + String(goalWpm) + ' WPM'}</small></div><label>Target WPM <input type="number" min="10" max="200" value={goalWpm} onChange={onGoalChange} /></label></section>
-        <FocusLauncher isPremium={isPremium} onStartFocus={onStartFocus} />
+        
         <RecentSessions practiceHistory={practiceHistory} />
       </main>
     ) : (

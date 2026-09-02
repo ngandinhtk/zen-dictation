@@ -16,11 +16,26 @@ const ReviewPage = ({ words, onAddWord, onPracticeWord, initialWord, onBack }: R
   const [reviewNow] = useState(() => Date.now());
   const [newWord, setNewWord] = useState('');
   const [inputError, setInputError] = useState('');
-  const scopedWords = selectedWord ? words.filter(word => word.word === selectedWord) : words;
-  const dueWords = scopedWords.filter(word => new Date(word.nextReviewAt).getTime() <= reviewNow);
+  const scopedWords = (selectedWord ? words.filter(word => word.word === selectedWord) : words).filter(word => word.correctStreak <= 8);
+  const orderedWords = [...scopedWords].sort((a, b) => {
+    const aDue = a.correctStreak < 4 || new Date(a.nextReviewAt).getTime() <= reviewNow;
+    const bDue = b.correctStreak < 4 || new Date(b.nextReviewAt).getTime() <= reviewNow;
+
+    if (aDue !== bDue) {
+      return Number(bDue) - Number(aDue);
+    }
+
+    return new Date(a.nextReviewAt).getTime() - new Date(b.nextReviewAt).getTime();
+  });
+  const dueWords = orderedWords.filter(word => word.correctStreak < 4 || new Date(word.nextReviewAt).getTime() <= reviewNow);
   const wordsPerPage = 10;
-  const pageCount = Math.max(1, Math.ceil(scopedWords.length / wordsPerPage));
-  const visibleWords = scopedWords.slice((currentPage - 1) * wordsPerPage, currentPage * wordsPerPage);
+  const searchTerm = newWord.trim().toLowerCase();
+  const matchingWords = searchTerm
+    ? orderedWords.filter(word => word.word.toLowerCase().includes(searchTerm))
+    : orderedWords;
+  const pageCount = Math.max(1, Math.ceil(matchingWords.length / wordsPerPage));
+  const safeCurrentPage = Math.min(currentPage, pageCount);
+  const visibleWords = matchingWords.slice((safeCurrentPage - 1) * wordsPerPage, safeCurrentPage * wordsPerPage);
   const handleAddWord = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const word = newWord.trim();
@@ -65,17 +80,20 @@ const ReviewPage = ({ words, onAddWord, onPracticeWord, initialWord, onBack }: R
           <div className="review-list-heading"><h2>Words to practice</h2><span>{dueWords.length ? 'Start with the due words' : 'Nothing due right now'}</span></div>
           <div className="review-list">
             {visibleWords.map(word => {
-              const isDue = new Date(word.nextReviewAt).getTime() <= reviewNow;
+              const isDue = word.correctStreak < 4 || new Date(word.nextReviewAt).getTime() <= reviewNow;
               return <article className={`review-card ${isDue ? 'is-due' : ''}`} key={word.word}>
                 <div><strong>{word.word}</strong><span>{word.mistakes} mistake{word.mistakes === 1 ? '' : 's'}</span>{word.note && <small className="review-card-note">Note: {word.note}</small>}</div>
-                <div className="review-card-status">{isDue ? <button type="button" className="review-status-pill" onClick={() => onPracticeWord(word.word)}>Due now</button> : <span className="review-status-pill">Streak {word.correctStreak}</span>}<small>{isDue ? 'Practice this word now' : 'Keep your streak going'}</small></div>
+                <div className="review-card-status">
+                  {isDue ? <button type="button" className="review-status-pill" onClick={() => onPracticeWord(word.word)}>Due now</button> : <span className="review-status-pill">Streak {word.correctStreak}</span>}
+                  <small>{isDue ? 'Practice this word now' : 'Keep your streak going'}</small>
+                </div>
               </article>;
             })}
           </div>
           {pageCount > 1 && <nav className="review-pagination" aria-label="Review word pages">
-            <button type="button" onClick={() => setCurrentPage(page => Math.max(page - 1, 1))} disabled={currentPage === 1}>Previous</button>
-            <span>Page {currentPage} of {pageCount}</span>
-            <button type="button" onClick={() => setCurrentPage(page => Math.min(page + 1, pageCount))} disabled={currentPage === pageCount}>Next</button>
+            <button type="button" onClick={() => setCurrentPage(page => Math.max(page - 1, 1))} disabled={safeCurrentPage === 1}>Previous</button>
+            <span>Page {safeCurrentPage} of {pageCount}</span>
+            <button type="button" onClick={() => setCurrentPage(page => Math.min(page + 1, pageCount))} disabled={safeCurrentPage === pageCount}>Next</button>
           </nav>}
         </section>
       )}

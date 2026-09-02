@@ -1,6 +1,6 @@
 .header-nav { display: flex; align-items: center; gap: 1.15rem; }
 .header-nav a { position: relative; padding: .35rem 0; color: var(--text-muted); cursor: pointer; font-size: .7rem; letter-spacing: .06em; text-decoration: none; text-transform: uppercase; transition: color .2s ease; }
-.header-nav a::after { position: absolute; right: 0; bottom: 0; left: 0; height: 1px; background: linear-gradient(90deg, #927dc0, #4479a7, #71bd9c); content: ''; opacity: 0; transform: scaleX(.35); transition: opacity .2s ease, transform .2s ease; }
+.header-nav a::after { position: absolute; right: 0; bottom: 0; left: 0; height: 2px; background: linear-gradient(90deg, #927dc0, #4479a7, #71bd9c); content: ''; opacity: 0; transform: scaleX(.35); transition: opacity .2s ease, transform .2s ease; }
 .header-nav a:hover, .header-nav a[aria-expanded='true'], .header-nav .premium-toggle.active { color: var(--text-color); }
 .header-nav a:hover::after, .header-nav a[aria-expanded='true']::after, .header-nav .premium-toggle.active::after { opacity: 1; transform: scaleX(1); }
 .account-toggle { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

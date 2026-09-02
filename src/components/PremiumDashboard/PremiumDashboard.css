@@ -23,6 +23,23 @@
 .dashboard-metrics strong { display: block; margin: .55rem 0; font-family: var(--font-mono); font-size: 1.6rem; }
 .dashboard-metrics small { font-size: .7rem; }
 .dashboard-card { margin-top: .8rem; }
+.rewards-card { margin-top: 1.25rem; }
+.rewards-card  .section-title .premium-kicker {
+  color: var(--accent-color);
+}
+.rewards-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+.rewards-grid > div { display: flex; flex-direction: column; gap: .3rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: 12px; background: color-mix(in srgb, var(--bg-color) 70%, var(--hover-bg)); }
+.rewards-grid span, .rewards-grid em { color: var(--text-muted); font-size: .66rem; font-style: normal; }
+.rewards-grid strong { font-family: var(--font-mono); font-size: 1.5rem; }
+.achievements-card { margin-top: 1rem; }
+.achievements-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; margin-top: .9rem; }
+.achievement-item { display: flex; align-items: center; gap: .8rem; padding: .8rem .9rem; border: 1px solid var(--border-color); border-radius: 12px; background: color-mix(in srgb, var(--bg-color) 72%, var(--hover-bg)); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+.achievement-item.unlocked { border-color: rgba(113, 189, 156, .7); background: linear-gradient(135deg, rgba(113, 189, 156, .18), rgba(146, 125, 192, .14)); box-shadow: 0 10px 22px rgba(113, 189, 156, .15), inset 0 0 0 1px rgba(113, 189, 156, .14); }
+.achievement-item.unlocked .achievement-badge { box-shadow: 0 0 0 4px rgba(113, 189, 156, .14); transform: scale(1.08); }
+.achievement-item.locked { opacity: .72; }
+.achievement-badge { display: inline-flex; align-items: center; justify-content: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: linear-gradient(135deg, #927dc0, #4479a7 48%, #71bd9c); color: white; font-size: .8rem; transition: transform .2s ease, box-shadow .2s ease; }
+.achievement-item strong { display: block; font-size: .76rem; }
+.achievement-item small { display: block; color: var(--text-muted); font-size: .62rem; }
 .goal-card { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .dashboard-card h2, .benefits-grid h2 { margin: .35rem 0; font-size: 1rem; font-weight: 600; }
 .dashboard-card p, .benefits-grid p { color: var(--text-muted); font-size: .75rem; }
@@ -127,12 +144,27 @@
   transform: translateY(-2px);
 }
 
+.dashboard-metrics > div:nth-child(1) { border-top: 2px solid #4f9f8b; }
+.dashboard-metrics > div:nth-child(2) { border-top: 2px solid #d58a68; }
+.dashboard-metrics > div:nth-child(3) { border-top: 2px solid #628fc4; }
+.dashboard-metrics > div:nth-child(4) { border-top: 2px solid #a486bd; }
+.dashboard-metrics > div:nth-child(1) strong { color: #3f8d7b; }
+.dashboard-metrics > div:nth-child(2) strong { color: #c87554; }
+.dashboard-metrics > div:nth-child(3) strong { color: #4d7fb2; }
+.dashboard-metrics > div:nth-child(4) strong { color: #8b6aa7; }
+
 .dashboard-card {
   background: color-mix(in srgb, var(--bg-color) 78%, var(--hover-bg));
   box-shadow: 0 8px 24px rgba(31, 41, 55, .04);
 }
 
+.rewards-grid > div:first-child { border-color: rgba(213, 138, 104, .32); background: rgba(213, 138, 104, .08); }
+.rewards-grid > div:first-child strong { color: #c87554; }
+.rewards-grid > div:nth-child(2) { border-color: rgba(79, 159, 139, .34); background: rgba(79, 159, 139, .08); }
+.rewards-grid > div:nth-child(2) strong { color: #3f8d7b; }
+
 .goal-card { padding: 1.5rem; }
+.goal-card { border-left: 3px solid rgba(98, 143, 196, .65); }
 .goal-progress { height: .45rem; margin-top: 1rem; overflow: hidden; border-radius: 999px; background: var(--hover-bg); }
 .goal-progress span { display: block; height: 100%; min-width: 0; border-radius: inherit; background: linear-gradient(90deg, #927dc0, #4479a7 48%, #71bd9c); transition: width .3s ease; }
 .goal-progress-label { display: block; margin-top: .45rem; color: var(--text-muted); font-family: var(--font-mono); font-size: .62rem; }

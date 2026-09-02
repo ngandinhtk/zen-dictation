@@ -6,10 +6,11 @@ import DictationArea from './components/DictationArea/DictationArea';
 import Controls from './components/Controls/Controls';
 import './styles/globals.css';
 import './App.css';
-import SAMPLE_SENTENCES, { CAMBRIDGE_LEVELS, VOCABULARY_SENTENCES, type Difficulty } from './components/Stats/SampleSentence';
+import SAMPLE_SENTENCES, { CAMBRIDGE_LEVELS, VOCABULARY_SENTENCES } from './components/Stats/SampleSentence';
+import {  type Difficulty } from './utils/sentenceTranslations';
 import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
 import { addReviewWord, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, saveReviewNoteForAttempt, type ReviewWord } from './services/spacedRepetitionService';
-import { addPoints, getPoints, PERFECT_SENTENCE_POINTS } from './services/pointsService';
+import { addPoints, claimDailyTargetReward, getDailyTarget, getPoints, getUnlockedAchievements, PERFECT_SENTENCE_POINTS, subtractPoints, TIMEOUT_PENALTY_POINTS, updateDailyTargetProgress } from './services/pointsService';
 import { getGoalWpm, getPracticeHistory, getPracticeStreak, saveGoalWpm, savePracticeSession, type PracticeSession } from './services/premiumService';
 import PremiumDashboard from './components/PremiumDashboard/PremiumDashboard';
 import ReviewPage from './components/ReviewPage/ReviewPage';
@@ -22,6 +23,7 @@ const DEFAULT_TIME_LIMIT = 30;
 const LANG: VoiceLanguage = 'en-US';
 const DEFAULT_DIFFICULTY: Difficulty = 'easy';
 const SPEECH_SPEEDS = [0.5, 0.75, 1, 1.25];
+const ACHIEVEMENT_TOAST_DURATION_MS = 8000;
 type PracticeFocus = 'mixed' | 'vocabulary';
 const getRandomSentenceIndex = (sentences: string[], currentIndex?: number) => {
   const sentenceCount = sentences.length;
@@ -62,11 +64,10 @@ function App() {
   const [reviewNote, setReviewNote] = useState('');
   const [isReviewNoteSaved, setIsReviewNoteSaved] = useState(false);
   const [points, setPoints] = useState(getPoints);
-  // const [rewardMessage, setRewardMessage] = useState('');
+  const [dailyTarget, setDailyTarget] = useState(() => getDailyTarget());
   const [key, setKey] = useState(0);
   const [correctChars, setCorrectChars] = useState(0);
   const [timeLimit, setTimeLimit] = useState(DEFAULT_TIME_LIMIT);
-  const [isUnlimitedTime, setIsUnlimitedTime] = useState(false);
   const [timeLeft, setTimeLeft] = useState(DEFAULT_TIME_LIMIT);
   const [typingSpeed, setTypingSpeed] = useState(0);
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -80,6 +81,7 @@ function App() {
   const [isPaymentResultOpen, setIsPaymentResultOpen] = useState(() => window.location.hash === '#payment-result');
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(() => window.location.hash === '#review');
+  // const [showTranslation, setShowTranslation] = useState(false);
   const [reviewWord, setReviewWord] = useState<string | undefined>();
   const [focusTimeLeft, setFocusTimeLeft] = useState(20 * 60);
   const [goalWpm, setGoalWpm] = useState(getGoalWpm);
@@ -87,6 +89,8 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('zen-dictation-onboarding-seen') !== 'true');
   const [accountUser, setAccountUser] = useState<AccountUser | null>(null);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [achievementToast, setAchievementToast] = useState<{ title: string; description: string; icon: string } | null>(null);
+  const unlockedAchievementIdsRef = useRef<Set<string>>(new Set());
   const openPremiumDashboard = () => {
     window.history.pushState({}, '', '#premium');
     setIsPremiumOpen(true);
@@ -153,9 +157,10 @@ function App() {
     const matchingIndex = nextPool.findIndex(sentence => wordPattern.test(sentence));
     setDifficulty(nextDifficulty);
     setCurrentIndex(matchingIndex >= 0 ? matchingIndex : getRandomSentenceIndex(nextPool));
+    // setShowTranslation(false);
     setIsCompleted(false);
     setIsTimeUp(false);
-    resetStats(isUnlimitedTime ? 0 : timeLimit);
+    resetStats(timeLimit);
     setLastAttempt(null);
     setIsReviewOpen(false);
     setReviewWord(undefined);
@@ -165,9 +170,14 @@ function App() {
   };
   const speakTimeoutRef = useRef<number | null>(null);
   const timeUpSoundPlayedRef = useRef(false);
+  const timeoutPenaltyAppliedRef = useRef(false);
   const sentenceDecksRef = useRef<Record<string, number[]>>({});
   const recentSentenceIndicesRef = useRef<Record<string, number[]>>({});
   const focusSessionComplete = isFocusMode && focusTimeLeft === 0;
+
+  const sentencePool = practiceFocus === 'vocabulary' ? VOCABULARY_SENTENCES[LANG][difficulty] : SAMPLE_SENTENCES[LANG][difficulty];
+  const currentSentence = sentencePool[currentIndex] || sentencePool[0];
+  // const currentTranslation = getSentenceTranslation(currentSentence, difficulty);
 
   useEffect(() => {
     if (!isFocusMode || focusTimeLeft <= 0) return;
@@ -184,8 +194,6 @@ function App() {
     return () => document.removeEventListener('keydown', handleFocusEscape);
   }, [isFocusMode]);
 
-  const sentencePool = practiceFocus === 'vocabulary' ? VOCABULARY_SENTENCES[LANG][difficulty] : SAMPLE_SENTENCES[LANG][difficulty];
-  const currentSentence = sentencePool[currentIndex] || sentencePool[0];
   const getNextSentenceIndex = (nextDifficulty: Difficulty, previousIndex?: number) => {
     const nextPool = practiceFocus === 'vocabulary' ? VOCABULARY_SENTENCES[LANG][nextDifficulty] : SAMPLE_SENTENCES[LANG][nextDifficulty];
     const deckKey = `${practiceFocus}-${nextDifficulty}`;
@@ -348,7 +356,7 @@ function App() {
   }, [handleSpeak]);
 
   useEffect(() => {
-    if (!hasStartedTyping || !startedAt || isUnlimitedTime) return;
+    if (!hasStartedTyping || !startedAt) return;
     const tick = () => {
       const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
       const remainingSeconds = Math.max(0, timeLimit - elapsedSeconds);
@@ -364,23 +372,29 @@ function App() {
     tick();
     const intervalId = window.setInterval(tick, 250);
     return () => window.clearInterval(intervalId);
-  }, [correctChars, hasStartedTyping, isUnlimitedTime, startedAt, timeLimit]);
+  }, [correctChars, hasStartedTyping, startedAt, timeLimit]);
 
   useEffect(() => {
     if (isTimeUp && !timeUpSoundPlayedRef.current) {
       soundService.playTimeUp();
       timeUpSoundPlayedRef.current = true;
     }
+    if (isTimeUp && !timeoutPenaltyAppliedRef.current) {
+      setPoints(subtractPoints(TIMEOUT_PENALTY_POINTS));
+      timeoutPenaltyAppliedRef.current = true;
+    }
     if (!isTimeUp) {
       timeUpSoundPlayedRef.current = false;
+      timeoutPenaltyAppliedRef.current = false;
     }
   }, [isTimeUp]);
 
   const handleNext = () => {
     setCurrentIndex(getNextSentenceIndex(difficulty, currentIndex));
+    // setShowTranslation(false);
     setIsCompleted(false);
     setIsTimeUp(false);
-    resetStats(isUnlimitedTime ? 0 : timeLimit);
+    resetStats(timeLimit);
     setKey(prev => prev + 1);
   };
 
@@ -392,9 +406,10 @@ function App() {
     }
     setDifficulty(nextDifficulty);
     setCurrentIndex(getNextSentenceIndex(nextDifficulty));
+    // setShowTranslation(false);
     setIsCompleted(false);
     setIsTimeUp(false);
-    resetStats(isUnlimitedTime ? 0 : timeLimit);
+    resetStats(timeLimit);
     setKey(prev => prev + 1);
   };
 
@@ -403,29 +418,20 @@ function App() {
     const nextPool = nextFocus === 'vocabulary' ? VOCABULARY_SENTENCES[LANG][difficulty] : SAMPLE_SENTENCES[LANG][difficulty];
     setPracticeFocus(nextFocus);
     setCurrentIndex(getRandomSentenceIndex(nextPool));
+    // setShowTranslation(false);
     setIsCompleted(false);
     setIsTimeUp(false);
-    resetStats(isUnlimitedTime ? 0 : timeLimit);
+    resetStats(timeLimit);
     setReviewSummary(getReviewSummary());
     setKey(prev => prev + 1);
   };
 
   const handleTimeLimitChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const nextValue = Number(event.target.value);
-    const safeValue = Number.isFinite(nextValue) ? Math.min(Math.max(nextValue, 10), 180) : DEFAULT_TIME_LIMIT;
+    const safeValue = Number.isFinite(nextValue) ? Math.min(Math.max(nextValue, 10), 1800) : DEFAULT_TIME_LIMIT;
     setTimeLimit(safeValue);
     setIsTimeUp(false);
     resetStats(safeValue);
-    setKey(prev => prev + 1);
-  };
-
-  const handleUnlimitedTimeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const nextUnlimited = event.target.checked;
-    setIsUnlimitedTime(nextUnlimited);
-    const nextTimeLimit = nextUnlimited ? 0 : DEFAULT_TIME_LIMIT;
-    setTimeLimit(nextTimeLimit);
-    setIsTimeUp(false);
-    resetStats(nextTimeLimit);
     setKey(prev => prev + 1);
   };
 
@@ -454,8 +460,18 @@ function App() {
   };
 
   const handlePerfectComplete = (completedText = currentSentence, correctCharacters = currentSentence.length) => {
-    setPoints(addPoints(PERFECT_SENTENCE_POINTS));
-    // setRewardMessage(`+${PERFECT_SENTENCE_POINTS} points · Perfect sentence`);
+    const nextPoints = addPoints(PERFECT_SENTENCE_POINTS);
+    setPoints(nextPoints);
+
+    const nextDailyTarget = updateDailyTargetProgress(difficulty);
+    setDailyTarget(nextDailyTarget);
+
+    if (nextDailyTarget.completed) {
+      const rewardResult = claimDailyTargetReward();
+      setPoints(rewardResult.points);
+      setDailyTarget(rewardResult.target);
+    }
+
     if (isPremium) handlePremiumComplete(completedText, correctCharacters);
     else setIsCompleted(true);
     setTypingSpeed(0);
@@ -495,46 +511,108 @@ function App() {
     ? Math.round(practiceHistory.reduce((total, session) => total + session.accuracy, 0) / practiceHistory.length)
     : 0;
   const practiceStreak = getPracticeStreak(practiceHistory);
+  const achievements = getUnlockedAchievements(points);
+
+  useEffect(() => {
+    const currentAchievements = getUnlockedAchievements(points);
+    const nextUnlockedIds = new Set(currentAchievements.filter(achievement => achievement.unlocked).map(achievement => achievement.id));
+    const newlyUnlocked = currentAchievements.filter(achievement => achievement.unlocked && !unlockedAchievementIdsRef.current.has(achievement.id));
+
+    unlockedAchievementIdsRef.current = nextUnlockedIds;
+
+    if (newlyUnlocked.length === 0) return;
+
+    const nextAchievement = newlyUnlocked[0];
+    setAchievementToast({
+      title: nextAchievement.title,
+      description: nextAchievement.description,
+      icon: nextAchievement.icon,
+    });
+
+    const timeoutId = window.setTimeout(() => {
+      setAchievementToast(null);
+    }, ACHIEVEMENT_TOAST_DURATION_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [points]);
+
+  const achievementToastNode = achievementToast ? (
+    <div className="achievement-toast" role="status" aria-live="polite">
+      <span className="achievement-toast-badge" aria-hidden="true">{achievementToast.icon}</span>
+      <div>
+        <strong>Achievement unlocked!</strong>
+        <span>{achievementToast.title}</span>
+        <small>{achievementToast.description}</small>
+      </div>
+    </div>
+  ) : null;
 
   if (isReviewOpen) {
-    return <ReviewPage words={reviewWords} onAddWord={handleAddReviewWord} onPracticeWord={startDueWordPractice} initialWord={reviewWord} onBack={closeReviewPage} />;
+    return <>
+      {achievementToastNode}
+      <ReviewPage
+        words={reviewWords}
+        onAddWord={handleAddReviewWord}
+        onPracticeWord={startDueWordPractice}
+        initialWord={reviewWord}
+        onBack={closeReviewPage}
+      />
+    </>;
   }
 
   if (isPremiumOpen) {
-    return <PremiumDashboard
-      isPremium={isPremium}
-      goalWpm={goalWpm}
-      bestWpm={bestWpm}
-      averageAccuracy={averageAccuracy}
-      practiceStreak={practiceStreak}
-      practiceHistory={practiceHistory}
-      onGoalChange={handleGoalChange}
-      onLicenseActivated={() => setIsPremium(true)}
-      onStartFocus={startFocusSession}
-      onBack={closePremiumDashboard}
-    />;
-  }
-
-  if (isPaymentResultOpen) {
-    return <PaymentResultPage onBack={closePaymentResult} onActivated={() => { setIsPaymentResultOpen(false); openPremiumDashboard(); }} />;
-  }
-
-  if (isPaymentOpen) {
-    if (isPremium) {
-      return <PremiumDashboard
+    return <>
+      {achievementToastNode}
+      <PremiumDashboard
         isPremium={isPremium}
         goalWpm={goalWpm}
         bestWpm={bestWpm}
         averageAccuracy={averageAccuracy}
         practiceStreak={practiceStreak}
         practiceHistory={practiceHistory}
+        totalPoints={points}
+        dailyTarget={dailyTarget}
+        achievements={achievements}
         onGoalChange={handleGoalChange}
         onLicenseActivated={() => setIsPremium(true)}
         onStartFocus={startFocusSession}
-        onBack={closePaymentPage}
-      />;
+        onBack={closePremiumDashboard}
+      />
+    </>;
+  }
+
+  if (isPaymentResultOpen) {
+    return <>
+      {achievementToastNode}
+      <PaymentResultPage onBack={closePaymentResult} onActivated={() => { setIsPaymentResultOpen(false); openPremiumDashboard(); }} />
+    </>;
+  }
+
+  if (isPaymentOpen) {
+    if (isPremium) {
+      return <>
+        {achievementToastNode}
+        <PremiumDashboard
+          isPremium={isPremium}
+          goalWpm={goalWpm}
+          bestWpm={bestWpm}
+          averageAccuracy={averageAccuracy}
+          practiceStreak={practiceStreak}
+          practiceHistory={practiceHistory}
+          totalPoints={points}
+          dailyTarget={dailyTarget}
+          achievements={achievements}
+          onGoalChange={handleGoalChange}
+          onLicenseActivated={() => setIsPremium(true)}
+          onStartFocus={startFocusSession}
+          onBack={closePaymentPage}
+        />
+      </>;
     }
-    return <PaymentPage onBack={closePaymentPage} onLicenseClick={() => { closePaymentPage(); openPremiumDashboard(); }} />;
+    return <>
+      {achievementToastNode}
+      <PaymentPage onBack={closePaymentPage} onLicenseClick={() => { closePaymentPage(); openPremiumDashboard(); }} />
+    </>;
   }
 
   const handleTypingChange = (nextValue: string) => {
@@ -560,6 +638,7 @@ function App() {
 
   return (
     <div className={`app-layout ${isFocusMode ? 'focus-mode' : ''}`}>
+      {achievementToastNode}
       {!isFocusMode && <Header
         accountUser={accountUser}
         isAccountOpen={isAccountOpen}
@@ -675,58 +754,63 @@ function App() {
       {isFocusMode && <div className="focus-toolbar"><span><b>Focus mode</b><small>Distraction-free practice</small></span><strong>{Math.floor(focusTimeLeft / 60)}:{String(focusTimeLeft % 60).padStart(2, '0')}</strong><button type="button" onClick={exitFocusMode}>Exit focus</button></div>}
       {isFocusMode && focusSessionComplete && <section className="focus-summary" role="status"><span className="premium-kicker">Session complete</span><h2>Well done. You stayed focused.</h2><p>You practiced for this session with {typingSpeed.toFixed(1)} WPM on the last attempt.</p><button type="button" className="action-btn next" onClick={exitFocusMode}>Back to practice</button></section>}
       <main className="app-content">
-        <div className="stats-row">
-          <div className="time-limit-control" ><span className="stat-label">Typing speed</span><strong>{typingSpeed.toFixed(1)} WPM</strong></div>
-          <div>
-            
-            <div className="time-limit-control"> <span className="stat-label">Time limit</span>
-              <input type="number" min={10} max={180} step={5} value={isUnlimitedTime ? '' : timeLimit} onChange={handleTimeLimitChange} aria-label="Custom time limit in seconds" disabled={isUnlimitedTime} />
-              <span>{isUnlimitedTime ? '∞' : 's'}</span>
-              <label className="unlimited-toggle"><input type="checkbox" checked={isUnlimitedTime} onChange={handleUnlimitedTimeChange} /> Unlimited</label>
+        {!isFocusMode && (
+          <>
+            <div className="stats-row">
+              <div className="time-limit-control" ><span className="stat-label">Typing speed</span><strong>{typingSpeed.toFixed(1)} WPM</strong></div>
+              <div>
+                <div className="time-limit-control"> <span className="stat-label">Time limit</span>
+                  <input type="number" min={10} max={1800} step={5} value={timeLimit} onChange={handleTimeLimitChange} aria-label="Custom time limit in seconds" />
+                  <span>s</span>
+                </div>
+                <strong>{hasStartedTyping ? `${timeLeft}s left` : 'Waiting...'}</strong>
+              </div>
+              <div className="daily-target-card">
+                <span className="stat-label">Daily target</span>
+                <strong>{Math.min(dailyTarget.progress, dailyTarget.target)}/{dailyTarget.target}</strong>
+                <div className="stat-label" aria-label="Daily target progress">
+                  <span style={{ width: `${Math.min((dailyTarget.progress / dailyTarget.target) * 100, 100)}%` }} />
+                </div>
+                <small > {dailyTarget.completed ? `Reward claimead +${dailyTarget.rewardPoints}` : `Reward +${dailyTarget.rewardPoints}`}</small>
+              </div>
+              <div className="points-stat"><span className="stat-label">Points</span><strong>{points}</strong><small></small></div>
             </div>
-            <strong>{hasStartedTyping ? (isUnlimitedTime ? 'No time limit' : `${timeLeft}s left`) : 'Waiting...'}</strong>
-          
-          </div>
-          <div className="points-stat"><span className="stat-label">Points</span><strong>{points}</strong><small></small></div>
-        </div>
-      
-         {/* <div className="status-badge">{isCompleted ? '🎉 Done! Perfect!' : '🎧 Listen and type...' }</div> */}
-        <div className={'status-badge ' + (isTimeUp ? 'status-error' : isCompleted ? 'status-success' : 'status-ready')} role="status" aria-live="polite">
-            {isTimeUp && !isCompleted ? (
-           <>
-                <span aria-hidden="true">⏰</span> <strong>Time’s up</strong> — Hit Reset Timer to try again.
-            </>
-           ) : isCompleted ? '🎉 Done! +10 points perfect sentence' : '🎧 Listen and type...'}
-        </div>
-        {/* {rewardMessage && <div className="point-reward" role="status" aria-live="polite">✦ {rewardMessage}</div>} */}
-     
-        {/* {isCompleted && isTimeUp && (
-          <div className="completion-notice" role="status">
-            <strong>Excellent work!</strong>
-            <span>You completed the sentence perfectly.</span>
-            <small>Typing speed: {typingSpeed.toFixed(1)} WPM</small>
-          </div>
+
+            <div className={'status-badge ' + (isTimeUp ? 'status-error' : isCompleted ? 'status-success' : 'status-ready')} role="status" aria-live="polite">
+              {isTimeUp && !isCompleted ? (
+                <>
+                  <span aria-hidden="true">⏰</span> <strong>Time’s up</strong> — Hit Reset Timer to try again.
+                </>
+              ) : isCompleted ? '🎉 Done! +10 points perfect sentence' : '🎧 Listen and type...'}
+            </div>
+
+            <button type="button" className="reset-timer-btn" onClick={handleResetTimer}>
+              Reset Timer
+            </button>
+          </>
         )}
-        {isTimeUp && !isCompleted && (
-          <div className="time-up-notice" role="alert">
-            <strong>Time’s up</strong>
-            <span>Your sentence wasn’t completed.</span>
-            <small>Choose Reset Timer to try again.</small>
+
+        <DictationArea key={key} targetText={currentSentence} onComplete={handlePerfectComplete} onFinish={handleAttemptFinish} onNext={handleNext} onTypingChange={handleTypingChange} isHidden={isSentenceHidden} disabled={isTimeUp || (isFocusMode && focusSessionComplete)} />
+
+        {/* {!isFocusMode && (
+          <div className="translation-panel">
+            <button type="button" className="translation-toggle" onClick={() => setShowTranslation(value => !value)}>
+              <span className="translation-toggle-icon" aria-hidden="true">{showTranslation ? '−' : '+'}</span>
+              {showTranslation ? 'Hide' : 'Reveal'}
+            </button>
+            {showTranslation && <p className="translation-text">{currentTranslation}</p>}
           </div>
         )} */}
-        <button type="button" className="reset-timer-btn" onClick={handleResetTimer}>
-               Reset Timer
-           </button>
-       
-        <DictationArea key={key} targetText={currentSentence} onComplete={handlePerfectComplete} onFinish={handleAttemptFinish} onNext={handleNext} onTypingChange={handleTypingChange} isHidden={isSentenceHidden} disabled={isTimeUp || (isFocusMode && focusSessionComplete)} />
-          <button type="button" className="visibility-toggle" onClick={() => setIsSentenceHidden(prev => !prev)} aria-pressed={isSentenceHidden}>
+
+        <button type="button" className="visibility-toggle" onClick={() => setIsSentenceHidden(prev => !prev)} aria-pressed={isSentenceHidden}>
           {isSentenceHidden ? 'Show sentence' : 'Hide sentence'}
         </button>
-            {lastAttempt && (
+
+        {!isFocusMode && lastAttempt && (
           <div className="attempt-summary" role="status" aria-live="polite">
             <strong>{lastAttempt.accuracy}% accuracy</strong>
-            <span>{lastAttempt.incorrectCharacters} incorrect</span> 
-            <p> <small>Grammar focus: {lastAttempt.grammarTip}</small></p>
+            <span>{lastAttempt.incorrectCharacters} incorrect</span>
+            <p><small>Grammar focus: {lastAttempt.grammarTip}</small></p>
             {(lastAttempt.incorrectCharacters > 0 || lastAttempt.missingCharacters > 0) && <div className="review-note-editor">
               <label htmlFor="practice-review-note">Note for review <small>Saved with the words you missed</small></label>
               <textarea id="practice-review-note" value={reviewNote} onChange={event => { setReviewNote(event.target.value); setIsReviewNoteSaved(false); }} placeholder="e.g. Remember the spelling or meaning..." maxLength={240} />
@@ -735,7 +819,8 @@ function App() {
             </div>}
           </div>
         )}
-        <Controls onReplay={handleSpeak} onNext={handleNext} />
+
+        {!isFocusMode && <Controls onReplay={handleSpeak} onNext={handleNext} />}
         
       </main>
       {!isFocusMode && <footer className="app-footer"><p> <i> Tip: Focus on the sounds, then the letters. Repeat three times for best results. </i> </p>  </footer>}

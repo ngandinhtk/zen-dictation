@@ -34,6 +34,11 @@
 .review-status-pill:not(:disabled) { cursor: pointer; }
 .review-card.is-due .review-status-pill { background: rgba(141, 110, 161, .14); color: var(--accent-color); }
 .review-card.is-due .review-status-pill:hover { background: rgba(141, 110, 161, .24); color: var(--text-color); }
+.review-card-actions { display: flex; align-items: center; gap: .35rem; margin-top: .3rem; }
+.review-action { padding: .25rem .5rem; border: 1px solid var(--border-color); border-radius: 999px; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .56rem; transition: border-color .2s ease, color .2s ease, opacity .2s ease; }
+.review-action:hover { border-color: var(--accent-color); color: var(--text-color); }
+.review-action.secondary { border-color: rgba(113, 189, 156, .4); color: rgba(113, 189, 156, 1); }
+.review-action.danger { border-color: rgba(239, 68, 68, .35); color: rgba(239, 68, 68, 1); }
 .review-pagination { display: flex; align-items: center; justify-content: center; gap: .75rem; margin-top: 1rem; }
 .review-pagination button { padding: .35rem .6rem; border: 1px solid var(--border-color); border-radius: 999px; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .65rem; }
 .review-pagination button:hover:not(:disabled) { border-color: var(--accent-color); color: var(--text-color); }

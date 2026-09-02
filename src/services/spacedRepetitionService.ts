@@ -8,16 +8,18 @@ export interface ReviewWord {
 }
 
 const REVIEW_KEY = 'zen-dictation-spaced-repetition';
+const isDueNowReviewWord = (item: ReviewWord, now = Date.now()) => item.correctStreak < 4 || new Date(item.nextReviewAt).getTime() <= now;
+const isActiveReviewWord = (item: ReviewWord) => item.mistakes > 0 && item.correctStreak <= 8;
 const readReviews = (): ReviewWord[] => {
   try {
     const value = JSON.parse(localStorage.getItem(REVIEW_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
+    return Array.isArray(value) ? value.filter(isActiveReviewWord) : [];
   } catch {
     return [];
   }
 };
 
-const saveReviews = (reviews: ReviewWord[]) => localStorage.setItem(REVIEW_KEY, JSON.stringify(reviews.slice(-100)));
+const saveReviews = (reviews: ReviewWord[]) => localStorage.setItem(REVIEW_KEY, JSON.stringify(reviews.filter(isActiveReviewWord).slice(-100)));
 const normalizeWords = (value: string) => value.toLowerCase().match(/[a-z']+/g) || [];
 const nextReviewDate = (correctStreak: number) => {
   const days = correctStreak >= 3 ? 7 : correctStreak === 2 ? 3 : 1;
@@ -27,12 +29,16 @@ const nextReviewDate = (correctStreak: number) => {
 export const recordWordAttempt = (target: string, input: string) => {
   const targetWords = normalizeWords(target);
   const inputWords = normalizeWords(input);
-  const reviews = new Map(readReviews().filter(item => item.mistakes > 0).map(item => [item.word, item]));
+  const reviews = new Map(readReviews().map(item => [item.word, item]));
   targetWords.forEach((word, index) => {
     const existing = reviews.get(word);
     if (inputWords[index] === word) {
       if (!existing) return;
       existing.correctStreak += 1;
+      if (existing.correctStreak > 8) {
+        reviews.delete(word);
+        return;
+      }
       existing.nextReviewAt = nextReviewDate(existing.correctStreak);
     } else {
       const review = existing || { word, mistakes: 0, correctStreak: 0, nextReviewAt: new Date().toISOString() };
@@ -65,9 +71,10 @@ export const addReviewWord = (value: string) => {
   if (normalizedWords.length !== 1 || normalizedWords[0] !== value.trim().toLowerCase()) return readReviews();
 
   const word = normalizedWords[0];
-  const reviews = readReviews().filter(item => item.mistakes > 0);
+  const reviews = readReviews();
   const existing = reviews.find(item => item.word === word);
   if (existing) {
+    if (existing.correctStreak > 8) return getReviewWords();
     existing.mistakes = Math.max(existing.mistakes, 1);
     existing.correctStreak = 0;
     existing.nextReviewAt = new Date().toISOString();
@@ -80,13 +87,12 @@ export const addReviewWord = (value: string) => {
   return getReviewWords();
 };
 
-export const getDueReviewWords = () => readReviews().filter(item => item.mistakes > 0 && new Date(item.nextReviewAt).getTime() <= Date.now()).map(item => item.word);
+export const getDueReviewWords = () => readReviews().filter(item => isDueNowReviewWord(item)).map(item => item.word);
 
 export const getReviewWords = () => readReviews()
-  .filter(item => item.mistakes > 0)
   .sort((a, b) => new Date(b.lastMistakeAt || b.nextReviewAt).getTime() - new Date(a.lastMistakeAt || a.nextReviewAt).getTime());
 
 export const getReviewSummary = () => {
-  const reviews = readReviews().filter(item => item.mistakes > 0);
+  const reviews = readReviews();
   return { total: reviews.length, due: getDueReviewWords().length };
 };
