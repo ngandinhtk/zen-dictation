@@ -119,6 +119,9 @@ function App() {
     }
     setFocusTimeLeft(durationMinutes * 60);
     setIsFocusMode(true);
+    setIsCompleted(false);
+    setIsTimeUp(false);
+    resetStats(timeLimit);
     setIsPremiumOpen(false);
     setIsSettingsOpen(false);
     setIsAccountOpen(false);
@@ -356,7 +359,7 @@ function App() {
   }, [handleSpeak]);
 
   useEffect(() => {
-    if (!hasStartedTyping || !startedAt) return;
+    if (isFocusMode || !hasStartedTyping || !startedAt) return;
     const tick = () => {
       const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
       const remainingSeconds = Math.max(0, timeLimit - elapsedSeconds);
@@ -372,7 +375,7 @@ function App() {
     tick();
     const intervalId = window.setInterval(tick, 250);
     return () => window.clearInterval(intervalId);
-  }, [correctChars, hasStartedTyping, startedAt, timeLimit]);
+  }, [correctChars, hasStartedTyping, isFocusMode, startedAt, timeLimit]);
 
   useEffect(() => {
     if (isTimeUp && !timeUpSoundPlayedRef.current) {
@@ -528,13 +531,17 @@ function App() {
       description: nextAchievement.description,
       icon: nextAchievement.icon,
     });
+  }, [points]);
+
+  useEffect(() => {
+    if (!achievementToast) return;
 
     const timeoutId = window.setTimeout(() => {
       setAchievementToast(null);
     }, ACHIEVEMENT_TOAST_DURATION_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [points]);
+  }, [achievementToast]);
 
   const achievementToastNode = achievementToast ? (
     <div className="achievement-toast" role="status" aria-live="polite">
