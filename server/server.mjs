@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { createHash, createHmac, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { access, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -9,12 +9,13 @@ const scrypt = promisify(scryptCallback);
 const PORT = Number(process.env.PORT || 3002);
 const DB_FILE = join(process.cwd(), 'server', 'zen-dictation.sqlite');
 const LEGACY_DATA_FILE = join(process.cwd(), 'server', 'data.json');
-const sessions = new Map();
 const rateLimitBuckets = new Map();
 const isProduction = process.env.NODE_ENV === 'production';
 const hashLicense = value => createHash('sha256').update(value.trim().toUpperCase()).digest('hex');
+const licenseEncryptionKey = createHash('sha256').update(process.env.PREMIUM_DATA_KEY || (isProduction ? '' : 'zen-dictation-development-only')).digest();
+if (isProduction && !process.env.PREMIUM_DATA_KEY) throw new Error('PREMIUM_DATA_KEY must be configured in production');
 const db = new DatabaseSync(DB_FILE);
-db.exec('PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, is_premium INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS practice_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, date TEXT NOT NULL, difficulty TEXT NOT NULL, wpm INTEGER NOT NULL DEFAULT 0, accuracy INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS practice_sessions_user_date ON practice_sessions(user_id, date DESC); CREATE TABLE IF NOT EXISTS licenses (id TEXT PRIMARY KEY, key_hash TEXT NOT NULL UNIQUE, key_last4 TEXT NOT NULL, activated_by TEXT, activated_at TEXT); CREATE TABLE IF NOT EXISTS payment_orders (app_trans_id TEXT PRIMARY KEY, device_id TEXT NOT NULL, email TEXT, amount INTEGER NOT NULL, status TEXT NOT NULL DEFAULT \'pending\', order_url TEXT, zp_trans_id TEXT, delivery_key TEXT, created_at TEXT NOT NULL, paid_at TEXT);');
+db.exec('PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, is_premium INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS auth_sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS auth_sessions_expiry ON auth_sessions(expires_at); CREATE TABLE IF NOT EXISTS practice_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, date TEXT NOT NULL, difficulty TEXT NOT NULL, wpm INTEGER NOT NULL DEFAULT 0, accuracy INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS practice_sessions_user_date ON practice_sessions(user_id, date DESC); CREATE TABLE IF NOT EXISTS licenses (id TEXT PRIMARY KEY, key_hash TEXT NOT NULL UNIQUE, key_last4 TEXT NOT NULL, activated_by TEXT, activated_at TEXT); CREATE TABLE IF NOT EXISTS payment_orders (app_trans_id TEXT PRIMARY KEY, device_id TEXT NOT NULL, email TEXT, amount INTEGER NOT NULL, status TEXT NOT NULL DEFAULT \'pending\', order_url TEXT, zp_trans_id TEXT, delivery_key TEXT, created_at TEXT NOT NULL, paid_at TEXT);');
 
 const migrateLegacyData = async () => {
   try {
@@ -39,7 +40,7 @@ const seedConfiguredLicenses = () => {
 };
 seedConfiguredLicenses();
 
-const send = (res, status, payload) => {
+const send = (res, status, payload, extraHeaders = {}) => {
   const allowedOrigin = process.env.CLIENT_ORIGIN || (isProduction ? 'null' : 'http://localhost:5173');
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -49,8 +50,10 @@ const send = (res, status, payload) => {
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    ...extraHeaders,
   });
   res.end(JSON.stringify(payload));
 };
@@ -65,6 +68,23 @@ const body = async req => {
 };
 
 const publicUser = user => ({ id: user.id, email: user.email, createdAt: user.created_at, isPremium: Boolean(user.is_premium) });
+const parseCookies = header => Object.fromEntries((header || '').split(';').map(cookie => {
+  const separator = cookie.indexOf('=');
+  return separator < 0 ? [cookie.trim(), ''] : [cookie.slice(0, separator).trim(), cookie.slice(separator + 1).trim()];
+}));
+const authCookie = token => `zen_auth=${token}; HttpOnly; Path=/; Max-Age=${SESSION_TTL_MS / 1000}; SameSite=Lax${isProduction ? '; Secure' : ''}`;
+const clearedAuthCookie = `zen_auth=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${isProduction ? '; Secure' : ''}`;
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const hashSessionToken = token => createHash('sha256').update(token).digest('hex');
+const createSession = userId => {
+  const token = randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+  db.prepare('INSERT INTO auth_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)').run(hashSessionToken(token), userId, expiresAt);
+  return token;
+};
+const deleteSession = token => {
+  if (token) db.prepare('DELETE FROM auth_sessions WHERE token_hash = ?').run(hashSessionToken(token));
+};
 
 const hashPassword = async password => {
   const salt = randomBytes(16).toString('hex');
@@ -80,10 +100,11 @@ const verifyPassword = async (password, storedHash) => {
 };
 
 const getAuthUser = async req => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  const userId = token && sessions.get(token);
-  if (!userId) return null;
-  return db.prepare('SELECT id, email, password_hash, is_premium, created_at FROM users WHERE id = ?').get(userId) || null;
+  const token = parseCookies(req.headers.cookie).zen_auth || req.headers.authorization?.replace('Bearer ', '');
+  if (!token) return null;
+  const session = db.prepare('SELECT user_id FROM auth_sessions WHERE token_hash = ? AND expires_at > ?').get(hashSessionToken(token), new Date().toISOString());
+  if (!session) return null;
+  return db.prepare('SELECT id, email, password_hash, is_premium, created_at FROM users WHERE id = ?').get(session.user_id) || null;
 };
 
 const validateCredentials = ({ email, password }) => {
@@ -108,6 +129,25 @@ const createLicenseKey = () => {
   const value = randomBytes(6).toString('hex').toUpperCase();
   return `ZEN-${value.slice(0, 6)}-${value.slice(6)}`;
 };
+const encryptLicenseKey = value => {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', licenseEncryptionKey, iv);
+  const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+  return `v1:${iv.toString('base64url')}:${cipher.getAuthTag().toString('base64url')}:${encrypted.toString('base64url')}`;
+};
+const decryptLicenseKey = value => {
+  if (!value?.startsWith('v1:')) return value;
+  const [, ivValue, tagValue, encryptedValue] = value.split(':');
+  const decipher = createDecipheriv('aes-256-gcm', licenseEncryptionKey, Buffer.from(ivValue, 'base64url'));
+  decipher.setAuthTag(Buffer.from(tagValue, 'base64url'));
+  return Buffer.concat([decipher.update(Buffer.from(encryptedValue, 'base64url')), decipher.final()]).toString('utf8');
+};
+const migratePlaintextLicenseKeys = () => {
+  const legacyOrders = db.prepare("SELECT app_trans_id, delivery_key FROM payment_orders WHERE delivery_key IS NOT NULL AND delivery_key NOT LIKE 'v1:%'").all();
+  const update = db.prepare('UPDATE payment_orders SET delivery_key = ? WHERE app_trans_id = ?');
+  for (const order of legacyOrders) update.run(encryptLicenseKey(order.delivery_key), order.app_trans_id);
+};
+migratePlaintextLicenseKeys();
 const sameMac = (left, right) => {
   const a = Buffer.from(String(left || ''), 'utf8');
   const b = Buffer.from(String(right || ''), 'utf8');
@@ -138,6 +178,9 @@ setInterval(() => {
   const cutoff = Date.now() - 120_000;
   for (const [key, bucket] of rateLimitBuckets) if (bucket.startedAt < cutoff) rateLimitBuckets.delete(key);
 }, 120_000).unref();
+setInterval(() => {
+  db.prepare('DELETE FROM auth_sessions WHERE expires_at <= ?').run(new Date().toISOString());
+}, 60 * 60 * 1000).unref();
 
 const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, {});
@@ -196,7 +239,7 @@ const server = createServer(async (req, res) => {
       if (order.status !== 'paid') {
         const licenseKey = createLicenseKey();
         db.prepare('INSERT INTO licenses (id, key_hash, key_last4) VALUES (?, ?, ?)').run(randomUUID(), hashLicense(licenseKey), licenseKey.slice(-4));
-        db.prepare('UPDATE payment_orders SET status = ?, zp_trans_id = ?, delivery_key = ?, paid_at = ? WHERE app_trans_id = ?').run('paid', String(data.zp_trans_id || ''), licenseKey, new Date().toISOString(), order.app_trans_id);
+        db.prepare('UPDATE payment_orders SET status = ?, zp_trans_id = ?, delivery_key = ?, paid_at = ? WHERE app_trans_id = ?').run('paid', String(data.zp_trans_id || ''), encryptLicenseKey(licenseKey), new Date().toISOString(), order.app_trans_id);
       }
       return send(res, 200, { return_code: 1, return_message: 'Success' });
     }
@@ -206,7 +249,7 @@ const server = createServer(async (req, res) => {
       const deviceId = url.searchParams.get('deviceId') || '';
       const order = db.prepare('SELECT status, delivery_key, amount FROM payment_orders WHERE app_trans_id = ? AND device_id = ?').get(appTransId, deviceId);
       if (!order) return send(res, 404, { error: 'Payment order not found' });
-      return send(res, 200, { status: order.status, amount: order.amount, licenseKey: order.delivery_key || null });
+      return send(res, 200, { status: order.status, amount: order.amount, licenseKey: order.delivery_key ? decryptLicenseKey(order.delivery_key) : null });
     }
 
     if (url.pathname === '/api/auth/register' && req.method === 'POST') {
@@ -217,18 +260,16 @@ const server = createServer(async (req, res) => {
       if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) return send(res, 409, { error: 'An account with this email already exists' });
       const user = { id: randomUUID(), email, passwordHash: await hashPassword(input.password), isPremium: false, createdAt: new Date().toISOString() };
       db.prepare('INSERT INTO users (id, email, password_hash, is_premium, created_at) VALUES (?, ?, ?, ?, ?)').run(user.id, user.email, user.passwordHash, 0, user.createdAt);
-      const token = randomBytes(32).toString('hex');
-      sessions.set(token, user.id);
-      return send(res, 201, { user: publicUser(user), token });
+      const token = createSession(user.id);
+      return send(res, 201, { user: publicUser(user) }, { 'Set-Cookie': authCookie(token) });
     }
 
     if (url.pathname === '/api/auth/login' && req.method === 'POST') {
       const input = await body(req);
       const user = db.prepare('SELECT id, email, password_hash, is_premium, created_at FROM users WHERE email = ?').get(String(input.email || '').toLowerCase().trim());
       if (!user || !(await verifyPassword(input.password || '', user.password_hash))) return send(res, 401, { error: 'Email or password is incorrect' });
-      const token = randomBytes(32).toString('hex');
-      sessions.set(token, user.id);
-      return send(res, 200, { user: publicUser(user), token });
+      const token = createSession(user.id);
+      return send(res, 200, { user: publicUser(user) }, { 'Set-Cookie': authCookie(token) });
     }
 
     const user = await getAuthUser(req);
@@ -236,8 +277,9 @@ const server = createServer(async (req, res) => {
 
     if (url.pathname === '/api/auth/me' && req.method === 'GET') return send(res, 200, { user: publicUser(user) });
     if (url.pathname === '/api/auth/logout' && req.method === 'POST') {
-      sessions.delete(req.headers.authorization?.replace('Bearer ', ''));
-      return send(res, 200, { ok: true });
+      const token = parseCookies(req.headers.cookie).zen_auth || req.headers.authorization?.replace('Bearer ', '');
+      deleteSession(token);
+      return send(res, 200, { ok: true }, { 'Set-Cookie': clearedAuthCookie });
     }
 
     if (url.pathname === '/api/sessions' && req.method === 'GET') {
