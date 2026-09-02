@@ -99,3 +99,9 @@ PREMIUM_PRICE_VND=125000
 ```
 
 Use ZaloPay Sandbox first. The callback URL must be reachable from ZaloPay; a localhost URL will not receive callbacks. After the user returns from ZaloPay, the backend stores the generated license against the payment order, ready for the payment-result screen or an email delivery step.
+
+### Sentence bank
+
+Sentence metadata is normalized in `src/data/sentenceBank.ts`. The practice flow continues to consume text arrays, while `SENTENCE_BANK` and `VOCABULARY_SENTENCE_BANK` provide items with `id`, `text`, `difficulty`, `topic`, `source`, and optional `license` fields.
+
+New external sentences must have commercial usage rights, record the license in the metadata, and pass manual checks for grammar, length, and difficulty before being added to the active bank. Existing sentences are marked as `custom`.

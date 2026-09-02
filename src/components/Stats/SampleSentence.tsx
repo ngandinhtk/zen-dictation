@@ -307,6 +307,30 @@ const dailyVocabularySentences: Record<Difficulty, string[]> = {
   ],
 };
 
+const makeExpandedSentences = (subjects: string[], endings: string[]) =>
+  subjects.flatMap(subject => endings.map(ending => `${subject} ${ending}`));
+
+// Additional custom sentences live beside the original sentence bank.
+// They are grouped by topic in the normalized bank layer.
+const EXPANDED_SENTENCES: Record<Difficulty, string[]> = {
+  easy: [
+    ...makeExpandedSentences(['The baker', 'The gardener', 'The nurse', 'The artist', 'The driver'], ['opens the shop before sunrise.', 'keeps a small notebook nearby.', 'greets each visitor with a smile.', 'checks the list before starting work.']),
+    ...makeExpandedSentences(['A morning walk', 'A glass of water', 'A quiet breakfast', 'Fresh vegetables', 'Regular sleep'], ['can give the body more energy.', 'helps us begin the day calmly.', 'makes a simple routine easier to follow.', 'supports a healthy daily habit.']),
+    ...makeExpandedSentences(['The traveler', 'Our family', 'The young couple', 'My class', 'A friendly guide'], ['packs a light bag for the journey.', 'checks the map before leaving.', 'waits beside the station entrance.', 'takes a photo near the old bridge.']),
+    ...makeExpandedSentences(['A new word', 'A short lesson', 'A clear example', 'This exercise', 'A patient teacher'], ['can make a difficult idea easier.', 'helps us remember useful details.', 'gives the learner a chance to practice.', 'makes the next question less confusing.']),
+  ],
+  medium: [
+    ...makeExpandedSentences(['The project manager', 'A new employee', 'The design team', 'Our small company', 'The office assistant'], ['reviewed the schedule before the meeting began.', 'prepared a summary for the afternoon discussion.', 'created a clear system for sharing information.', 'asked for feedback before changing the plan.']),
+    ...makeExpandedSentences(['The software team', 'A careful user', 'The updated application', 'Many online services', 'A reliable backup system'], ['can protect important files from accidental loss.', 'makes routine tasks easier to complete.', 'requires regular testing before release.', 'should explain changes in language everyone understands.']),
+    ...makeExpandedSentences(['The local council', 'Several researchers', 'A responsible business', 'The community project', 'Many coastal towns'], ['is considering a practical response to the problem.', 'collected information before recommending a solution.', 'reduced unnecessary waste during the previous year.', 'must balance immediate needs with future concerns.']),
+    ...makeExpandedSentences(['A thoughtful speaker', 'The discussion group', 'An experienced teacher', 'The customer service team', 'A well-written message'], ['can prevent a misunderstanding from becoming a conflict.', 'examined several viewpoints before reaching an agreement.', 'encourages people to ask questions openly.', 'usually provides enough context for a useful response.']),
+  ],
+  hard: [
+    ...makeExpandedSentences(['A rigorous investigation', 'The independent study', 'The research committee', 'A carefully designed survey', 'The published analysis'], ['must distinguish reliable evidence from attractive assumptions.', 'revealed limitations that had been overlooked initially.', 'compared competing explanations before presenting its conclusion.', 'demonstrated why the original question required greater precision.']),
+    ...makeExpandedSentences(['A convincing argument', 'A nuanced interpretation', 'The strongest conclusion', 'An apparently minor detail', 'A balanced evaluation'], ['becomes weaker when it ignores evidence that complicates the narrative.', 'should acknowledge uncertainty rather than conceal it behind certainty.', 'emerges only after alternative explanations have been considered.', 'may reveal a deeper problem within the original reasoning.']),
+  ],
+};
+
 const vocabularySentences: Record<Difficulty, string[]> = {
   easy: [
     'The bright window made the small room feel welcoming',
@@ -471,6 +495,7 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       ...grammarSentences.easy,
       ...vocabularySentences.easy,
       ...diverseSentenceBank.easy,
+      ...EXPANDED_SENTENCES.easy,
     ]),
     medium: cleanSentences([
       'Practice makes perfect when it comes to language learning',
@@ -494,6 +519,7 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       ...grammarSentences.medium,
       ...vocabularySentences.medium,
       ...diverseSentenceBank.medium,
+      ...EXPANDED_SENTENCES.medium,
     ]),
     hard: cleanSentences([
       'The only limit to our realization of tomorrow is our doubts of today',
@@ -517,6 +543,7 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       ...grammarSentences.hard,
       ...vocabularySentences.hard,
       ...diverseSentenceBank.hard,
+      ...EXPANDED_SENTENCES.hard,
     ]),
   },
 };

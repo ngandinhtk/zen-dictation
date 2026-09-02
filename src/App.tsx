@@ -6,7 +6,7 @@ import DictationArea from './components/DictationArea/DictationArea';
 import Controls from './components/Controls/Controls';
 import './styles/globals.css';
 import './App.css';
-import SAMPLE_SENTENCES, { CAMBRIDGE_LEVELS, VOCABULARY_SENTENCES } from './components/Stats/SampleSentence';
+import SAMPLE_SENTENCES, { CAMBRIDGE_LEVELS, VOCABULARY_SENTENCES_TEXT as VOCABULARY_SENTENCES } from './data/sentenceBank';
 import {  type Difficulty } from './utils/sentenceTranslations';
 import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
 import { addReviewWord, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, saveReviewNoteForAttempt, type ReviewWord } from './services/spacedRepetitionService';
@@ -90,7 +90,7 @@ function App() {
   const [accountUser, setAccountUser] = useState<AccountUser | null>(null);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [achievementToast, setAchievementToast] = useState<{ title: string; description: string; icon: string } | null>(null);
-  const unlockedAchievementIdsRef = useRef<Set<string>>(new Set());
+  const unlockedAchievementIdsRef = useRef<Set<string> | null>(null);
   const openPremiumDashboard = () => {
     window.history.pushState({}, '', '#premium');
     setIsPremiumOpen(true);
@@ -519,7 +519,12 @@ function App() {
   useEffect(() => {
     const currentAchievements = getUnlockedAchievements(points);
     const nextUnlockedIds = new Set(currentAchievements.filter(achievement => achievement.unlocked).map(achievement => achievement.id));
-    const newlyUnlocked = currentAchievements.filter(achievement => achievement.unlocked && !unlockedAchievementIdsRef.current.has(achievement.id));
+    if (unlockedAchievementIdsRef.current === null) {
+      unlockedAchievementIdsRef.current = nextUnlockedIds;
+      return;
+    }
+    const previousUnlockedIds = unlockedAchievementIdsRef.current;
+    const newlyUnlocked = currentAchievements.filter(achievement => achievement.unlocked && !previousUnlockedIds.has(achievement.id));
 
     unlockedAchievementIdsRef.current = nextUnlockedIds;
 
@@ -816,7 +821,12 @@ function App() {
         {!isFocusMode && lastAttempt && (
           <div className="attempt-summary" role="status" aria-live="polite">
             <strong>{lastAttempt.accuracy}% accuracy</strong>
-            <span>{lastAttempt.incorrectCharacters} incorrect</span>
+            {lastAttempt.incorrectWords.length > 0 && <div className="incorrect-details" aria-label="Incorrect words">
+              {/* <span>Words to review</span> */}
+              <div className="incorrect-details-list">
+                {lastAttempt.incorrectWords.map((detail, index) => <span className="incorrect-word" key={`${detail.actual}-${detail.expected}-${index}`}><b>{detail.actual}</b><i>→</i><strong>{detail.expected}</strong></span>)}
+              </div>
+            </div>}
             <p><small>Grammar focus: {lastAttempt.grammarTip}</small></p>
             {(lastAttempt.incorrectCharacters > 0 || lastAttempt.missingCharacters > 0) && <div className="review-note-editor">
               <label htmlFor="practice-review-note">Note for review <small>Saved with the words you missed</small></label>

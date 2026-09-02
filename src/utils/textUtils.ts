@@ -20,6 +20,7 @@ export interface AttemptAnalysis {
   incorrectCharacters: number;
   missingCharacters: number;
   grammarTip: string;
+  incorrectWords: Array<{ actual: string; expected: string }>;
 }
 
 export const getGrammarTip = (sentence: string): string => {
@@ -42,11 +43,17 @@ export const analyzeAttempt = (target: string, input: string): AttemptAnalysis =
   const incorrectCharacters = feedback.filter(item => item.status === 'incorrect').length;
   const missingCharacters = feedback.filter(item => item.status === 'pending').length;
   const correctCharacters = feedback.length - incorrectCharacters - missingCharacters;
+  const targetWords = target.toLowerCase().match(/[a-z']+/g) || [];
+  const inputWords = input.toLowerCase().match(/[a-z']+/g) || [];
+  const incorrectWords = inputWords
+    .map((word, index) => ({ actual: word, expected: targetWords[index] }))
+    .filter(detail => detail.expected !== undefined && detail.expected !== detail.actual);
   return {
     accuracy: Math.round((correctCharacters / Math.max(target.length, 1)) * 100),
     incorrectCharacters,
     missingCharacters,
     grammarTip: getGrammarTip(target),
+    incorrectWords,
   };
 };
 
