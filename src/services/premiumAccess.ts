@@ -1,3 +1,5 @@
+import { apiUrl } from './api';
+
 export interface PremiumEntitlement {
   isPremium: boolean;
   source: 'license' | 'payment' | 'admin' | 'none';
@@ -35,14 +37,14 @@ const readApiResponse = async <T>(response: Response): Promise<T & { error?: str
 };
 
 export const getPremiumStatus = async (): Promise<PremiumEntitlement> => {
-  const response = await fetch('/api/premium/status?deviceId=' + encodeURIComponent(getDeviceId()), { credentials: 'include' });
+  const response = await fetch(apiUrl('/api/premium/status?deviceId=' + encodeURIComponent(getDeviceId())), { credentials: 'include' });
   const result = await readApiResponse<PremiumEntitlement>(response);
   if (!response.ok) throw new Error(result.error || 'Premium status unavailable');
   return result;
 };
 
 export const activatePremiumLicense = async (licenseKey: string): Promise<PremiumEntitlement> => {
-  const response = await fetch('/api/premium/activate', {
+  const response = await fetch(apiUrl('/api/premium/activate'), {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -54,7 +56,7 @@ export const activatePremiumLicense = async (licenseKey: string): Promise<Premiu
 };
 
 export const createZaloPayOrder = async (email = ''): Promise<ZaloPayOrder> => {
-  const response = await fetch('/api/payments/zalopay/create-order', {
+  const response = await fetch(apiUrl('/api/payments/zalopay/create-order'), {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -66,7 +68,7 @@ export const createZaloPayOrder = async (email = ''): Promise<ZaloPayOrder> => {
 };
 
 export const getZaloPayPaymentStatus = async (appTransId: string): Promise<ZaloPayPaymentStatus> => {
-  const response = await fetch('/api/payments/zalopay/status?appTransId=' + encodeURIComponent(appTransId) + '&deviceId=' + encodeURIComponent(getDeviceId()), { credentials: 'include' });
+  const response = await fetch(apiUrl('/api/payments/zalopay/status?appTransId=' + encodeURIComponent(appTransId) + '&deviceId=' + encodeURIComponent(getDeviceId())), { credentials: 'include' });
   const result = await readApiResponse<ZaloPayPaymentStatus & { error?: string }>(response);
   if (!response.ok) throw new Error(result.error || 'Unable to check payment status');
   return result;

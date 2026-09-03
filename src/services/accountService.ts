@@ -1,3 +1,5 @@
+import { apiUrl } from './api';
+
 export interface AccountUser {
   id: string;
   email: string;
@@ -14,7 +16,7 @@ export interface AccountPracticeSession {
 }
 
 const request = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     ...options,
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...options.headers },

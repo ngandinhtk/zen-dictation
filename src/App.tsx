@@ -822,7 +822,7 @@ function App() {
           <div className="attempt-summary" role="status" aria-live="polite">
             <strong>{lastAttempt.accuracy}% accuracy</strong>
             {lastAttempt.incorrectWords.length > 0 && <div className="incorrect-details" aria-label="Incorrect words">
-              {/* <span>Words to review</span> */}
+              {/* <span>Words */}
               <div className="incorrect-details-list">
                 {lastAttempt.incorrectWords.map((detail, index) => <span className="incorrect-word" key={`${detail.actual}-${detail.expected}-${index}`}><b>{detail.actual}</b><i>→</i><strong>{detail.expected}</strong></span>)}
               </div>

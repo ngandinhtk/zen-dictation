@@ -3,42 +3,49 @@ import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, 
 import { promisify } from 'node:util';
 import { access, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import pg from 'pg';
 
 const scrypt = promisify(scryptCallback);
 const PORT = Number(process.env.PORT || 3002);
-const DB_FILE = join(process.cwd(), 'server', 'zen-dictation.sqlite');
 const LEGACY_DATA_FILE = join(process.cwd(), 'server', 'data.json');
 const rateLimitBuckets = new Map();
 const isProduction = process.env.NODE_ENV === 'production';
+const { Pool } = pg;
+const DATABASE_URL = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
+if (!DATABASE_URL) throw new Error('DATABASE_URL must be configured');
+const pool = new Pool({ connectionString: DATABASE_URL, ssl: isProduction ? { rejectUnauthorized: false } : undefined });
+const query = (text, values = []) => pool.query(text, values);
 const hashLicense = value => createHash('sha256').update(value.trim().toUpperCase()).digest('hex');
 const licenseEncryptionKey = createHash('sha256').update(process.env.PREMIUM_DATA_KEY || (isProduction ? '' : 'zen-dictation-development-only')).digest();
 if (isProduction && !process.env.PREMIUM_DATA_KEY) throw new Error('PREMIUM_DATA_KEY must be configured in production');
-const db = new DatabaseSync(DB_FILE);
-db.exec('PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, is_premium INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS auth_sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS auth_sessions_expiry ON auth_sessions(expires_at); CREATE TABLE IF NOT EXISTS practice_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, date TEXT NOT NULL, difficulty TEXT NOT NULL, wpm INTEGER NOT NULL DEFAULT 0, accuracy INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS practice_sessions_user_date ON practice_sessions(user_id, date DESC); CREATE TABLE IF NOT EXISTS licenses (id TEXT PRIMARY KEY, key_hash TEXT NOT NULL UNIQUE, key_last4 TEXT NOT NULL, activated_by TEXT, activated_at TEXT); CREATE TABLE IF NOT EXISTS payment_orders (app_trans_id TEXT PRIMARY KEY, device_id TEXT NOT NULL, email TEXT, amount INTEGER NOT NULL, status TEXT NOT NULL DEFAULT \'pending\', order_url TEXT, zp_trans_id TEXT, delivery_key TEXT, created_at TEXT NOT NULL, paid_at TEXT);');
+await query(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, is_premium BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL);
+CREATE TABLE IF NOT EXISTS auth_sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at TIMESTAMPTZ NOT NULL);
+CREATE INDEX IF NOT EXISTS auth_sessions_expiry ON auth_sessions(expires_at);
+CREATE TABLE IF NOT EXISTS practice_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, date TIMESTAMPTZ NOT NULL, difficulty TEXT NOT NULL, wpm INTEGER NOT NULL DEFAULT 0, accuracy INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX IF NOT EXISTS practice_sessions_user_date ON practice_sessions(user_id, date DESC);
+CREATE TABLE IF NOT EXISTS licenses (id TEXT PRIMARY KEY, key_hash TEXT NOT NULL UNIQUE, key_last4 TEXT NOT NULL, activated_by TEXT, activated_at TIMESTAMPTZ);
+CREATE TABLE IF NOT EXISTS payment_orders (app_trans_id TEXT PRIMARY KEY, device_id TEXT NOT NULL, email TEXT, amount INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', order_url TEXT, zp_trans_id TEXT, delivery_key TEXT, created_at TIMESTAMPTZ NOT NULL, paid_at TIMESTAMPTZ);`);
 
 const migrateLegacyData = async () => {
   try {
     await access(LEGACY_DATA_FILE);
-    if (db.prepare('SELECT COUNT(*) AS count FROM users').get().count > 0) return;
+    const count = await query('SELECT COUNT(*)::int AS count FROM users');
+    if (count.rows[0].count > 0) return;
     const legacy = JSON.parse(await readFile(LEGACY_DATA_FILE, 'utf8'));
-    const insertUser = db.prepare('INSERT OR IGNORE INTO users (id, email, password_hash, is_premium, created_at) VALUES (?, ?, ?, ?, ?)');
-    const insertSession = db.prepare('INSERT OR IGNORE INTO practice_sessions (id, user_id, date, difficulty, wpm, accuracy) VALUES (?, ?, ?, ?, ?, ?)');
-    for (const user of legacy.users || []) insertUser.run(user.id, user.email, user.passwordHash, user.isPremium ? 1 : 0, user.createdAt);
-    for (const session of legacy.practiceSessions || []) insertSession.run(session.id, session.userId, session.date, session.difficulty, session.wpm, session.accuracy);
-    console.log('Migrated legacy JSON data to SQLite');
+    for (const user of legacy.users || []) await query('INSERT INTO users (id, email, password_hash, is_premium, created_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING', [user.id, user.email, user.passwordHash, Boolean(user.isPremium), user.createdAt]);
+    for (const session of legacy.practiceSessions || []) await query('INSERT INTO practice_sessions (id, user_id, date, difficulty, wpm, accuracy) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING', [session.id, session.userId, session.date, session.difficulty, session.wpm, session.accuracy]);
+    console.log('Migrated legacy JSON data to Supabase');
   } catch (error) {
     if (error.code !== 'ENOENT') console.error('Legacy data migration failed:', error.message);
   }
 };
 await migrateLegacyData();
 
-const seedConfiguredLicenses = () => {
+const seedConfiguredLicenses = async () => {
   const configuredKeys = (process.env.PREMIUM_LICENSE_KEYS || '').split(',').map(key => key.trim()).filter(Boolean);
-  const insert = db.prepare('INSERT OR IGNORE INTO licenses (id, key_hash, key_last4) VALUES (?, ?, ?)');
-  for (const key of configuredKeys) insert.run(randomUUID(), hashLicense(key), key.slice(-4).toUpperCase());
+  for (const key of configuredKeys) await query('INSERT INTO licenses (id, key_hash, key_last4) VALUES ($1, $2, $3) ON CONFLICT (key_hash) DO NOTHING', [randomUUID(), hashLicense(key), key.slice(-4).toUpperCase()]);
 };
-seedConfiguredLicenses();
+await seedConfiguredLicenses();
 
 const send = (res, status, payload, extraHeaders = {}) => {
   const allowedOrigin = process.env.CLIENT_ORIGIN || (isProduction ? 'null' : 'http://localhost:5173');
@@ -72,18 +79,19 @@ const parseCookies = header => Object.fromEntries((header || '').split(';').map(
   const separator = cookie.indexOf('=');
   return separator < 0 ? [cookie.trim(), ''] : [cookie.slice(0, separator).trim(), cookie.slice(separator + 1).trim()];
 }));
-const authCookie = token => `zen_auth=${token}; HttpOnly; Path=/; Max-Age=${SESSION_TTL_MS / 1000}; SameSite=Lax${isProduction ? '; Secure' : ''}`;
-const clearedAuthCookie = `zen_auth=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${isProduction ? '; Secure' : ''}`;
+const cookieSameSite = isProduction ? 'None' : 'Lax';
+const authCookie = token => `zen_auth=${token}; HttpOnly; Path=/; Max-Age=${SESSION_TTL_MS / 1000}; SameSite=${cookieSameSite}${isProduction ? '; Secure' : ''}`;
+const clearedAuthCookie = `zen_auth=; HttpOnly; Path=/; Max-Age=0; SameSite=${cookieSameSite}${isProduction ? '; Secure' : ''}`;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const hashSessionToken = token => createHash('sha256').update(token).digest('hex');
-const createSession = userId => {
+const createSession = async userId => {
   const token = randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
-  db.prepare('INSERT INTO auth_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)').run(hashSessionToken(token), userId, expiresAt);
+  await query('INSERT INTO auth_sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [hashSessionToken(token), userId, expiresAt]);
   return token;
 };
-const deleteSession = token => {
-  if (token) db.prepare('DELETE FROM auth_sessions WHERE token_hash = ?').run(hashSessionToken(token));
+const deleteSession = async token => {
+  if (token) await query('DELETE FROM auth_sessions WHERE token_hash = $1', [hashSessionToken(token)]);
 };
 
 const hashPassword = async password => {
@@ -102,9 +110,9 @@ const verifyPassword = async (password, storedHash) => {
 const getAuthUser = async req => {
   const token = parseCookies(req.headers.cookie).zen_auth || req.headers.authorization?.replace('Bearer ', '');
   if (!token) return null;
-  const session = db.prepare('SELECT user_id FROM auth_sessions WHERE token_hash = ? AND expires_at > ?').get(hashSessionToken(token), new Date().toISOString());
+  const session = (await query('SELECT user_id FROM auth_sessions WHERE token_hash = $1 AND expires_at > $2', [hashSessionToken(token), new Date().toISOString()])).rows[0];
   if (!session) return null;
-  return db.prepare('SELECT id, email, password_hash, is_premium, created_at FROM users WHERE id = ?').get(session.user_id) || null;
+  return (await query('SELECT id, email, password_hash, is_premium, created_at FROM users WHERE id = $1', [session.user_id])).rows[0] || null;
 };
 
 const validateCredentials = ({ email, password }) => {
@@ -113,7 +121,7 @@ const validateCredentials = ({ email, password }) => {
   return null;
 };
 
-const getDeviceLicense = deviceId => db.prepare('SELECT key_last4 FROM licenses WHERE activated_by = ?').get(deviceId);
+const getDeviceLicense = async deviceId => (await query('SELECT key_last4 FROM licenses WHERE activated_by = $1', [deviceId])).rows[0];
 const getZaloPayConfig = () => ({
   appId: Number(process.env.ZALOPAY_APP_ID || 0),
   key1: process.env.ZALOPAY_KEY1 || '',
@@ -142,12 +150,11 @@ const decryptLicenseKey = value => {
   decipher.setAuthTag(Buffer.from(tagValue, 'base64url'));
   return Buffer.concat([decipher.update(Buffer.from(encryptedValue, 'base64url')), decipher.final()]).toString('utf8');
 };
-const migratePlaintextLicenseKeys = () => {
-  const legacyOrders = db.prepare("SELECT app_trans_id, delivery_key FROM payment_orders WHERE delivery_key IS NOT NULL AND delivery_key NOT LIKE 'v1:%'").all();
-  const update = db.prepare('UPDATE payment_orders SET delivery_key = ? WHERE app_trans_id = ?');
-  for (const order of legacyOrders) update.run(encryptLicenseKey(order.delivery_key), order.app_trans_id);
+const migratePlaintextLicenseKeys = async () => {
+  const legacyOrders = (await query("SELECT app_trans_id, delivery_key FROM payment_orders WHERE delivery_key IS NOT NULL AND delivery_key NOT LIKE 'v1:%'")).rows;
+  for (const order of legacyOrders) await query('UPDATE payment_orders SET delivery_key = $1 WHERE app_trans_id = $2', [encryptLicenseKey(order.delivery_key), order.app_trans_id]);
 };
-migratePlaintextLicenseKeys();
+await migratePlaintextLicenseKeys();
 const sameMac = (left, right) => {
   const a = Buffer.from(String(left || ''), 'utf8');
   const b = Buffer.from(String(right || ''), 'utf8');
@@ -179,7 +186,7 @@ setInterval(() => {
   for (const [key, bucket] of rateLimitBuckets) if (bucket.startedAt < cutoff) rateLimitBuckets.delete(key);
 }, 120_000).unref();
 setInterval(() => {
-  db.prepare('DELETE FROM auth_sessions WHERE expires_at <= ?').run(new Date().toISOString());
+  query('DELETE FROM auth_sessions WHERE expires_at <= $1', [new Date().toISOString()]).catch(error => console.error('Session cleanup failed:', error.message));
 }, 60 * 60 * 1000).unref();
 
 const server = createServer(async (req, res) => {
@@ -193,7 +200,7 @@ const server = createServer(async (req, res) => {
       const deviceId = url.searchParams.get('deviceId') || '';
       const user = await getAuthUser(req);
       if (user?.is_premium) return send(res, 200, { isPremium: true, source: 'payment' });
-      const license = deviceId.length <= 128 ? getDeviceLicense(deviceId) : null;
+      const license = deviceId.length <= 128 ? await getDeviceLicense(deviceId) : null;
       return send(res, 200, { isPremium: Boolean(license), source: license ? 'license' : 'none', licenseLast4: license?.key_last4 || null });
     }
 
@@ -202,12 +209,12 @@ const server = createServer(async (req, res) => {
       const licenseKey = typeof input.licenseKey === 'string' ? input.licenseKey.trim().toUpperCase() : '';
       const deviceId = typeof input.deviceId === 'string' ? input.deviceId.trim() : '';
       if (!licenseKey || !deviceId || deviceId.length > 128) return send(res, 400, { error: 'A valid license key is required' });
-      const license = db.prepare('SELECT id, key_last4, activated_by FROM licenses WHERE key_hash = ?').get(hashLicense(licenseKey));
+      const license = (await query('SELECT id, key_last4, activated_by FROM licenses WHERE key_hash = $1', [hashLicense(licenseKey)])).rows[0];
       if (!license) return send(res, 404, { error: 'This license key is not valid' });
       if (license.activated_by && license.activated_by !== deviceId) return send(res, 409, { error: 'This license key is already used on another device' });
-      db.prepare('UPDATE licenses SET activated_by = ?, activated_at = ? WHERE id = ?').run(deviceId, new Date().toISOString(), license.id);
+      await query('UPDATE licenses SET activated_by = $1, activated_at = $2 WHERE id = $3', [deviceId, new Date().toISOString(), license.id]);
       const user = await getAuthUser(req);
-      if (user) db.prepare('UPDATE users SET is_premium = 1 WHERE id = ?').run(user.id);
+      if (user) await query('UPDATE users SET is_premium = TRUE WHERE id = $1', [user.id]);
       return send(res, 200, { isPremium: true, source: user ? 'payment' : 'license', licenseLast4: license.key_last4 });
     }
 
@@ -229,7 +236,7 @@ const server = createServer(async (req, res) => {
       const result = await fetch(config.createUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(order) });
       const payload = await result.json();
       if (!result.ok || payload.return_code !== 1 || !payload.order_url) return send(res, 502, { error: payload.return_message || 'ZaloPay could not create the order' });
-      db.prepare('INSERT INTO payment_orders (app_trans_id, device_id, email, amount, status, order_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(appTransId, deviceId, email || null, config.amount, 'pending', payload.order_url, new Date().toISOString());
+      await query('INSERT INTO payment_orders (app_trans_id, device_id, email, amount, status, order_url, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)', [appTransId, deviceId, email || null, config.amount, 'pending', payload.order_url, new Date().toISOString()]);
       return send(res, 201, { orderUrl: payload.order_url, appTransId, amount: config.amount });
     }
 
@@ -238,12 +245,12 @@ const server = createServer(async (req, res) => {
       const input = await body(req);
       if (!config.key2 || !sameMac(hmacSha256(config.key2, input.data), input.mac)) return send(res, 200, { return_code: -1, return_message: 'mac not equal' });
       const data = JSON.parse(input.data || '{}');
-      const order = db.prepare('SELECT * FROM payment_orders WHERE app_trans_id = ?').get(data.app_trans_id);
+      const order = (await query('SELECT * FROM payment_orders WHERE app_trans_id = $1', [data.app_trans_id])).rows[0];
       if (!order || Number(data.amount) !== order.amount) return send(res, 200, { return_code: -1, return_message: 'order not found' });
       if (order.status !== 'paid') {
         const licenseKey = createLicenseKey();
-        db.prepare('INSERT INTO licenses (id, key_hash, key_last4) VALUES (?, ?, ?)').run(randomUUID(), hashLicense(licenseKey), licenseKey.slice(-4));
-        db.prepare('UPDATE payment_orders SET status = ?, zp_trans_id = ?, delivery_key = ?, paid_at = ? WHERE app_trans_id = ?').run('paid', String(data.zp_trans_id || ''), encryptLicenseKey(licenseKey), new Date().toISOString(), order.app_trans_id);
+        await query('INSERT INTO licenses (id, key_hash, key_last4) VALUES ($1, $2, $3)', [randomUUID(), hashLicense(licenseKey), licenseKey.slice(-4)]);
+        await query('UPDATE payment_orders SET status = $1, zp_trans_id = $2, delivery_key = $3, paid_at = $4 WHERE app_trans_id = $5', ['paid', String(data.zp_trans_id || ''), encryptLicenseKey(licenseKey), new Date().toISOString(), order.app_trans_id]);
       }
       return send(res, 200, { return_code: 1, return_message: 'Success' });
     }
@@ -251,7 +258,7 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/api/payments/zalopay/status' && req.method === 'GET') {
       const appTransId = url.searchParams.get('appTransId') || '';
       const deviceId = url.searchParams.get('deviceId') || '';
-      const order = db.prepare('SELECT status, delivery_key, amount FROM payment_orders WHERE app_trans_id = ? AND device_id = ?').get(appTransId, deviceId);
+      const order = (await query('SELECT status, delivery_key, amount FROM payment_orders WHERE app_trans_id = $1 AND device_id = $2', [appTransId, deviceId])).rows[0];
       if (!order) return send(res, 404, { error: 'Payment order not found' });
       return send(res, 200, { status: order.status, amount: order.amount, licenseKey: order.delivery_key ? decryptLicenseKey(order.delivery_key) : null });
     }
@@ -261,18 +268,18 @@ const server = createServer(async (req, res) => {
       const error = validateCredentials(input);
       if (error) return send(res, 400, { error });
       const email = input.email.toLowerCase().trim();
-      if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) return send(res, 409, { error: 'An account with this email already exists' });
+      if ((await query('SELECT id FROM users WHERE email = $1', [email])).rows[0]) return send(res, 409, { error: 'An account with this email already exists' });
       const user = { id: randomUUID(), email, passwordHash: await hashPassword(input.password), isPremium: false, createdAt: new Date().toISOString() };
-      db.prepare('INSERT INTO users (id, email, password_hash, is_premium, created_at) VALUES (?, ?, ?, ?, ?)').run(user.id, user.email, user.passwordHash, 0, user.createdAt);
-      const token = createSession(user.id);
+      await query('INSERT INTO users (id, email, password_hash, is_premium, created_at) VALUES ($1, $2, $3, $4, $5)', [user.id, user.email, user.passwordHash, false, user.createdAt]);
+      const token = await createSession(user.id);
       return send(res, 201, { user: publicUser(user) }, { 'Set-Cookie': authCookie(token) });
     }
 
     if (url.pathname === '/api/auth/login' && req.method === 'POST') {
       const input = await body(req);
-      const user = db.prepare('SELECT id, email, password_hash, is_premium, created_at FROM users WHERE email = ?').get(String(input.email || '').toLowerCase().trim());
+      const user = (await query('SELECT id, email, password_hash, is_premium, created_at FROM users WHERE email = $1', [String(input.email || '').toLowerCase().trim()])).rows[0];
       if (!user || !(await verifyPassword(input.password || '', user.password_hash))) return send(res, 401, { error: 'Email or password is incorrect' });
-      const token = createSession(user.id);
+      const token = await createSession(user.id);
       return send(res, 200, { user: publicUser(user) }, { 'Set-Cookie': authCookie(token) });
     }
 
@@ -282,20 +289,20 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/api/auth/me' && req.method === 'GET') return send(res, 200, { user: publicUser(user) });
     if (url.pathname === '/api/auth/logout' && req.method === 'POST') {
       const token = parseCookies(req.headers.cookie).zen_auth || req.headers.authorization?.replace('Bearer ', '');
-      deleteSession(token);
+      await deleteSession(token);
       return send(res, 200, { ok: true }, { 'Set-Cookie': clearedAuthCookie });
     }
 
     if (url.pathname === '/api/sessions' && req.method === 'GET') {
-      const rows = db.prepare('SELECT id, date, difficulty, wpm, accuracy FROM practice_sessions WHERE user_id = ? ORDER BY date DESC LIMIT 30').all(user.id);
+      const rows = (await query('SELECT id, date, difficulty, wpm, accuracy FROM practice_sessions WHERE user_id = $1 ORDER BY date DESC LIMIT 30', [user.id])).rows;
       return send(res, 200, { sessions: rows });
     }
 
     if (url.pathname === '/api/sessions' && req.method === 'POST') {
       const input = await body(req);
       const session = { id: randomUUID(), userId: user.id, date: input.date || new Date().toISOString(), difficulty: input.difficulty || 'easy', wpm: Number(input.wpm) || 0, accuracy: Number(input.accuracy) || 0 };
-      db.prepare('INSERT INTO practice_sessions (id, user_id, date, difficulty, wpm, accuracy) VALUES (?, ?, ?, ?, ?, ?)').run(session.id, session.userId, session.date, session.difficulty, session.wpm, session.accuracy);
-      db.prepare('DELETE FROM practice_sessions WHERE user_id = ? AND id NOT IN (SELECT id FROM practice_sessions WHERE user_id = ? ORDER BY date DESC LIMIT 30)').run(user.id, user.id);
+      await query('INSERT INTO practice_sessions (id, user_id, date, difficulty, wpm, accuracy) VALUES ($1, $2, $3, $4, $5, $6)', [session.id, session.userId, session.date, session.difficulty, session.wpm, session.accuracy]);
+      await query('DELETE FROM practice_sessions WHERE user_id = $1 AND id NOT IN (SELECT id FROM practice_sessions WHERE user_id = $1 ORDER BY date DESC LIMIT 30)', [user.id]);
       return send(res, 201, { session });
     }
 

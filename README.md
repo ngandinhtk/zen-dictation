@@ -79,7 +79,7 @@ The account API runs separately from the Vite frontend during development.
 
 Run \`npm run server\` in one terminal and \`npm run dev\` in another. The frontend proxies \`/api\` requests to \`http://localhost:3002\`.
 
-The backend currently provides account registration, login, logout, the current-user endpoint, and authenticated practice-session endpoints. User data is stored in SQLite at \`server/zen-dictation.sqlite\`, which is ignored by Git. If an older \`server/data.json\` exists, it is migrated automatically on first start.
+The backend currently provides account registration, login, logout, the current-user endpoint, and authenticated practice-session endpoints. User data is stored in Supabase PostgreSQL. Set the Supabase connection string in \`DATABASE_URL\`; the required tables are created automatically on first start. If an older \`server/data.json\` exists, it is migrated automatically on first start.
 
 New accounts are Free by default. Premium entitlement is granted only after a valid license key is activated. The Premium payment screen now uses ZaloPay; the server creates orders and verifies ZaloPay callbacks before issuing a license.
 
