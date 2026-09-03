@@ -83,7 +83,7 @@ The backend currently provides account registration, login, logout, the current-
 
 New accounts are Free by default. Premium entitlement is granted only after a valid license key is activated. The Premium payment screen now uses ZaloPay; the server creates orders and verifies ZaloPay callbacks before issuing a license.
 
-For local license testing, start the API with a configured key, for example \`PREMIUM_LICENSE_KEYS=ZEN-DEMO-2026 npm run server\`. Users can enter that key from the Premium page without creating an account. In production, license keys should be created by the payment webhook rather than configured manually.
+For local license testing, start the API with a configured key, for example \`PREMIUM_LICENSE_KEYS=ZEN-DEMO-2026   npm run server\`. Users can enter that key from the Premium page without creating an account. In production, license keys should be created by the payment webhook rather than configured manually.
 
 ### ZaloPay configuration
 
@@ -105,3 +105,5 @@ Use ZaloPay Sandbox first. The callback URL must be reachable from ZaloPay; a lo
 Sentence metadata is normalized in `src/data/sentenceBank.ts`. The practice flow continues to consume text arrays, while `SENTENCE_BANK` and `VOCABULARY_SENTENCE_BANK` provide items with `id`, `text`, `difficulty`, `topic`, `source`, and optional `license` fields.
 
 New external sentences must have commercial usage rights, record the license in the metadata, and pass manual checks for grammar, length, and difficulty before being added to the active bank. Existing sentences are marked as `custom`.
+
+e6b9fa7ad2b1f0ad02daee7f96a9cf5e
