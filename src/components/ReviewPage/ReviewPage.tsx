@@ -5,17 +5,23 @@ import './ReviewPage.css';
 interface ReviewPageProps {
   words: ReviewWord[];
   onAddWord: (word: string) => void;
+  onUpdateWord: (currentWord: string, nextWord: string, note: string) => void;
+  onRemoveWord: (word: string) => void;
   onPracticeWord: (word: string) => void;
   initialWord?: string;
   onBack: () => void;
 }
 
-const ReviewPage = ({ words, onAddWord, onPracticeWord, initialWord, onBack }: ReviewPageProps) => {
+const ReviewPage = ({ words, onAddWord, onUpdateWord, onPracticeWord, initialWord, onBack }: ReviewPageProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const selectedWord = initialWord;
   const [reviewNow] = useState(() => Date.now());
   const [newWord, setNewWord] = useState('');
   const [inputError, setInputError] = useState('');
+  const [editingWord, setEditingWord] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const [editError, setEditError] = useState('');
   const scopedWords = (selectedWord ? words.filter(word => word.word === selectedWord) : words).filter(word => word.correctStreak <= 8);
   const orderedWords = [...scopedWords].sort((a, b) => {
     const aDue = a.correctStreak < 4 || new Date(a.nextReviewAt).getTime() <= reviewNow;
@@ -47,6 +53,27 @@ const ReviewPage = ({ words, onAddWord, onPracticeWord, initialWord, onBack }: R
     setNewWord('');
     setInputError('');
     setCurrentPage(1);
+  };
+  const startEditing = (word: ReviewWord) => {
+    setEditingWord(word.word);
+    setEditValue(word.word);
+    setEditNote(word.note || '');
+    setEditError('');
+  };
+  const handleEditWord = (event: React.FormEvent<HTMLFormElement>, currentWord: string) => {
+    event.preventDefault();
+    const nextWord = editValue.trim().toLowerCase();
+    if (!/^[a-zA-Z']+$/.test(nextWord)) {
+      setEditError('Enter one English word only.');
+      return;
+    }
+    if (words.some(word => word.word === nextWord && word.word !== currentWord)) {
+      setEditError('That word is already in your review list.');
+      return;
+    }
+    onUpdateWord(currentWord, nextWord, editNote);
+    setEditingWord(null);
+    setEditError('');
   };
 
   return <div className="review-page">
@@ -82,7 +109,12 @@ const ReviewPage = ({ words, onAddWord, onPracticeWord, initialWord, onBack }: R
             {visibleWords.map(word => {
               const isDue = word.correctStreak < 4 || new Date(word.nextReviewAt).getTime() <= reviewNow;
               return <article className={`review-card ${isDue ? 'is-due' : ''}`} key={word.word}>
-                <div><strong>{word.word}</strong><span>{word.mistakes} mistake{word.mistakes === 1 ? '' : 's'}</span>{word.note && <small className="review-card-note">Note: {word.note}</small>}</div>
+                <div className="review-card-details">{editingWord === word.word ? <form className="review-edit-form" onSubmit={event => handleEditWord(event, word.word)}>
+                  <input aria-label="Word" value={editValue} onChange={event => { setEditValue(event.target.value); setEditError(''); }} autoFocus />
+                  <input aria-label="Note" value={editNote} onChange={event => setEditNote(event.target.value)} placeholder="Optional note" />
+                  <div className="review-card-actions"><button type="submit" className="review-action secondary">Save</button><button type="button" className="review-action" onClick={() => setEditingWord(null)}>Cancel</button></div>
+                  {editError && <small className="review-edit-error" role="alert">{editError}</small>}
+                </form> : <><strong>{word.word}</strong><span>{word.mistakes} mistake{word.mistakes === 1 ? '' : 's'}</span>{word.note && <small className="review-card-note">Note: {word.note}</small>}<div className="review-card-actions"><button type="button" className="review-action" onClick={() => startEditing(word)}>Edit</button></div></>}</div>
                 <div className="review-card-status">
                   {isDue ? <button type="button" className="review-status-pill" onClick={() => onPracticeWord(word.word)}>Due now</button> : <span className="review-status-pill">Streak {word.correctStreak}</span>}
                   <small>{isDue ? 'Practice this word now' : 'Keep your streak going'}</small>

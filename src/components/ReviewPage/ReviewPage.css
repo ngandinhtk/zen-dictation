@@ -31,6 +31,11 @@
 .review-card.is-due { border-left-color: #d58a68; background: rgba(213, 138, 104, .045); }
 .review-card:last-child { border-bottom: 0; }
 .review-card > div:first-child { display: flex; flex-direction: column; gap: .15rem; }
+.review-card-details { min-width: 0; }
+.review-edit-form { display: flex; flex-direction: column; gap: .35rem; min-width: min(100%, 300px); }
+.review-edit-form input { padding: .4rem .5rem; border: 1px solid var(--border-color); border-radius: 7px; outline: none; background: var(--bg-color); color: var(--text-color); font: inherit; font-size: .7rem; }
+.review-edit-form input:focus { border-color: var(--accent-color); }
+.review-edit-error { color: var(--incorrect-color); font-size: .62rem; }
 .review-card > div:first-child strong { font-family: var(--font-mono); font-size: .9rem; font-weight: 500; }
 .review-card > div:first-child span, .review-card-status small { color: var(--text-muted); font-size: .66rem; }
 .review-card-note { color: var(--text-color); font-size: .65rem; font-style: italic; }

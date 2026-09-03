@@ -9,7 +9,7 @@ import './App.css';
 import SAMPLE_SENTENCES, { CAMBRIDGE_LEVELS, VOCABULARY_SENTENCES_TEXT as VOCABULARY_SENTENCES } from './data/sentenceBank';
 import {  type Difficulty } from './utils/sentenceTranslations';
 import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
-import { addReviewWord, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, saveReviewNoteForAttempt, type ReviewWord } from './services/spacedRepetitionService';
+import { addReviewWord, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, removeReviewWord, saveReviewNoteForAttempt, updateReviewWord, type ReviewWord } from './services/spacedRepetitionService';
 import { addPoints, claimDailyTargetReward, getDailyTarget, getPoints, getUnlockedAchievements, PERFECT_SENTENCE_POINTS, subtractPoints, TIMEOUT_PENALTY_POINTS, updateDailyTargetProgress } from './services/pointsService';
 import { getGoalWpm, getPracticeHistory, getPracticeStreak, saveGoalWpm, savePracticeSession, type PracticeSession } from './services/premiumService';
 import PremiumDashboard from './components/PremiumDashboard/PremiumDashboard';
@@ -144,6 +144,16 @@ function App() {
   };
   const handleAddReviewWord = (word: string) => {
     const nextWords = addReviewWord(word);
+    setReviewWords(nextWords.filter(review => review.mistakes > 0));
+    setReviewSummary(getReviewSummary());
+  };
+  const handleUpdateReviewWord = (currentWord: string, nextWord: string, note: string) => {
+    const nextWords = updateReviewWord(currentWord, nextWord, note);
+    setReviewWords(nextWords.filter(review => review.mistakes > 0));
+    setReviewSummary(getReviewSummary());
+  };
+  const handleRemoveReviewWord = (word: string) => {
+    const nextWords = removeReviewWord(word);
     setReviewWords(nextWords.filter(review => review.mistakes > 0));
     setReviewSummary(getReviewSummary());
   };
@@ -565,6 +575,8 @@ function App() {
       <ReviewPage
         words={reviewWords}
         onAddWord={handleAddReviewWord}
+        onUpdateWord={handleUpdateReviewWord}
+        onRemoveWord={handleRemoveReviewWord}
         onPracticeWord={startDueWordPractice}
         initialWord={reviewWord}
         onBack={closeReviewPage}

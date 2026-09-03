@@ -87,6 +87,27 @@ export const addReviewWord = (value: string) => {
   return getReviewWords();
 };
 
+export const updateReviewWord = (currentWord: string, value: string, note: string) => {
+  const normalizedWords = normalizeWords(value.trim());
+  if (normalizedWords.length !== 1 || normalizedWords[0] !== value.trim().toLowerCase()) return getReviewWords();
+
+  const nextWord = normalizedWords[0];
+  const reviews = readReviews();
+  const existing = reviews.find(item => item.word === currentWord);
+  const duplicate = reviews.some(item => item.word === nextWord && item.word !== currentWord);
+  if (!existing || duplicate) return getReviewWords();
+
+  existing.word = nextWord;
+  existing.note = note.trim();
+  saveReviews(reviews.sort((a, b) => b.mistakes - a.mistakes));
+  return getReviewWords();
+};
+
+export const removeReviewWord = (word: string) => {
+  saveReviews(readReviews().filter(item => item.word !== word));
+  return getReviewWords();
+};
+
 export const getDueReviewWords = () => readReviews().filter(item => isDueNowReviewWord(item)).map(item => item.word);
 
 export const getReviewWords = () => readReviews()
