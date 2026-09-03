@@ -122,7 +122,7 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
       <main className="checkout-content">
         <div className="checkout-intro"><span className="premium-kicker">Secure checkout</span><h1>Your Premium, one simple payment.</h1><p>After payment is confirmed, we will generate a license key for you. No account is required.</p></div>
         <section className="checkout-card" aria-label="Checkout summary">
-          <div className="checkout-card-header"><span>Zen Dictation Premium</span><strong>$3</strong></div>
+          <div className="checkout-card-header"><span>Zen Dictation Premium</span><strong>$4</strong></div>
           <span className="checkout-subtitle">Lifetime access · One-time payment</span>
           <label className="receipt-email">Email for your receipt <span>optional</span><input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" /></label>
           <div className="checkout-security"><span aria-hidden="true">▣</span><span><strong>Secure hosted payment</strong><small>Your card details will be handled by our payment provider, never stored in Zen Dictation.</small></span></div>
@@ -150,7 +150,7 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
       <section className="price-card" aria-label="Premium pricing">
         <div className="price-card-top"><span className="premium-kicker">Lifetime access</span><span className="price-badge">One-time payment</span></div>
         <h2>Zen Dictation Premium</h2>
-        <div className="price"><del>$19</del><strong>$3</strong><span>one-time</span></div>
+        <div className="price"><del>$20</del><strong>$4</strong><span>one-time</span></div>
         <span className="discount-badge">Save $16 · Limited offer</span>
         <ul className="price-features">
           <li>Unlock Medium and Hard level</li>
