@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "server": "node --env-file=.env server/server.mjs",
+    "server": "node server/server.mjs",
+    "server:local": "node --env-file=.env server/server.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
