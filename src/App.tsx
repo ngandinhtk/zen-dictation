@@ -6,7 +6,7 @@ import DictationArea from './components/DictationArea/DictationArea';
 import Controls from './components/Controls/Controls';
 import './styles/globals.css';
 import './App.css';
-import SAMPLE_SENTENCES, { CAMBRIDGE_LEVELS, VOCABULARY_SENTENCES_TEXT as VOCABULARY_SENTENCES } from './data/sentenceBank';
+import SAMPLE_SENTENCES, { CAMBRIDGE_LEVELS, CONVERSATIONS, VOCABULARY_SENTENCES_TEXT as VOCABULARY_SENTENCES } from './data/sentenceBank';
 import {  type Difficulty } from './utils/sentenceTranslations';
 import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
 import { addReviewWord, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, removeReviewWord, saveReviewNoteForAttempt, updateReviewWord, type ReviewWord } from './services/spacedRepetitionService';
@@ -214,6 +214,18 @@ function App() {
     const rememberSentence = (index: number) => {
       recentSentenceIndicesRef.current[deckKey] = [...recentIndices.filter(value => value !== index), index].slice(-3);
     };
+    const currentConversation = practiceFocus === 'mixed'
+      ? CONVERSATIONS.find(conversation => conversation.sentences.includes(currentSentence))
+      : undefined;
+    const currentTurn = currentConversation?.sentences.indexOf(currentSentence) ?? -1;
+    if (previousIndex !== undefined && currentConversation && currentTurn >= 0 && currentTurn < currentConversation.sentences.length - 1) {
+      const nextConversationSentence = currentConversation.sentences[currentTurn + 1];
+      const nextConversationIndex = nextPool.indexOf(nextConversationSentence);
+      if (nextConversationIndex >= 0) {
+        rememberSentence(nextConversationIndex);
+        return nextConversationIndex;
+      }
+    }
     const dueWords = getDueReviewWords();
     const reviewCandidates = nextPool.map((sentence, index) => ({ sentence, index })).filter(item => dueWords.some(word => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(item.sentence)) && item.index !== previousIndex);
     const freshReviewCandidates = reviewCandidates.filter(item => !recentIndices.includes(item.index));
