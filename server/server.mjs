@@ -138,6 +138,19 @@ const paypalToken = async config => {
   if (!result.ok || !payload.access_token) throw new Error('PayPal authentication failed');
   return payload.access_token;
 };
+const sendLicenseEmail = async (email, licenseKey) => {
+  if (!email) return;
+  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
+    console.warn('License email skipped: RESEND_API_KEY and EMAIL_FROM are not configured');
+    return;
+  }
+  const result = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: process.env.EMAIL_FROM, to: [email], subject: 'Your Zen Dictation Premium license', text: `Thank you for your purchase!\n\nYour Zen Dictation Premium license key is:\n${licenseKey}\n\nOpen Zen Dictation Premium and enter this key to activate your access.` }),
+  });
+  if (!result.ok) throw new Error(`License email failed: ${await result.text()}`);
+};
 const rawBody = async req => {
   let raw = '';
   for await (const chunk of req) { raw += chunk; if (raw.length > 100_000) throw new Error('Payload too large'); }
@@ -149,6 +162,7 @@ const completePayment = async (orderId, captureId) => {
   const licenseKey = createLicenseKey();
   await query('INSERT INTO licenses (id, key_hash, key_last4) VALUES ($1, $2, $3)', [randomUUID(), hashLicense(licenseKey), licenseKey.slice(-4)]);
   await query('UPDATE payment_orders SET status = $1, zp_trans_id = $2, delivery_key = $3, paid_at = $4 WHERE app_trans_id = $5', ['paid', captureId, encryptLicenseKey(licenseKey), new Date().toISOString(), orderId]);
+  try { await sendLicenseEmail(order.email, licenseKey); } catch (error) { console.error('License email delivery failed:', error.message); }
   return true;
 };
 const createLicenseKey = () => {

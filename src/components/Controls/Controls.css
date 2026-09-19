@@ -47,6 +47,7 @@
 .action-btn {
   border: 1px solid var(--border-color);
   background: transparent;
+  touch-action: manipulation;
   padding: 0.55rem 1.6rem;
   border-radius: 999px;
  
@@ -56,6 +57,11 @@
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   letter-spacing: 0.01em;
+}
+
+@media (max-width: 640px) {
+  .controls-container { gap: 1rem; }
+  .main-actions { gap: .55rem; }
 }
 
 .action-btn:hover {

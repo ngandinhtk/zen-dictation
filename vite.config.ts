@@ -5,6 +5,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
+    allowedHosts: ['massager-chemo-cofounder.ngrok-free.dev'],
     proxy: {
       '/api': 'http://localhost:3002',
     },

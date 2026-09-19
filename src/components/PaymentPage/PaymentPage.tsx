@@ -33,7 +33,8 @@ export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProp
     let timer: number | undefined;
     const checkStatus = async () => {
       try {
-        const paypalToken = new URLSearchParams(window.location.search).get('token');
+        const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
+        const paypalToken = new URLSearchParams(window.location.search).get('token') || new URLSearchParams(hashQuery).get('token');
         const result = paypalToken && paypalToken === appTransId
           ? await capturePayPalOrder(paypalToken)
           : await getPayPalPaymentStatus(appTransId);
@@ -86,6 +87,7 @@ export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProp
         <span className="premium-kicker">{status === 'paid' ? 'Payment complete' : status === 'error' ? 'Payment update' : 'Checking payment'}</span>
         <h1>{status === 'paid' ? 'Welcome to Premium.' : status === 'error' ? 'Almost there.' : 'Confirming your payment…'}</h1>
         <p>{message}</p>
+        {status === 'paid' && <p><strong>Thank you for your purchase. We truly appreciate your support.</strong></p>}
         {status === 'checking' && <div className="payment-loader" aria-label="Checking payment status" />}
         {status === 'paid' && <>
           <label className="license-reveal">Your license key<input value={licenseKey} readOnly aria-label="Premium license key" /></label>

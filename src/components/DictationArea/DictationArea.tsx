@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getFeedback, type CharFeedback } from '../../utils/textUtils';
 import { soundService } from '../../services/soundService';
 import './DictationArea.css';
@@ -14,9 +14,22 @@ interface DictationAreaProps {
 }
 
 const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, onFinish, onNext, onTypingChange, isHidden = false, disabled = false }) => {
-  const [userInput, setUserInput] = useState('');
+  const draftKey = `zen-dictation-draft:${encodeURIComponent(targetText)}`;
+  const [userInput, setUserInput] = useState(() => {
+    try {
+      return localStorage.getItem(draftKey) || '';
+    } catch {
+      return '';
+    }
+  });
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const perfectAttemptAwarded = useRef(false);
+  useEffect(() => {
+    if (userInput) onTypingChange?.(userInput);
+    // Restore the timer/statistics once when a saved draft is loaded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const feedback = useMemo(() => getFeedback(targetText, userInput), [targetText, userInput]);
   const wordGroups = useMemo(() => {
     const groups: CharFeedback[][] = [];
@@ -57,9 +70,21 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
     }
 
     setUserInput(value);
+    setHasSubmitted(false);
+    try {
+      if (value) localStorage.setItem(draftKey, value);
+      else localStorage.removeItem(draftKey);
+    } catch {
+      // Draft persistence is best-effort when storage is unavailable.
+    }
     onTypingChange?.(value);
 
     if (value.length === targetText.length && value.toLowerCase() === targetText.toLowerCase() && !perfectAttemptAwarded.current) {
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {
+        // Ignore storage failures; completion should never be blocked.
+      }
       perfectAttemptAwarded.current = true;
       onComplete(value, targetText.length);
     }
@@ -75,13 +100,16 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
       return;
     }
 
-    // Enter submits the attempt even when it is incomplete or contains typos.
-    // An empty attempt is ignored so an accidental Enter does not skip a sentence.
-    if (hasInput && onNext) {
+    // The first Enter submits the attempt; a second Enter advances after feedback is visible.
+    if (hasInput) {
       e.preventDefault();
+      if (hasSubmitted && onNext) {
+        onNext();
+        return;
+      }
       onFinish?.(userInput, feedback.filter(item => item.status === 'correct').length, isComplete);
+      setHasSubmitted(true);
       if (isComplete) soundService.playSuccess();
-      onNext();
     }
   };
 

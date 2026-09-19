@@ -86,6 +86,16 @@ class SpeechService {
     }, 50);
   }
 
+  /** Resume the browser speech engine from a user gesture (important on iOS/Safari). */
+  public prime() {
+    if (!this.synth) {
+      this.setStatus('unsupported');
+      return;
+    }
+    this.synth.resume();
+    if (this.voices.length === 0) this.loadVoices();
+  }
+
   public stop() {
     this.speakRequest += 1;
     this.synth?.cancel();

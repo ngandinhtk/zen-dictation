@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { speechService } from './services/speechService';
 import { soundService } from './services/soundService';
 import type { SpeechStatus, VoiceLanguage } from './services/speechService';
@@ -12,12 +12,16 @@ import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
 import { addReviewWord, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, removeReviewWord, saveReviewNoteForAttempt, updateReviewWord, type ReviewWord } from './services/spacedRepetitionService';
 import { addPoints, claimDailyTargetReward, getDailyTarget, getPoints, getUnlockedAchievements, PERFECT_SENTENCE_POINTS, subtractPoints, TIMEOUT_PENALTY_POINTS, updateDailyTargetProgress } from './services/pointsService';
 import { getGoalWpm, getPracticeHistory, getPracticeStreak, saveGoalWpm, savePracticeSession, type PracticeSession } from './services/premiumService';
-import PremiumDashboard from './components/PremiumDashboard/PremiumDashboard';
-import ReviewPage from './components/ReviewPage/ReviewPage';
+const PremiumDashboard = lazy(() => import('./components/PremiumDashboard/PremiumDashboard'));
+const ReviewPage = lazy(() => import('./components/ReviewPage/ReviewPage'));
 import { getPremiumStatus } from './services/premiumAccess';
 import { getAccountSessions, getCurrentAccount, saveAccountSession, type AccountUser } from './services/accountService';
 import Header from './components/Header/Header';
-import PaymentPage, { PaymentResultPage } from './components/PaymentPage/PaymentPage';
+const PaymentPage = lazy(() => import('./components/PaymentPage/PaymentPage'));
+const PaymentResultPage = lazy(async () => {
+  const module = await import('./components/PaymentPage/PaymentPage');
+  return { default: module.PaymentResultPage };
+});
 
 const DEFAULT_TIME_LIMIT = 30;
 const LANG: VoiceLanguage = 'en-US';
@@ -25,6 +29,18 @@ const DEFAULT_DIFFICULTY: Difficulty = 'easy';
 const SPEECH_SPEEDS = [0.5, 0.75, 1, 1.25];
 const ACHIEVEMENT_TOAST_DURATION_MS = 8000;
 type PracticeFocus = 'mixed' | 'vocabulary';
+const ACTIVE_PRACTICE_KEY = 'zen-dictation-active-practice';
+type ActivePractice = { difficulty: Difficulty; focus: PracticeFocus; index: number; targetText: string };
+const readActivePractice = (): ActivePractice | null => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(ACTIVE_PRACTICE_KEY) || 'null') as Partial<ActivePractice> | null;
+    if (!saved || !['easy', 'medium', 'hard'].includes(saved.difficulty || '') || !['mixed', 'vocabulary'].includes(saved.focus || '') || !Number.isInteger(saved.index) || !saved.targetText) return null;
+    return saved as ActivePractice;
+  } catch {
+    return null;
+  }
+};
+const savedPractice = readActivePractice();
 const getRandomSentenceIndex = (sentences: string[], currentIndex?: number) => {
   const sentenceCount = sentences.length;
   if (sentenceCount < 2) return 0;
@@ -47,9 +63,12 @@ const shuffleSentenceIndices = (sentences: string[], excludedIndex?: number) => 
 };
 
 function App() {
-  const [difficulty, setDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
-  const [practiceFocus, setPracticeFocus] = useState<PracticeFocus>('mixed');
-  const [currentIndex, setCurrentIndex] = useState(() => getRandomSentenceIndex(SAMPLE_SENTENCES[LANG][DEFAULT_DIFFICULTY]));
+  const [difficulty, setDifficulty] = useState<Difficulty>(() => savedPractice?.difficulty || DEFAULT_DIFFICULTY);
+  const [practiceFocus, setPracticeFocus] = useState<PracticeFocus>(() => savedPractice?.focus || 'mixed');
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    const pool = (savedPractice?.focus === 'vocabulary' ? VOCABULARY_SENTENCES : SAMPLE_SENTENCES)[LANG][savedPractice?.difficulty || DEFAULT_DIFFICULTY];
+    return savedPractice && pool[savedPractice.index] === savedPractice.targetText ? savedPractice.index : getRandomSentenceIndex(pool);
+  });
   const [speed, setSpeed] = useState(1);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceStatus, setVoiceStatus] = useState<SpeechStatus>(() => speechService.getStatus());
@@ -76,11 +95,12 @@ function App() {
   const [isSentenceHidden, setIsSentenceHidden] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
-  const [isPremiumOpen, setIsPremiumOpen] = useState(() => window.location.hash === '#premium');
-  const [isPaymentOpen, setIsPaymentOpen] = useState(() => window.location.hash === '#payment');
-  const [isPaymentResultOpen, setIsPaymentResultOpen] = useState(() => window.location.hash === '#payment-result');
+  const initialHash = window.location.hash.split('?')[0];
+  const [isPremiumOpen, setIsPremiumOpen] = useState(() => initialHash === '#premium');
+  const [isPaymentOpen, setIsPaymentOpen] = useState(() => initialHash === '#payment');
+  const [isPaymentResultOpen, setIsPaymentResultOpen] = useState(() => initialHash === '#payment-result');
   const [isFocusMode, setIsFocusMode] = useState(false);
-  const [isReviewOpen, setIsReviewOpen] = useState(() => window.location.hash === '#review');
+  const [isReviewOpen, setIsReviewOpen] = useState(() => initialHash === '#review');
   // const [showTranslation, setShowTranslation] = useState(false);
   const [reviewWord, setReviewWord] = useState<string | undefined>();
   const [focusTimeLeft, setFocusTimeLeft] = useState(20 * 60);
@@ -338,6 +358,7 @@ function App() {
   }, [timeLimit]);
 
   const handleSpeak = useCallback(() => {
+    speechService.prime();
     if (speakTimeoutRef.current !== null) {
       window.clearTimeout(speakTimeoutRef.current);
     }
@@ -349,6 +370,11 @@ function App() {
   }, [currentSentence, selectedVoice, speed]);
 
   useEffect(() => {
+    const isMobileViewport = window.matchMedia('(max-width: 640px), (pointer: coarse)').matches;
+    if (isMobileViewport) {
+      speechService.stop();
+      return;
+    }
     if (speakTimeoutRef.current !== null) {
       window.clearTimeout(speakTimeoutRef.current);
     }
@@ -371,7 +397,9 @@ function App() {
 
   useEffect(() => {
     const handleControlKey = (event: KeyboardEvent) => {
-      if (event.key === 'Control' && !event.repeat) {
+      const target = event.target as HTMLElement | null;
+      const isEditing = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable;
+      if (event.key === 'Control' && !event.repeat && !isEditing) {
         handleSpeak();
       }
     };
@@ -414,7 +442,16 @@ function App() {
     }
   }, [isTimeUp]);
 
+  const clearActivePractice = () => {
+    try {
+      localStorage.removeItem(ACTIVE_PRACTICE_KEY);
+    } catch {
+      // Draft cleanup is best-effort when storage is unavailable.
+    }
+  };
+
   const handleNext = () => {
+    clearActivePractice();
     setCurrentIndex(getNextSentenceIndex(difficulty, currentIndex));
     // setShowTranslation(false);
     setIsCompleted(false);
@@ -429,6 +466,7 @@ function App() {
       openPremiumDashboard();
       return;
     }
+    clearActivePractice();
     setDifficulty(nextDifficulty);
     setCurrentIndex(getNextSentenceIndex(nextDifficulty));
     // setShowTranslation(false);
@@ -441,6 +479,7 @@ function App() {
   const handleFocusChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const nextFocus = event.target.value as PracticeFocus;
     const nextPool = nextFocus === 'vocabulary' ? VOCABULARY_SENTENCES[LANG][difficulty] : SAMPLE_SENTENCES[LANG][difficulty];
+    clearActivePractice();
     setPracticeFocus(nextFocus);
     setCurrentIndex(getRandomSentenceIndex(nextPool));
     // setShowTranslation(false);
@@ -454,6 +493,7 @@ function App() {
   const handleTimeLimitChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const nextValue = Number(event.target.value);
     const safeValue = Number.isFinite(nextValue) ? Math.min(Math.max(nextValue, 10), 1800) : DEFAULT_TIME_LIMIT;
+    clearActivePractice();
     setTimeLimit(safeValue);
     setIsTimeUp(false);
     resetStats(safeValue);
@@ -461,10 +501,21 @@ function App() {
   };
 
   const handleResetTimer = () => {
+    clearActivePractice();
+    try {
+      localStorage.removeItem(`zen-dictation-draft:${encodeURIComponent(currentSentence)}`);
+    } catch {
+      // Reset must still work when browser storage is unavailable.
+    }
     setIsCompleted(false);
     setIsTimeUp(false);
+    setLastAttempt(null);
     resetStats(timeLimit);
     setKey(prev => prev + 1);
+  };
+
+  const handleRetry = () => {
+    handleResetTimer();
   };
 
   const recordPremiumSession = (completedText: string, correctCharacters: number) => {
@@ -485,6 +536,7 @@ function App() {
   };
 
   const handlePerfectComplete = (completedText = currentSentence, correctCharacters = currentSentence.length) => {
+    clearActivePractice();
     const nextPoints = addPoints(PERFECT_SENTENCE_POINTS);
     setPoints(nextPoints);
 
@@ -582,7 +634,7 @@ function App() {
   ) : null;
 
   if (isReviewOpen) {
-    return <>
+    return <Suspense fallback={<div className="screen-loading" role="status">Loading review…</div>}><>
       {achievementToastNode}
       <ReviewPage
         words={reviewWords}
@@ -593,11 +645,11 @@ function App() {
         initialWord={reviewWord}
         onBack={closeReviewPage}
       />
-    </>;
+    </></Suspense>;
   }
 
   if (isPremiumOpen) {
-    return <>
+    return <Suspense fallback={<div className="screen-loading" role="status">Loading dashboard…</div>}><>
       {achievementToastNode}
       <PremiumDashboard
         isPremium={isPremium}
@@ -614,19 +666,19 @@ function App() {
         onStartFocus={startFocusSession}
         onBack={closePremiumDashboard}
       />
-    </>;
+    </></Suspense>;
   }
 
   if (isPaymentResultOpen) {
-    return <>
+    return <Suspense fallback={<div className="screen-loading" role="status">Loading payment…</div>}><>
       {achievementToastNode}
       <PaymentResultPage onBack={closePaymentResult} onActivated={() => { setIsPaymentResultOpen(false); openPremiumDashboard(); }} />
-    </>;
+    </></Suspense>;
   }
 
   if (isPaymentOpen) {
     if (isPremium) {
-      return <>
+      return <Suspense fallback={<div className="screen-loading" role="status">Loading dashboard…</div>}><>
         {achievementToastNode}
         <PremiumDashboard
           isPremium={isPremium}
@@ -643,16 +695,23 @@ function App() {
           onStartFocus={startFocusSession}
           onBack={closePaymentPage}
         />
-      </>;
+      </></Suspense>;
     }
-    return <>
+    return <Suspense fallback={<div className="screen-loading" role="status">Loading payment…</div>}><>
       {achievementToastNode}
       <PaymentPage onBack={closePaymentPage} onLicenseClick={() => { closePaymentPage(); openPremiumDashboard(); }} />
-    </>;
+    </></Suspense>;
   }
 
   const handleTypingChange = (nextValue: string) => {
     if (isTimeUp) return;
+    if (nextValue) {
+      try {
+        localStorage.setItem(ACTIVE_PRACTICE_KEY, JSON.stringify({ difficulty, focus: practiceFocus, index: currentIndex, targetText: currentSentence } satisfies ActivePractice));
+      } catch {
+        // Draft persistence is best-effort when storage is unavailable.
+      }
+    }
     const nextCorrectChars = Array.from(nextValue).reduce((count, char, index) => {
       const targetChar = currentSentence[index];
       return count + (targetChar && char.toLowerCase() === targetChar.toLowerCase() ? 1 : 0);
@@ -852,6 +911,7 @@ function App() {
               </div>
             </div>}
             <p><small>Grammar focus: {lastAttempt.grammarTip}</small></p>
+            <button type="button" className="retry-attempt-button" onClick={handleRetry}>Try again</button>
             {(lastAttempt.incorrectCharacters > 0 || lastAttempt.missingCharacters > 0) && <div className="review-note-editor">
               <label htmlFor="practice-review-note">Note for review <small>Saved with the words you missed</small></label>
               <textarea id="practice-review-note" value={reviewNote} onChange={event => { setReviewNote(event.target.value); setIsReviewNoteSaved(false); }} placeholder="e.g. Remember the spelling or meaning..." maxLength={240} />
