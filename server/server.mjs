@@ -122,17 +122,35 @@ const validateCredentials = ({ email, password }) => {
 };
 
 const getDeviceLicense = async deviceId => (await query('SELECT key_last4 FROM licenses WHERE activated_by = $1', [deviceId])).rows[0];
-const getZaloPayConfig = () => ({
-  appId: Number(process.env.ZALOPAY_APP_ID || 0),
-  key1: process.env.ZALOPAY_KEY1 || '',
-  key2: process.env.ZALOPAY_KEY2 || '',
-  createUrl: process.env.ZALOPAY_CREATE_ORDER_URL || 'https://sb-openapi.zalopay.vn/v2/create',
-  callbackUrl: process.env.ZALOPAY_CALLBACK_URL || '',
-  redirectUrl: process.env.PUBLIC_APP_URL ? process.env.PUBLIC_APP_URL.replace(/\/$/, '') + '#payment-result' : '',
-  amount: Number(process.env.PREMIUM_PRICE_VND || 0),
+const getPayPalConfig = () => ({
+  clientId: process.env.PAYPAL_CLIENT_ID || '',
+  clientSecret: process.env.PAYPAL_CLIENT_SECRET || '',
+  webhookId: process.env.PAYPAL_WEBHOOK_ID || '',
+  apiUrl: process.env.PAYPAL_ENV === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com',
+  amount: Number(process.env.PREMIUM_PRICE_USD || 0),
+  currency: process.env.PAYPAL_CURRENCY || 'USD',
+  returnUrl: process.env.PUBLIC_APP_URL ? process.env.PUBLIC_APP_URL.replace(/\/$/, '') + '#payment-result' : '',
+  cancelUrl: process.env.PUBLIC_APP_URL ? process.env.PUBLIC_APP_URL.replace(/\/$/, '') + '#payment' : '',
 });
-const hmacSha256 = (key, value) => createHmac('sha256', key).update(value).digest('hex');
-const vietnamDateCode = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(2, 10).replaceAll('-', '');
+const paypalToken = async config => {
+  const result = await fetch(`${config.apiUrl}/v1/oauth2/token`, { method: 'POST', headers: { Authorization: `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'grant_type=client_credentials' });
+  const payload = await result.json();
+  if (!result.ok || !payload.access_token) throw new Error('PayPal authentication failed');
+  return payload.access_token;
+};
+const rawBody = async req => {
+  let raw = '';
+  for await (const chunk of req) { raw += chunk; if (raw.length > 100_000) throw new Error('Payload too large'); }
+  return raw;
+};
+const completePayment = async (orderId, captureId) => {
+  const order = (await query('SELECT * FROM payment_orders WHERE app_trans_id = $1', [orderId])).rows[0];
+  if (!order || order.status === 'paid') return Boolean(order);
+  const licenseKey = createLicenseKey();
+  await query('INSERT INTO licenses (id, key_hash, key_last4) VALUES ($1, $2, $3)', [randomUUID(), hashLicense(licenseKey), licenseKey.slice(-4)]);
+  await query('UPDATE payment_orders SET status = $1, zp_trans_id = $2, delivery_key = $3, paid_at = $4 WHERE app_trans_id = $5', ['paid', captureId, encryptLicenseKey(licenseKey), new Date().toISOString(), orderId]);
+  return true;
+};
 const createLicenseKey = () => {
   const value = randomBytes(6).toString('hex').toUpperCase();
   return `ZEN-${value.slice(0, 6)}-${value.slice(6)}`;
@@ -168,8 +186,8 @@ const getClientIp = req => {
   return req.socket.remoteAddress || 'unknown';
 };
 const isRateLimited = (req, pathname) => {
-  if (pathname === '/api/health' || pathname === '/api/payments/zalopay/callback') return false;
-  const isSensitive = pathname.includes('/auth/') || pathname.includes('/premium/activate') || pathname.includes('/payments/zalopay/create-order');
+  if (pathname === '/api/health' || pathname === '/api/payments/paypal/webhook') return false;
+  const isSensitive = pathname.includes('/auth/') || pathname.includes('/premium/activate') || pathname.includes('/payments/paypal/create-order');
   const limit = isSensitive ? 12 : 120;
   const key = `${getClientIp(req)}:${pathname}`;
   const now = Date.now();
@@ -218,44 +236,62 @@ const server = createServer(async (req, res) => {
       return send(res, 200, { isPremium: true, source: user ? 'payment' : 'license', licenseLast4: license.key_last4 });
     }
 
-    if (url.pathname === '/api/payments/zalopay/create-order' && req.method === 'POST') {
-      const config = getZaloPayConfig();
-      if (!config.appId || !config.key1 || !config.key2 || !config.callbackUrl || !config.amount) return send(res, 503, { error: 'ZaloPay is not configured on the server' });
+    if (url.pathname === '/api/payments/paypal/create-order' && req.method === 'POST') {
+      const config = getPayPalConfig();
+      if (!config.clientId || !config.clientSecret || !config.amount || !config.returnUrl) return send(res, 503, { error: 'PayPal is not configured on the server' });
       const input = await body(req);
       const deviceId = typeof input.deviceId === 'string' ? input.deviceId.trim() : '';
       const email = typeof input.email === 'string' ? input.email.trim().slice(0, 254) : '';
       if (!deviceId || deviceId.length > 128) return send(res, 400, { error: 'A valid device is required' });
       if (email && !/^\S+@\S+\.\S+$/.test(email)) return send(res, 400, { error: 'Enter a valid email address' });
-      const appTransId = `${vietnamDateCode()}_${randomBytes(4).toString('hex')}`;
-      const appUser = `guest-${deviceId.slice(0, 40)}`;
-      const appTime = Date.now();
-      const item = JSON.stringify([{ itemid: 'zen-premium', itemname: 'Zen Dictation Premium', itemprice: config.amount, itemquantity: 1 }]);
-      const embedData = JSON.stringify(config.redirectUrl ? { redirecturl: config.redirectUrl } : {});
-      const mac = hmacSha256(config.key1, `${config.appId}|${appTransId}|${appUser}|${config.amount}|${appTime}|${embedData}|${item}`);
-      const order = { app_id: config.appId, app_user: appUser, app_trans_id: appTransId, app_time: appTime, amount: config.amount, description: 'Zen Dictation Premium', item, embed_data: embedData, callback_url: config.callbackUrl, expire_duration_seconds: 15, bank_code: '', mac };
-      const result = await fetch(config.createUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(order) });
+      const token = await paypalToken(config);
+      const result = await fetch(`${config.apiUrl}/v2/checkout/orders`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ reference_id: deviceId, description: 'Zen Dictation Premium', amount: { currency_code: config.currency, value: config.amount.toFixed(2) } }], application_context: { return_url: config.returnUrl, cancel_url: config.cancelUrl } }) });
       const payload = await result.json();
-      if (!result.ok || payload.return_code !== 1 || !payload.order_url) return send(res, 502, { error: payload.return_message || 'ZaloPay could not create the order' });
-      await query('INSERT INTO payment_orders (app_trans_id, device_id, email, amount, status, order_url, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)', [appTransId, deviceId, email || null, config.amount, 'pending', payload.order_url, new Date().toISOString()]);
-      return send(res, 201, { orderUrl: payload.order_url, appTransId, amount: config.amount });
+      const approvalUrl = payload.links?.find(link => link.rel === 'approve')?.href;
+      if (!result.ok || !payload.id || !approvalUrl) return send(res, 502, { error: payload.message || 'PayPal could not create the order' });
+      await query('INSERT INTO payment_orders (app_trans_id, device_id, email, amount, status, order_url, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)', [payload.id, deviceId, email || null, Math.round(config.amount * 100), 'pending', approvalUrl, new Date().toISOString()]);
+      return send(res, 201, { orderUrl: approvalUrl, appTransId: payload.id, amount: config.amount });
     }
 
-    if (url.pathname === '/api/payments/zalopay/callback' && req.method === 'POST') {
-      const config = getZaloPayConfig();
+    if (url.pathname === '/api/payments/paypal/capture-order' && req.method === 'POST') {
+      const config = getPayPalConfig();
+      if (!config.clientId || !config.clientSecret) return send(res, 503, { error: 'PayPal is not configured on the server' });
       const input = await body(req);
-      if (!config.key2 || !sameMac(hmacSha256(config.key2, input.data), input.mac)) return send(res, 200, { return_code: -1, return_message: 'mac not equal' });
-      const data = JSON.parse(input.data || '{}');
-      const order = (await query('SELECT * FROM payment_orders WHERE app_trans_id = $1', [data.app_trans_id])).rows[0];
-      if (!order || Number(data.amount) !== order.amount) return send(res, 200, { return_code: -1, return_message: 'order not found' });
+      const orderId = typeof input.orderId === 'string' ? input.orderId.trim() : '';
+      const deviceId = typeof input.deviceId === 'string' ? input.deviceId.trim() : '';
+      if (!orderId || !deviceId || deviceId.length > 128) return send(res, 400, { error: 'A valid PayPal order and device are required' });
+      const order = (await query('SELECT app_trans_id, status FROM payment_orders WHERE app_trans_id = $1 AND device_id = $2', [orderId, deviceId])).rows[0];
+      if (!order) return send(res, 404, { error: 'Payment order not found' });
       if (order.status !== 'paid') {
-        const licenseKey = createLicenseKey();
-        await query('INSERT INTO licenses (id, key_hash, key_last4) VALUES ($1, $2, $3)', [randomUUID(), hashLicense(licenseKey), licenseKey.slice(-4)]);
-        await query('UPDATE payment_orders SET status = $1, zp_trans_id = $2, delivery_key = $3, paid_at = $4 WHERE app_trans_id = $5', ['paid', String(data.zp_trans_id || ''), encryptLicenseKey(licenseKey), new Date().toISOString(), order.app_trans_id]);
+        const token = await paypalToken(config);
+        const result = await fetch(`${config.apiUrl}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+        const payload = await result.json();
+        if (!result.ok && payload.name !== 'UNPROCESSABLE_ENTITY') return send(res, 502, { error: payload.message || 'PayPal could not capture the order' });
+        const capture = payload.purchase_units?.[0]?.payments?.captures?.[0];
+        if (payload.status === 'COMPLETED' && capture?.status === 'COMPLETED') await completePayment(orderId, capture.id);
+        else if (order.status !== 'paid') return send(res, 409, { error: 'PayPal payment is not completed yet' });
       }
-      return send(res, 200, { return_code: 1, return_message: 'Success' });
+      const paidOrder = (await query('SELECT status, delivery_key, amount FROM payment_orders WHERE app_trans_id = $1 AND device_id = $2', [orderId, deviceId])).rows[0];
+      return send(res, 200, { status: paidOrder.status, amount: paidOrder.amount, licenseKey: paidOrder.delivery_key ? decryptLicenseKey(paidOrder.delivery_key) : null });
     }
 
-    if (url.pathname === '/api/payments/zalopay/status' && req.method === 'GET') {
+    if (url.pathname === '/api/payments/paypal/webhook' && req.method === 'POST') {
+      const config = getPayPalConfig();
+      const raw = await rawBody(req);
+      const input = JSON.parse(raw || '{}');
+      if (!config.webhookId) return send(res, 503, { error: 'PayPal webhook is not configured' });
+      const token = await paypalToken(config);
+      const verification = await fetch(`${config.apiUrl}/v1/notifications/verify-webhook-signature`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ auth_algo: req.headers['paypal-auth-algo'], cert_url: req.headers['paypal-cert-url'], transmission_id: req.headers['paypal-transmission-id'], transmission_sig: req.headers['paypal-transmission-sig'], transmission_time: req.headers['paypal-transmission-time'], webhook_id: config.webhookId, webhook_event: input }) });
+      const verificationPayload = await verification.json();
+      if (!verification.ok || verificationPayload.verification_status !== 'SUCCESS') return send(res, 400, { error: 'Invalid PayPal webhook signature' });
+      if (input.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
+        const orderId = input.resource?.supplementary_data?.related_ids?.order_id;
+        await completePayment(orderId, input.resource?.id || '');
+      }
+      return send(res, 200, { received: true });
+    }
+
+    if (url.pathname === '/api/payments/paypal/status' && req.method === 'GET') {
       const appTransId = url.searchParams.get('appTransId') || '';
       const deviceId = url.searchParams.get('deviceId') || '';
       const order = (await query('SELECT status, delivery_key, amount FROM payment_orders WHERE app_trans_id = $1 AND device_id = $2', [appTransId, deviceId])).rows[0];

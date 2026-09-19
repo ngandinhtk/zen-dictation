@@ -5,13 +5,13 @@ export interface PremiumEntitlement {
   source: 'license' | 'payment' | 'admin' | 'none';
 }
 
-export interface ZaloPayOrder {
+export interface PayPalOrder {
   orderUrl: string;
   appTransId: string;
   amount: number;
 }
 
-export interface ZaloPayPaymentStatus {
+export interface PayPalPaymentStatus {
   status: 'pending' | 'paid';
   amount: number;
   licenseKey: string | null;
@@ -55,21 +55,33 @@ export const activatePremiumLicense = async (licenseKey: string): Promise<Premiu
   return result;
 };
 
-export const createZaloPayOrder = async (email = ''): Promise<ZaloPayOrder> => {
-  const response = await fetch(apiUrl('/api/payments/zalopay/create-order'), {
+export const createPayPalOrder = async (email = ''): Promise<PayPalOrder> => {
+  const response = await fetch(apiUrl('/api/payments/paypal/create-order'), {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, deviceId: getDeviceId() }),
   });
-  const result = await readApiResponse<ZaloPayOrder & { error?: string }>(response);
-  if (!response.ok) throw new Error(result.error || 'Unable to start ZaloPay checkout');
+  const result = await readApiResponse<PayPalOrder & { error?: string }>(response);
+  if (!response.ok) throw new Error(result.error || 'Unable to start PayPal checkout');
   return result;
 };
 
-export const getZaloPayPaymentStatus = async (appTransId: string): Promise<ZaloPayPaymentStatus> => {
-  const response = await fetch(apiUrl('/api/payments/zalopay/status?appTransId=' + encodeURIComponent(appTransId) + '&deviceId=' + encodeURIComponent(getDeviceId())), { credentials: 'include' });
-  const result = await readApiResponse<ZaloPayPaymentStatus & { error?: string }>(response);
+export const getPayPalPaymentStatus = async (appTransId: string): Promise<PayPalPaymentStatus> => {
+  const response = await fetch(apiUrl('/api/payments/paypal/status?appTransId=' + encodeURIComponent(appTransId) + '&deviceId=' + encodeURIComponent(getDeviceId())), { credentials: 'include' });
+  const result = await readApiResponse<PayPalPaymentStatus & { error?: string }>(response);
   if (!response.ok) throw new Error(result.error || 'Unable to check payment status');
+  return result;
+};
+
+export const capturePayPalOrder = async (orderId: string): Promise<PayPalPaymentStatus> => {
+  const response = await fetch(apiUrl('/api/payments/paypal/capture-order'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderId, deviceId: getDeviceId() }),
+  });
+  const result = await readApiResponse<PayPalPaymentStatus & { error?: string }>(response);
+  if (!response.ok) throw new Error(result.error || 'Unable to capture PayPal payment');
   return result;
 };

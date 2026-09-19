@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import './PaymentPage.css';
-import { activatePremiumLicense, createZaloPayOrder, getZaloPayPaymentStatus } from '../../services/premiumAccess';
+import { activatePremiumLicense, capturePayPalOrder, createPayPalOrder, getPayPalPaymentStatus } from '../../services/premiumAccess';
 
 interface PaymentPageProps {
   onBack: () => void;
@@ -17,10 +17,10 @@ interface PaymentResultPageProps {
 }
 
 export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProps) => {
-  const appTransId = sessionStorage.getItem('zen-zalopay-order-id') || '';
+  const appTransId = sessionStorage.getItem('zen-paypal-order-id') || '';
   const [status, setStatus] = useState<'checking' | 'paid' | 'error'>(appTransId ? 'checking' : 'error');
   const [licenseKey, setLicenseKey] = useState('');
-  const [message, setMessage] = useState(appTransId ? 'Waiting for ZaloPay confirmation…' : 'We could not find this payment order. Please return to Premium and try again.');
+  const [message, setMessage] = useState(appTransId ? 'Waiting for PayPal confirmation…' : 'We could not find this payment order. Please return to Premium and try again.');
   const [isActivating, setIsActivating] = useState(false);
 
   useEffect(() => {
@@ -33,7 +33,10 @@ export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProp
     let timer: number | undefined;
     const checkStatus = async () => {
       try {
-        const result = await getZaloPayPaymentStatus(appTransId);
+        const paypalToken = new URLSearchParams(window.location.search).get('token');
+        const result = paypalToken && paypalToken === appTransId
+          ? await capturePayPalOrder(paypalToken)
+          : await getPayPalPaymentStatus(appTransId);
         if (!isActive) return;
         if (result.licenseKey) {
           setLicenseKey(result.licenseKey);
@@ -65,7 +68,7 @@ export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProp
     setIsActivating(true);
     try {
       await activatePremiumLicense(licenseKey);
-      sessionStorage.removeItem('zen-zalopay-order-id');
+      sessionStorage.removeItem('zen-paypal-order-id');
       onActivated();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to activate Premium');
@@ -100,12 +103,12 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [paymentError, setPaymentError] = useState('');
 
-  const startZaloPayCheckout = async () => {
+  const startPayPalCheckout = async () => {
     setIsCreatingOrder(true);
     setPaymentError('');
     try {
-      const order = await createZaloPayOrder(email);
-      sessionStorage.setItem('zen-zalopay-order-id', order.appTransId);
+      const order = await createPayPalOrder(email);
+      sessionStorage.setItem('zen-paypal-order-id', order.appTransId);
       window.location.assign(order.orderUrl);
     } catch (error) {
       setPaymentError(error instanceof Error ? error.message : 'Unable to start payment');
@@ -126,11 +129,11 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
           <span className="checkout-subtitle">Lifetime access · One-time payment</span>
           <label className="receipt-email">Email for your receipt <span>optional</span><input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" /></label>
           <div className="checkout-security"><span aria-hidden="true">▣</span><span><strong>Secure hosted payment</strong><small>Your card details will be handled by our payment provider, never stored in Zen Dictation.</small></span></div>
-          <button type="button" className="checkout-button checkout-next" onClick={startZaloPayCheckout} disabled={isCreatingOrder}>{isCreatingOrder ? 'Opening ZaloPay…' : 'Pay securely with ZaloPay'} {!isCreatingOrder }</button>
+          <button type="button" className="checkout-button checkout-next" onClick={startPayPalCheckout} disabled={isCreatingOrder}>{isCreatingOrder ? 'Opening PayPal…' : 'Pay securely with PayPal'} {!isCreatingOrder }</button>
           {paymentError && <p className="payment-error" role="alert">{paymentError}</p>}
           <button type="button" className="license-button" onClick={onLicenseClick}>Already paid? Enter your license key</button>
         </section>
-        <p className="payment-note">You will be redirected to ZaloPay to complete the payment. Your email is optional and is only used for the receipt.</p>
+        <p className="payment-note">You will be redirected to PayPal to complete the payment. Your email is optional and is only used for the receipt.</p>
       </main>
     </div>;
   }
