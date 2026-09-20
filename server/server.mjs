@@ -23,8 +23,15 @@ CREATE TABLE IF NOT EXISTS auth_sessions (token_hash TEXT PRIMARY KEY, user_id T
 CREATE INDEX IF NOT EXISTS auth_sessions_expiry ON auth_sessions(expires_at);
 CREATE TABLE IF NOT EXISTS practice_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, date TIMESTAMPTZ NOT NULL, difficulty TEXT NOT NULL, wpm INTEGER NOT NULL DEFAULT 0, accuracy INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS practice_sessions_user_date ON practice_sessions(user_id, date DESC);
-CREATE TABLE IF NOT EXISTS licenses (id TEXT PRIMARY KEY, key_hash TEXT NOT NULL UNIQUE, key_last4 TEXT NOT NULL, activated_by TEXT, activated_at TIMESTAMPTZ);
-CREATE TABLE IF NOT EXISTS payment_orders (app_trans_id TEXT PRIMARY KEY, device_id TEXT NOT NULL, email TEXT, amount INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', order_url TEXT, zp_trans_id TEXT, delivery_key TEXT, created_at TIMESTAMPTZ NOT NULL, paid_at TIMESTAMPTZ);`);
+CREATE TABLE IF NOT EXISTS licenses (id TEXT PRIMARY KEY, key_hash TEXT NOT NULL UNIQUE, key_last4 TEXT NOT NULL, activated_by TEXT, activated_user_id TEXT REFERENCES users(id) ON DELETE SET NULL, activated_at TIMESTAMPTZ);
+CREATE TABLE IF NOT EXISTS payment_orders (app_trans_id TEXT PRIMARY KEY, device_id TEXT NOT NULL, email TEXT, amount INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', order_url TEXT, zp_trans_id TEXT, delivery_key TEXT, created_at TIMESTAMPTZ NOT NULL, paid_at TIMESTAMPTZ);
+CREATE TABLE IF NOT EXISTS sentence_packs (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', is_premium BOOLEAN NOT NULL DEFAULT FALSE, is_active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS sentences (id TEXT PRIMARY KEY, pack_id TEXT NOT NULL REFERENCES sentence_packs(id) ON DELETE CASCADE, text TEXT NOT NULL, difficulty TEXT NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard')), topic TEXT NOT NULL DEFAULT 'general', source TEXT NOT NULL DEFAULT 'custom', license TEXT, sort_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE INDEX IF NOT EXISTS sentences_pack_difficulty_idx ON sentences(pack_id, difficulty, sort_order);
+CREATE TABLE IF NOT EXISTS learning_state (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, review_words JSONB NOT NULL DEFAULT '[]'::jsonb, points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0), daily_target JSONB, goal_wpm INTEGER NOT NULL DEFAULT 40 CHECK (goal_wpm BETWEEN 10 AND 200), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE INDEX IF NOT EXISTS learning_state_updated_at_idx ON learning_state(updated_at DESC);`);
+await query('ALTER TABLE licenses ADD COLUMN IF NOT EXISTS activated_user_id TEXT REFERENCES users(id) ON DELETE SET NULL');
+await query('CREATE INDEX IF NOT EXISTS licenses_activated_user_idx ON licenses(activated_user_id) WHERE activated_user_id IS NOT NULL');
 
 const migrateLegacyData = async () => {
   try {
@@ -46,6 +53,19 @@ const seedConfiguredLicenses = async () => {
   for (const key of configuredKeys) await query('INSERT INTO licenses (id, key_hash, key_last4) VALUES ($1, $2, $3) ON CONFLICT (key_hash) DO NOTHING', [randomUUID(), hashLicense(key), key.slice(-4).toUpperCase()]);
 };
 await seedConfiguredLicenses();
+
+const sentencePackCache = new Map();
+const warmSentencePackCache = async () => {
+  const rows = (await query(`SELECT s.id, s.text, s.difficulty, s.topic, s.source, s.license, s.sort_order, p.id AS pack_id, p.name AS pack_name, p.is_premium FROM sentences s JOIN sentence_packs p ON p.id = s.pack_id WHERE p.is_active = TRUE AND s.is_active = TRUE ORDER BY s.pack_id, s.difficulty, s.sort_order`)).rows;
+  rows.forEach(sentence => {
+    const key = `${sentence.pack_id}:${sentence.difficulty}`;
+    const pack = sentencePackCache.get(key) || [];
+    pack.push(sentence);
+    sentencePackCache.set(key, pack);
+  });
+  console.log(`Warmed ${rows.length} sentences in memory`);
+};
+await warmSentencePackCache();
 
 const send = (res, status, payload, extraHeaders = {}) => {
   const allowedOrigin = process.env.CLIENT_ORIGIN || (isProduction ? 'null' : 'http://localhost:5173');
@@ -121,7 +141,16 @@ const validateCredentials = ({ email, password }) => {
   return null;
 };
 
-const getDeviceLicense = async deviceId => (await query('SELECT key_last4 FROM licenses WHERE activated_by = $1', [deviceId])).rows[0];
+const getDeviceLicense = async deviceId => (await query('SELECT key_last4, activated_user_id FROM licenses WHERE activated_by = $1', [deviceId])).rows[0];
+const getUserLicense = async userId => (await query('SELECT key_last4 FROM licenses WHERE activated_user_id = $1', [userId])).rows[0];
+const claimDeviceLicense = async (userId, deviceId) => {
+  if (!userId || !deviceId) return null;
+  const license = (await query('SELECT id, key_last4, activated_user_id FROM licenses WHERE activated_by = $1', [deviceId])).rows[0];
+  if (!license || (license.activated_user_id && license.activated_user_id !== userId)) return null;
+  await query('UPDATE licenses SET activated_user_id = $1, activated_at = $2 WHERE id = $3 AND (activated_user_id IS NULL OR activated_user_id = $1)', [userId, new Date().toISOString(), license.id]);
+  await query('UPDATE users SET is_premium = TRUE WHERE id = $1', [userId]);
+  return license;
+};
 const getPayPalConfig = () => ({
   clientId: process.env.PAYPAL_CLIENT_ID || '',
   clientSecret: process.env.PAYPAL_CLIENT_SECRET || '',
@@ -228,11 +257,29 @@ const server = createServer(async (req, res) => {
     if (isRateLimited(req, url.pathname)) return send(res, 429, { error: 'Too many requests. Please try again shortly.' });
     if (url.pathname === '/api/health' && req.method === 'GET') return send(res, 200, { ok: true });
 
+    if (url.pathname === '/api/sentences' && req.method === 'GET') {
+      const pack = url.searchParams.get('pack') || 'core';
+      const difficulty = url.searchParams.get('difficulty');
+      const allowedDifficulty = difficulty && ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : null;
+      const rows = allowedDifficulty
+        ? sentencePackCache.get(`${pack}:${allowedDifficulty}`) || []
+        : [...sentencePackCache.entries()]
+          .filter(([key]) => key.startsWith(`${pack}:`))
+          .flatMap(([, sentences]) => sentences);
+      return send(res, 200, { pack, sentences: rows });
+    }
+
     if (url.pathname === '/api/premium/status' && req.method === 'GET') {
       const deviceId = url.searchParams.get('deviceId') || '';
       const user = await getAuthUser(req);
       if (user?.is_premium) return send(res, 200, { isPremium: true, source: 'payment' });
-      const license = deviceId.length <= 128 ? await getDeviceLicense(deviceId) : null;
+      const accountLicense = user ? await getUserLicense(user.id) : null;
+      if (accountLicense) {
+        await query('UPDATE users SET is_premium = TRUE WHERE id = $1', [user.id]);
+        return send(res, 200, { isPremium: true, source: 'license', licenseLast4: accountLicense.key_last4 });
+      }
+      const claimedLicense = user && deviceId.length <= 128 ? await claimDeviceLicense(user.id, deviceId) : null;
+      const license = claimedLicense || (deviceId.length <= 128 ? await getDeviceLicense(deviceId) : null);
       return send(res, 200, { isPremium: Boolean(license), source: license ? 'license' : 'none', licenseLast4: license?.key_last4 || null });
     }
 
@@ -241,13 +288,14 @@ const server = createServer(async (req, res) => {
       const licenseKey = typeof input.licenseKey === 'string' ? input.licenseKey.trim().toUpperCase() : '';
       const deviceId = typeof input.deviceId === 'string' ? input.deviceId.trim() : '';
       if (!licenseKey || !deviceId || deviceId.length > 128) return send(res, 400, { error: 'A valid license key is required' });
-      const license = (await query('SELECT id, key_last4, activated_by FROM licenses WHERE key_hash = $1', [hashLicense(licenseKey)])).rows[0];
-      if (!license) return send(res, 404, { error: 'This license key is not valid' });
-      if (license.activated_by && license.activated_by !== deviceId) return send(res, 409, { error: 'This license key is already used on another device' });
-      await query('UPDATE licenses SET activated_by = $1, activated_at = $2 WHERE id = $3', [deviceId, new Date().toISOString(), license.id]);
       const user = await getAuthUser(req);
+      const license = (await query('SELECT id, key_last4, activated_by, activated_user_id FROM licenses WHERE key_hash = $1', [hashLicense(licenseKey)])).rows[0];
+      if (!license) return send(res, 404, { error: 'This license key is not valid' });
+      if (license.activated_user_id && license.activated_user_id !== user?.id) return send(res, 409, { error: 'This license key belongs to another account' });
+      if (!license.activated_user_id && license.activated_by && license.activated_by !== deviceId) return send(res, 409, { error: 'This license key is already used on another device' });
+      await query('UPDATE licenses SET activated_by = COALESCE(activated_by, $1), activated_user_id = COALESCE(activated_user_id, $2), activated_at = $3 WHERE id = $4', [deviceId, user?.id || null, new Date().toISOString(), license.id]);
       if (user) await query('UPDATE users SET is_premium = TRUE WHERE id = $1', [user.id]);
-      return send(res, 200, { isPremium: true, source: user ? 'payment' : 'license', licenseLast4: license.key_last4 });
+      return send(res, 200, { isPremium: true, source: 'license', licenseLast4: license.key_last4 });
     }
 
     if (url.pathname === '/api/payments/paypal/create-order' && req.method === 'POST') {
@@ -354,6 +402,21 @@ const server = createServer(async (req, res) => {
       await query('INSERT INTO practice_sessions (id, user_id, date, difficulty, wpm, accuracy) VALUES ($1, $2, $3, $4, $5, $6)', [session.id, session.userId, session.date, session.difficulty, session.wpm, session.accuracy]);
       await query('DELETE FROM practice_sessions WHERE user_id = $1 AND id NOT IN (SELECT id FROM practice_sessions WHERE user_id = $1 ORDER BY date DESC LIMIT 30)', [user.id]);
       return send(res, 201, { session });
+    }
+
+    if (url.pathname === '/api/learning-state' && req.method === 'GET') {
+      const state = (await query('SELECT review_words, points, daily_target, goal_wpm, updated_at FROM learning_state WHERE user_id = $1', [user.id])).rows[0];
+      return send(res, 200, { state: state || null });
+    }
+
+    if (url.pathname === '/api/learning-state' && req.method === 'PUT') {
+      const input = await body(req);
+      const reviewWords = Array.isArray(input.reviewWords) ? input.reviewWords.slice(0, 100) : [];
+      const points = Math.max(0, Math.round(Number(input.points) || 0));
+      const goalWpm = Math.min(Math.max(Math.round(Number(input.goalWpm) || 40), 10), 200);
+      const dailyTarget = input.dailyTarget && typeof input.dailyTarget === 'object' ? input.dailyTarget : null;
+      const state = (await query(`INSERT INTO learning_state (user_id, review_words, points, daily_target, goal_wpm, updated_at) VALUES ($1, $2::jsonb, $3, $4::jsonb, $5, NOW()) ON CONFLICT (user_id) DO UPDATE SET review_words = EXCLUDED.review_words, points = EXCLUDED.points, daily_target = EXCLUDED.daily_target, goal_wpm = EXCLUDED.goal_wpm, updated_at = NOW() RETURNING review_words, points, daily_target, goal_wpm, updated_at`, [user.id, JSON.stringify(reviewWords), points, JSON.stringify(dailyTarget), goalWpm])).rows[0];
+      return send(res, 200, { state });
     }
 
     return send(res, 404, { error: 'Not found' });

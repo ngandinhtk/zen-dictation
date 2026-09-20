@@ -66,7 +66,9 @@ export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProp
   }, [appTransId]);
 
   const handleActivate = async () => {
+    if (!licenseKey || isActivating) return;
     setIsActivating(true);
+    setMessage('Activating your Premium license…');
     try {
       await activatePremiumLicense(licenseKey);
       sessionStorage.removeItem('zen-paypal-order-id');
@@ -91,7 +93,7 @@ export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProp
         {status === 'checking' && <div className="payment-loader" aria-label="Checking payment status" />}
         {status === 'paid' && <>
           <label className="license-reveal">Your license key<input value={licenseKey} readOnly aria-label="Premium license key" /></label>
-          <button type="button" className="checkout-button checkout-next" onClick={() => void handleActivate()} disabled={isActivating}>{isActivating ? 'Activating Premium…' : 'Activate Premium'}</button>
+          <button type="button" className="checkout-button checkout-next" onClick={() => void handleActivate()} disabled={!licenseKey || isActivating} aria-busy={isActivating}>{isActivating ? 'Activating Premium…' : 'Activate this license'}</button>
         </>}
         <button type="button" className="license-button" onClick={onBack}>{status === 'paid' ? 'I will activate later' : 'Return to practice'}</button>
       </section>
@@ -168,7 +170,7 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
         <button type="button" className="checkout-button" onClick={() => setIsCheckoutOpen(true)}>Continue to checkout</button>
         <button type="button" className="license-button" onClick={onLicenseClick}>Already have a license key?</button>
       </section>
-      <p className="payment-note">Your Premium license will work without creating an account. An account is optional for syncing your progress across devices.</p>
+      {/* <p className="payment-note">Your Premium license will work without creating an account. An account is optional for syncing your progress across devices.</p> */}
     </main>
   </div>
   );

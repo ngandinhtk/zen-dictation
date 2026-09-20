@@ -37,6 +37,11 @@ export const saveGoalWpm = (value: number) => {
   return goal;
 };
 
+export const clearPremiumLearningState = () => {
+  localStorage.removeItem(HISTORY_KEY);
+  localStorage.removeItem(GOAL_KEY);
+};
+
 export const getPracticeStreak = (history: PracticeSession[]) => {
   const practicedDates = new Set(history.map(session => new Date(session.date).toLocaleDateString()));
   const cursor = new Date();

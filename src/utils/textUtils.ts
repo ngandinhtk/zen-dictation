@@ -21,7 +21,42 @@ export interface AttemptAnalysis {
   missingCharacters: number;
   grammarTip: string;
   incorrectWords: Array<{ actual: string; expected: string }>;
+  missingWords: string[];
+  extraWords: string[];
 }
+
+const getWordAlignment = (targetWords: string[], inputWords: string[]) => {
+  const targetCount = targetWords.length;
+  const inputCount = inputWords.length;
+  const table = Array.from({ length: targetCount + 1 }, () => Array<number>(inputCount + 1).fill(0));
+
+  for (let targetIndex = targetCount - 1; targetIndex >= 0; targetIndex -= 1) {
+    for (let inputIndex = inputCount - 1; inputIndex >= 0; inputIndex -= 1) {
+      table[targetIndex][inputIndex] = targetWords[targetIndex] === inputWords[inputIndex]
+        ? table[targetIndex + 1][inputIndex + 1] + 1
+        : Math.max(table[targetIndex + 1][inputIndex], table[targetIndex][inputIndex + 1]);
+    }
+  }
+
+  const missingWords: string[] = [];
+  const extraWords: string[] = [];
+  let targetIndex = 0;
+  let inputIndex = 0;
+  while (targetIndex < targetCount || inputIndex < inputCount) {
+    if (targetIndex < targetCount && inputIndex < inputCount && targetWords[targetIndex] === inputWords[inputIndex]) {
+      targetIndex += 1;
+      inputIndex += 1;
+    } else if (targetIndex < targetCount && (inputIndex >= inputCount || table[targetIndex + 1][inputIndex] >= table[targetIndex][inputIndex + 1])) {
+      missingWords.push(targetWords[targetIndex]);
+      targetIndex += 1;
+    } else if (inputIndex < inputCount) {
+      extraWords.push(inputWords[inputIndex]);
+      inputIndex += 1;
+    }
+  }
+
+  return { missingWords, extraWords };
+};
 
 export const getGrammarTip = (sentence: string): string => {
   const text = sentence.toLowerCase();
@@ -48,12 +83,15 @@ export const analyzeAttempt = (target: string, input: string): AttemptAnalysis =
   const incorrectWords = inputWords
     .map((word, index) => ({ actual: word, expected: targetWords[index] }))
     .filter(detail => detail.expected !== undefined && detail.expected !== detail.actual);
+  const { missingWords, extraWords } = getWordAlignment(targetWords, inputWords);
   return {
     accuracy: Math.round((correctCharacters / Math.max(target.length, 1)) * 100),
     incorrectCharacters,
     missingCharacters,
     grammarTip: getGrammarTip(target),
     incorrectWords,
+    missingWords,
+    extraWords,
   };
 };
 

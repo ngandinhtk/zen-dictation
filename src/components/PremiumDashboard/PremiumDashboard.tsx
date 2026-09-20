@@ -90,6 +90,71 @@ const AchievementPanel = ({ achievements }: { achievements: Array<Achievement & 
   </section>
 );
 
+const ProgressAnalytics = ({ practiceHistory }: { practiceHistory: PracticeSession[] }) => {
+  const sessions = [...practiceHistory].slice(0, 12).reverse();
+  if (sessions.length < 2) {
+    return <section className="dashboard-card analytics-card"><div className="section-title"><h2>Progress analytics</h2><span>Premium insight</span></div><p className="dashboard-empty">Complete at least two sessions to see your WPM and accuracy trends.</p></section>;
+  }
+
+  const wpmValues = sessions.map(session => session.wpm);
+  const accuracyValues = sessions.map(session => session.accuracy);
+  const maxWpm = Math.max(...wpmValues, 1);
+  const chartPoints = (values: number[], maxValue: number) => values.map((value, index) => `${(index / Math.max(values.length - 1, 1)) * 100},${100 - (value / maxValue) * 82 - 9}`).join(' ');
+  const midpoint = Math.max(Math.floor(sessions.length / 2), 1);
+  const average = (values: number[]) => values.reduce((total, value) => total + value, 0) / values.length;
+  const wpmTrend = Math.round(average(wpmValues.slice(midpoint)) - average(wpmValues.slice(0, midpoint)));
+  const accuracyTrend = Math.round(average(accuracyValues.slice(midpoint)) - average(accuracyValues.slice(0, midpoint)));
+  const trendLabel = (value: number, unit: string) => `${value > 0 ? '+' : ''}${value}${unit} vs earlier sessions`;
+
+  return <section className="dashboard-card analytics-card" aria-label="Progress analytics">
+    <div className="section-title"><h2>Progress analytics</h2><span>Last {sessions.length} sessions</span></div>
+    <div className="analytics-grid">
+      <div className="analytics-chart-block">
+        <div className="analytics-chart-heading"><span>Typing speed</span><strong>{trendLabel(wpmTrend, ' WPM')}</strong></div>
+        <svg className="analytics-chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Typing speed trend chart">
+          <polyline points={chartPoints(wpmValues, maxWpm)} fill="none" stroke="currentColor" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+        </svg>
+        <div className="analytics-chart-labels"><span>Older</span><span>Recent</span></div>
+      </div>
+      <div className="analytics-chart-block accuracy-chart-block">
+        <div className="analytics-chart-heading"><span>Accuracy</span><strong>{trendLabel(accuracyTrend, '%')}</strong></div>
+        <svg className="analytics-chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Accuracy trend chart">
+          <polyline points={chartPoints(accuracyValues, 100)} fill="none" stroke="currentColor" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+        </svg>
+        <div className="analytics-chart-labels"><span>Older</span><span>Recent</span></div>
+      </div>
+    </div>
+  </section>;
+};
+
+const WeeklyLearningReport = ({ practiceHistory }: { practiceHistory: PracticeSession[] }) => {
+  const [reportNow] = useState(() => Date.now());
+  const weekStart = reportNow - 7 * 24 * 60 * 60 * 1000;
+  const weeklySessions = practiceHistory.filter(session => new Date(session.date).getTime() >= weekStart);
+  const activeDays = new Set(weeklySessions.map(session => new Date(session.date).toLocaleDateString())).size;
+  const averageAccuracy = weeklySessions.length ? Math.round(weeklySessions.reduce((total, session) => total + session.accuracy, 0) / weeklySessions.length) : 0;
+  const bestWpm = weeklySessions.length ? Math.max(...weeklySessions.map(session => session.wpm)) : 0;
+  const weakestSession = weeklySessions.length ? [...weeklySessions].sort((a, b) => a.accuracy - b.accuracy)[0] : undefined;
+  const recommendation = !weeklySessions.length
+    ? 'Complete a session this week to unlock your first report.'
+    : averageAccuracy < 85
+      ? 'Focus on accuracy first. Replay each sentence once before typing.'
+      : bestWpm < 35
+        ? 'Your accuracy is solid. Try a slightly faster speech speed to build fluency.'
+        : 'You are building a strong rhythm. Try Adaptive Practice for a new challenge.';
+
+  return <section className="dashboard-card weekly-report" aria-label="Weekly learning report">
+    <div className="section-title"><h2>Weekly learning report</h2><span>Last 7 days</span></div>
+    <div className="weekly-report-metrics">
+      <div><strong>{weeklySessions.length}</strong><span>Sessions</span></div>
+      <div><strong>{activeDays}</strong><span>Active days</span></div>
+      <div><strong>{averageAccuracy || '—'}<small>%</small></strong><span>Average accuracy</span></div>
+      <div><strong>{bestWpm || '—'}<small> WPM</small></strong><span>Best speed</span></div>
+    </div>
+    <div className="weekly-recommendation"><span>Next focus</span><p>{recommendation}</p>{weakestSession && <small>Lowest accuracy this week: {weakestSession.accuracy}% on {weakestSession.difficulty} practice.</small>}</div>
+  </section>;
+};
+
 const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practiceStreak, practiceHistory, totalPoints, dailyTarget, achievements, onGoalChange, onLicenseActivated, onStartFocus, onBack }: PremiumDashboardProps) => (
   <div className="premium-page">
     <header className="premium-page-header">
@@ -107,6 +172,8 @@ const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practi
           <div><span>Completed sessions</span><strong>{practiceHistory.length}</strong><em>Saved on this device</em></div>
           <div><span>Current streak</span><strong>{practiceStreak}<small> days</small></strong><em>Keep the habit going</em></div>
         </section>
+        <ProgressAnalytics practiceHistory={practiceHistory} />
+        <WeeklyLearningReport practiceHistory={practiceHistory} />
         <RewardsPanel totalPoints={totalPoints} dailyTarget={dailyTarget} />
         <AchievementPanel achievements={achievements} />
         <section className="dashboard-card goal-card"><div><span className="premium-kicker">Your next milestone</span><h2>Build your speed steadily</h2><p>Choose a target that feels challenging but achievable.</p><div className="goal-progress" role="progressbar" aria-label="Progress toward WPM goal" aria-valuemin={0} aria-valuemax={goalWpm} aria-valuenow={Math.min(bestWpm, goalWpm)}><span style={{ width: String(Math.min((bestWpm / Math.max(goalWpm, 1)) * 100, 100)) + '%' }} /></div><small className="goal-progress-label">{bestWpm ? String(bestWpm) + ' of ' + String(goalWpm) + ' WPM' : 'Set your first record · Goal ' + String(goalWpm) + ' WPM'}</small></div><label>Target WPM <input type="number" min="10" max="200" value={goalWpm} onChange={onGoalChange} /></label></section>

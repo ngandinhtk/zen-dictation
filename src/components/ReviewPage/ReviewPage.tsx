@@ -34,6 +34,11 @@ const ReviewPage = ({ words, onAddWord, onUpdateWord, onPracticeWord, initialWor
     return new Date(a.nextReviewAt).getTime() - new Date(b.nextReviewAt).getTime();
   });
   const dueWords = orderedWords.filter(word => word.correctStreak < 4 || new Date(word.nextReviewAt).getTime() <= reviewNow);
+  const formatNextReview = (word: ReviewWord, isDue: boolean) => {
+    if (isDue) return 'Ready to review';
+    const date = new Date(word.nextReviewAt);
+    return `Next review ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+  };
   const wordsPerPage = 10;
   const searchTerm = newWord.trim().toLowerCase();
   const matchingWords = searchTerm
@@ -116,8 +121,8 @@ const ReviewPage = ({ words, onAddWord, onUpdateWord, onPracticeWord, initialWor
                   {editError && <small className="review-edit-error" role="alert">{editError}</small>}
                 </form> : <><strong>{word.word}</strong><span>{word.mistakes} mistake{word.mistakes === 1 ? '' : 's'}</span>{word.note && <small className="review-card-note">Note: {word.note}</small>}<div className="review-card-actions"><button type="button" className="review-action" onClick={() => startEditing(word)}>Edit</button></div></>}</div>
                 <div className="review-card-status">
-                  {isDue ? <button type="button" className="review-status-pill" onClick={() => onPracticeWord(word.word)}>Due now</button> : <span className="review-status-pill">Streak {word.correctStreak}</span>}
-                  <small>{isDue ? 'Practice this word now' : 'Keep your streak going'}</small>
+                  {isDue ? <button type="button" className="review-status-pill" onClick={() => onPracticeWord(word.word)}>Duo now</button> : <span className="review-status-pill">Streak {word.correctStreak}</span>}
+                  <small>{formatNextReview(word, isDue)}</small>
                 </div>
               </article>;
             })}

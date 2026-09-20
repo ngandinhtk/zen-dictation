@@ -23,6 +23,24 @@
 .dashboard-metrics strong { display: block; margin: .55rem 0; font-family: var(--font-mono); font-size: 1.6rem; }
 .dashboard-metrics small { font-size: .7rem; }
 .dashboard-card { margin-top: .8rem; }
+.analytics-card { margin-top: 1.25rem; }
+.analytics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; margin-top: 1rem; }
+.analytics-chart-block { min-width: 0; padding: .85rem; border: 1px solid var(--border-color); border-radius: 12px; background: color-mix(in srgb, var(--bg-color) 70%, var(--hover-bg)); color: #4d7fb2; }
+.accuracy-chart-block { color: #3f8d7b; }
+.analytics-chart-heading { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; color: var(--text-muted); font-size: .66rem; }
+.analytics-chart-heading strong { color: currentColor; font-family: var(--font-mono); font-size: .6rem; font-weight: 500; white-space: nowrap; }
+.analytics-chart { display: block; width: 100%; height: 90px; margin-top: .65rem; overflow: visible; background: repeating-linear-gradient(to bottom, transparent 0, transparent 29px, var(--border-color) 30px); }
+.analytics-chart-labels { display: flex; justify-content: space-between; color: var(--text-muted); font-size: .56rem; }
+.weekly-report { margin-top: 1.25rem; }
+.weekly-report-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; margin-top: 1rem; }
+.weekly-report-metrics > div { padding: .75rem .55rem; border: 1px solid var(--border-color); border-radius: 10px; background: color-mix(in srgb, var(--bg-color) 70%, var(--hover-bg)); }
+.weekly-report-metrics strong { display: block; color: var(--accent-color); font-family: var(--font-mono); font-size: 1.15rem; font-weight: 500; }
+.weekly-report-metrics strong small { font-size: .6rem; }
+.weekly-report-metrics span { display: block; margin-top: .2rem; color: var(--text-muted); font-size: .58rem; }
+.weekly-recommendation { margin-top: .8rem; padding: .8rem .9rem; border-left: 2px solid #71bd9c; border-radius: 0 10px 10px 0; background: rgba(113, 189, 156, .08); }
+.weekly-recommendation span { color: var(--accent-color); font-size: .62rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+.weekly-recommendation p { margin: .3rem 0; color: var(--text-color); font-size: .72rem; }
+.weekly-recommendation small { color: var(--text-muted); font-size: .6rem; }
 .rewards-card { margin-top: 1.25rem; }
 .rewards-card  .section-title .premium-kicker {
   color: var(--accent-color);
@@ -72,6 +90,8 @@
   .premium-page { padding: 1.25rem; }
   .premium-dashboard, .premium-landing { margin-top: 5rem; }
   .dashboard-metrics { grid-template-columns: 1fr; margin-top: 2rem; }
+  .analytics-grid { grid-template-columns: 1fr; }
+  .weekly-report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .goal-card { align-items: flex-start; flex-direction: column; }
   .dashboard-history-row { grid-template-columns: 1fr auto; }
   .dashboard-history-row span:last-child { grid-column: 1 / -1; }

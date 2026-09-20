@@ -20,6 +20,8 @@ const readReviews = (): ReviewWord[] => {
 };
 
 const saveReviews = (reviews: ReviewWord[]) => localStorage.setItem(REVIEW_KEY, JSON.stringify(reviews.filter(isActiveReviewWord).slice(-100)));
+export const replaceReviewWords = (reviews: ReviewWord[]) => saveReviews(reviews);
+export const clearReviewWords = () => localStorage.removeItem(REVIEW_KEY);
 const normalizeWords = (value: string) => value.toLowerCase().match(/[a-z']+/g) || [];
 const nextReviewDate = (correctStreak: number) => {
   const days = correctStreak >= 3 ? 7 : correctStreak === 2 ? 3 : 1;

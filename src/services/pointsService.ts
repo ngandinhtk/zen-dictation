@@ -46,6 +46,22 @@ export const getPoints = () => {
   return Number.isFinite(points) && points >= 0 ? points : 0;
 };
 
+export const replacePoints = (points: number) => {
+  const nextPoints = Math.max(0, Math.round(points));
+  localStorage.setItem(POINTS_KEY, String(nextPoints));
+  return nextPoints;
+};
+
+export const replaceDailyTarget = (target: DailyTarget) => {
+  localStorage.setItem(DAILY_TARGET_KEY, JSON.stringify(target));
+  return target;
+};
+
+export const clearPointsState = () => {
+  localStorage.removeItem(POINTS_KEY);
+  localStorage.removeItem(DAILY_TARGET_KEY);
+};
+
 export const addPoints = (points: number) => {
   const nextPoints = getPoints() + Math.max(0, Math.round(points));
   localStorage.setItem(POINTS_KEY, String(nextPoints));

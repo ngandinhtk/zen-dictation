@@ -40,7 +40,7 @@
 .review-card > div:first-child span, .review-card-status small { color: var(--text-muted); font-size: .66rem; }
 .review-card-note { color: var(--text-color); font-size: .65rem; font-style: italic; }
 .review-card-status { display: flex; align-items: flex-end; flex-direction: column; gap: .2rem; text-align: right; }
-.review-status-pill { padding: .22rem .45rem; border: 0; border-radius: 999px; background: var(--hover-bg); color: var(--text-muted); cursor: default; font: inherit; font-size: .6rem; }
+.review-status-pill { min-height: 2rem; padding: .35rem .6rem; border: 0; border-radius: 999px; background: var(--hover-bg); color: var(--text-muted); cursor: default; font: inherit; font-size: .6rem; touch-action: manipulation; }
 .review-status-pill:not(:disabled) { cursor: pointer; }
 .review-card.is-due .review-status-pill { background: rgba(213, 138, 104, .16); color: #c87554; }
 .review-card.is-due .review-status-pill:hover { background: rgba(213, 138, 104, .27); color: var(--text-color); }

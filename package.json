@@ -7,6 +7,7 @@
     "dev": "vite",
     "server": "node server/server.mjs",
     "server:local": "node --env-file=.env server/server.mjs",
+    "seed:sentences": "node --env-file=.env scripts/seed-sentences.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

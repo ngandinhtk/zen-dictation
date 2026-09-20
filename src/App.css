@@ -659,6 +659,9 @@
 .point-reward { margin: 0 0 .8rem; padding: .45rem .8rem; border: 1px solid rgba(113, 189, 156, .38); border-radius: 999px; background: rgba(113, 189, 156, .1); color: var(--correct-color); font-family: var(--font-mono); font-size: .68rem; animation: feedbackPop .3s ease-out; }
 .attempt-summary { text-align: center !important; display: flex; align-items: center; flex-wrap: wrap; width: min(100%, 540px); gap: .65rem; margin: .8rem 0 1rem; padding: .45rem .7rem; border: 1px solid var(--border-color); border-radius: 14px; background: var(--hover-bg); color: var(--text-muted); font-size: .65rem; animation: feedbackPop .25s ease-out; }
 .screen-loading { display: grid; min-height: 60vh; place-items: center; color: var(--text-muted); font-size: .75rem; }
+.sentence-catalog-state { display: flex; align-items: center; flex-direction: column; gap: .35rem; width: 100%; min-height: 190px; margin: .75rem auto 1rem; padding: 3rem 1rem; border: 1px solid var(--border-color); border-radius: 18px; background: color-mix(in srgb, var(--bg-color) 70%, var(--hover-bg)); text-align: center; }
+.sentence-catalog-state strong { color: var(--accent-color); font-size: .8rem; }
+.sentence-catalog-state small { color: var(--text-muted); font-size: .68rem; }
 .attempt-summary strong { color: var(--accent-color); font-family: var(--font-mono); font-size: .68rem; }
 .attempt-summary small { display: block; flex-basis: 100%; width: 100%; max-width: 100%; color: var(--text-muted); font-size: .62rem; }
 .retry-attempt-button { flex-basis: 100%; align-self: center; padding: .4rem .75rem; border: 1px solid var(--accent-color); border-radius: 999px; background: transparent; color: var(--accent-color); cursor: pointer; font: inherit; font-size: .62rem; }
@@ -669,6 +672,11 @@
 .incorrect-word b { color: var(--incorrect-color); font-weight: 600; }
 .incorrect-word i { color: var(--text-muted); font-style: normal; }
 .incorrect-word strong { color: var(--correct-color); font-size: .62rem; }
+.word-difference { display: flex; flex-basis: 100%; gap: .4rem; align-items: baseline; text-align: left; font-size: .62rem; }
+.word-difference span { color: var(--text-muted); min-width: 3.2rem; }
+.word-difference strong { font-family: var(--font-mono); font-size: .62rem; font-weight: 600; }
+.missing-words strong { color: var(--correct-color); }
+.extra-words strong { color: var(--incorrect-color); }
 .review-note-editor { display: flex; flex-basis: 100%; flex-direction: column; align-items: stretch; gap: .35rem; margin-top: .35rem; text-align: left; }
 .review-note-editor label { color: var(--text-color); font-size: .65rem; }
 .review-note-editor label small { display: inline; margin-left: .35rem; color: var(--text-muted); font-size: .58rem; }
