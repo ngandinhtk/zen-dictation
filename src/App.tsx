@@ -48,6 +48,7 @@ const getSentencePool = (focus: PracticeFocus, difficulty: Difficulty) => {
   return databasePool || [];
 };
 const ACTIVE_PRACTICE_KEY = 'zen-dictation-active-practice';
+const LAST_SENTENCE_KEY = 'zen-dictation-last-sentence';
 type ActivePractice = { difficulty: Difficulty; focus: PracticeFocus; index: number; targetText: string };
 const readActivePractice = (): ActivePractice | null => {
   try {
@@ -112,8 +113,7 @@ function App() {
   const [, setSentenceCatalogVersion] = useState(0);
   const [sentenceCatalogStatus, setSentenceCatalogStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [currentIndex, setCurrentIndex] = useState(() => {
-    const pool = getSentencePool(savedPractice?.focus || 'mixed', savedPractice?.difficulty || DEFAULT_DIFFICULTY);
-    return savedPractice && pool[savedPractice.index] === savedPractice.targetText ? savedPractice.index : getRandomSentenceIndex(pool);
+    return 0;
   });
   const [speed, setSpeed] = useState(1);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -337,6 +337,12 @@ function App() {
       .then(sentences => {
         if (!sentences.length) throw new Error('Sentence pack is empty');
         updateDatabaseSentencePool(practiceFocus, sentences);
+        const nextPool = getSentencePool(practiceFocus, difficulty);
+        const lastSentence = localStorage.getItem(LAST_SENTENCE_KEY);
+        const availableIndices = nextPool.map((_, index) => index).filter(index => nextPool.length < 2 || nextPool[index] !== lastSentence);
+        const nextIndex = availableIndices.length ? availableIndices[Math.floor(Math.random() * availableIndices.length)] : 0;
+        setCurrentIndex(nextIndex);
+        try { localStorage.setItem(LAST_SENTENCE_KEY, nextPool[nextIndex]); } catch { /* best effort */ }
         setSentenceCatalogStatus('ready');
         setSentenceCatalogVersion(version => version + 1);
       })
@@ -551,6 +557,7 @@ function App() {
 
   const handleNext = () => {
     clearActivePractice();
+    try { localStorage.setItem(LAST_SENTENCE_KEY, currentSentence); } catch { /* best effort */ }
     const attemptAccuracy = lastAttempt?.accuracy ?? (isCompleted ? 100 : 0);
     const nextDifficulty = isAdaptiveMode ? getAdaptiveDifficulty(difficulty, attemptAccuracy) : difficulty;
     if (nextDifficulty !== difficulty) setDifficulty(nextDifficulty);
@@ -561,6 +568,7 @@ function App() {
     resetStats(timeLimit);
     setKey(prev => prev + 1);
   };
+
 
   const handleDifficultyChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const nextDifficulty = event.target.value as Difficulty;

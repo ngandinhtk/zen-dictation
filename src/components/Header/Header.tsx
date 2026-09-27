@@ -23,6 +23,7 @@ const Header = ({ accountUser, isAccountOpen, isPremium, isPremiumOpen, isSettin
     <header className="app-header">
       <h1 className="logo">Zen Dictation</h1>
       <nav className="header-nav" aria-label="Primary navigation">
+        {(import.meta.env.VITE_TELEGRAM_URL as string | undefined) && <a href={import.meta.env.VITE_TELEGRAM_URL as string} className="telegram-toggle" target="_blank" rel="noreferrer">✈ Contact Telegram</a>}
         <a href="#review" className="review-toggle" onClick={event => { event.preventDefault(); onReviewOpen(); }} aria-expanded={isReviewOpen} aria-controls="review-page">
           <span aria-hidden="true" style={{ color: '#4479a7' }}>✦</span> Review words
         </a>

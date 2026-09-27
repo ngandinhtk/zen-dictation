@@ -151,6 +151,35 @@ const claimDeviceLicense = async (userId, deviceId) => {
   await query('UPDATE users SET is_premium = TRUE WHERE id = $1', [userId]);
   return license;
 };
+
+const decodeHtml = value => value.replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code))).replace(/&#x([\da-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16))).replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+const getYoutubeVideoId = value => {
+  try {
+    const url = new URL(value);
+    if (url.hostname === 'youtu.be') return url.pathname.slice(1).split('/')[0];
+    if (url.hostname.endsWith('youtube.com')) return url.searchParams.get('v') || url.pathname.match(/\/shorts\/([^/]+)/)?.[1] || url.pathname.match(/\/embed\/([^/]+)/)?.[1] || '';
+  } catch { return ''; }
+  return '';
+};
+const fetchYoutubeTranscript = async videoUrl => {
+  const videoId = getYoutubeVideoId(videoUrl);
+  if (!videoId) throw new Error('Please enter a valid YouTube link');
+  const page = await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  if (!page.ok) throw new Error('Unable to open this YouTube video');
+  const html = await page.text();
+  const match = html.match(/\\?"captionTracks\\?":(\[[\s\S]*?\])(?:,\\?"audioTracks\\?"|,\\?"translationLanguages\\?")/);
+  if (!match) throw new Error('This video has no available captions');
+  let tracks;
+  try { tracks = JSON.parse(match[1]); } catch { throw new Error('Could not read the video captions'); }
+  const track = tracks.find(item => item.languageCode === 'en') || tracks[0];
+  if (!track?.baseUrl) throw new Error('This video has no available captions');
+  const captionResponse = await fetch(track.baseUrl);
+  if (!captionResponse.ok) throw new Error('Could not download the captions');
+  const xml = await captionResponse.text();
+  const segments = [...xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/g)].map(match => decodeHtml(match[1]).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (!segments.length) throw new Error('This video has no readable captions');
+  return { videoId, language: track.languageCode || 'unknown', segments };
+};
 const getPayPalConfig = () => ({
   clientId: process.env.PAYPAL_CLIENT_ID || '',
   clientSecret: process.env.PAYPAL_CLIENT_SECRET || '',
@@ -359,6 +388,18 @@ const server = createServer(async (req, res) => {
       const order = (await query('SELECT status, delivery_key, amount FROM payment_orders WHERE app_trans_id = $1 AND device_id = $2', [appTransId, deviceId])).rows[0];
       if (!order) return send(res, 404, { error: 'Payment order not found' });
       return send(res, 200, { status: order.status, amount: order.amount, licenseKey: order.delivery_key ? decryptLicenseKey(order.delivery_key) : null });
+    }
+
+    if (url.pathname === '/api/youtube/transcript' && req.method === 'POST') {
+      const input = await body(req);
+      if (typeof input.url !== 'string' || input.url.length > 500) return send(res, 400, { error: 'Please enter a valid YouTube link' });
+      try {
+        const transcript = await fetchYoutubeTranscript(input.url);
+        return send(res, 200, transcript);
+      } catch (error) {
+        console.error('YouTube transcript error:', error);
+        return send(res, 502, { error: error instanceof Error ? error.message : 'Unable to fetch the YouTube captions' });
+      }
     }
 
     if (url.pathname === '/api/auth/register' && req.method === 'POST') {
