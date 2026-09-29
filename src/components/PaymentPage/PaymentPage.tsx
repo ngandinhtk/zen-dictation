@@ -184,10 +184,13 @@ const BankQrPayment = () => {
   // const accountName = (import.meta.env.VITE_BANK_ACCOUNT_NAME as string | undefined) || 'Account holder';
   const accountNumber = (import.meta.env.VITE_BANK_ACCOUNT_NUMBER as string | undefined) || '0908045090';
   const transferNote = (import.meta.env.VITE_BANK_TRANSFER_NOTE as string | undefined) || 'Buy ZENTATION a coffee';
+  const telegramUrl = import.meta.env.VITE_TELEGRAM_URL as string | undefined;
+  const confirmationMessage = encodeURIComponent(`Xin chào, tôi đã chuyển khoản ủng hộ Zen Dictation. Nội dung: ${transferNote}. Vui lòng kiểm tra và hỗ trợ kích hoạt Premium cho tôi.`);
   return <div className="bank-qr-payment">
     {qrUrl ? <img className="bank-qr-image" src={qrUrl} alt={`Bank transfer QR`} /> : <div className="bank-qr-missing">Add <code>VITE_BANK_QR_URL</code> to show your QR code.</div>}
     <p className="bank-qr-title">Buy me a coffee via bank transfer</p>
     <dl className="bank-details"><div><dt>Bank</dt><dd>{bankName}</dd></div><div><dt>Account</dt><dd>{accountNumber}</dd></div><div><dt>Transfer note</dt><dd>{transferNote}</dd></div></dl>
+    {telegramUrl && <a className="bank-confirm-button" href={`${telegramUrl}${telegramUrl.includes('?') ? '&' : '?'}text=${confirmationMessage}`} target="_blank" rel="noreferrer">I&apos;ve completed the transfer — Contact Telegram</a>}
     <p className="bank-qr-note">Thank you for supporting Zen Dictation! This contribution is separate from the automatic Premium purchase.</p>
   </div>;
 };

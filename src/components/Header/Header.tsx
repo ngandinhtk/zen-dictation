@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { AccountUser } from '../../services/accountService';
 import { logoutAccount } from '../../services/accountService';
 import AccountPanel from '../AccountPanel/AccountPanel';
@@ -18,12 +19,14 @@ interface HeaderProps {
   onReviewOpen: () => void;
 }
 
-const Header = ({ accountUser, isAccountOpen, isPremium, isPremiumOpen, isSettingsOpen, isReviewOpen, onAccountToggle, onAuthenticated, onLoggedOut, onPremiumOpen, onSettingsToggle, onReviewOpen }: HeaderProps) => (
+const Header = ({ accountUser, isAccountOpen, isPremium, isPremiumOpen, isSettingsOpen, isReviewOpen, onAccountToggle, onAuthenticated, onLoggedOut, onPremiumOpen, onSettingsToggle, onReviewOpen }: HeaderProps) => {
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  return (
   <>
     <header className="app-header">
       <h1 className="logo">Zen Dictation</h1>
-      <nav className="header-nav" aria-label="Primary navigation">
-        {(import.meta.env.VITE_TELEGRAM_URL as string | undefined) && <a href={import.meta.env.VITE_TELEGRAM_URL as string} className="telegram-toggle" target="_blank" rel="noreferrer">✈ Contact Telegram</a>}
+      <button type="button" className="mobile-nav-toggle" onClick={() => setIsMobileNavOpen(open => !open)} aria-expanded={isMobileNavOpen} aria-controls="primary-navigation" aria-label={isMobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}><span /><span /><span /></button>
+      <nav id="primary-navigation" className={`header-nav ${isMobileNavOpen ? 'mobile-nav-open' : ''}`} aria-label="Primary navigation">
         <a href="#review" className="review-toggle" onClick={event => { event.preventDefault(); onReviewOpen(); }} aria-expanded={isReviewOpen} aria-controls="review-page">
           <span aria-hidden="true" style={{ color: '#4479a7' }}>✦</span> Review words
         </a>
@@ -35,6 +38,7 @@ const Header = ({ accountUser, isAccountOpen, isPremium, isPremiumOpen, isSettin
           <span aria-hidden="true"  >⚙</span> Settings
         </a>
      
+        {(import.meta.env.VITE_TELEGRAM_URL as string | undefined) && <a href={import.meta.env.VITE_TELEGRAM_URL as string} className="telegram-toggle" target="_blank" rel="noreferrer">✈ Contact</a>}
        <a href="#account" className="account-toggle" onClick={event => { event.preventDefault(); onAccountToggle(); }} aria-expanded={isAccountOpen} aria-controls="account-menu">
            {accountUser ? accountUser.email.split('@')[0] : 'Account'}
         </a>  
@@ -47,6 +51,7 @@ const Header = ({ accountUser, isAccountOpen, isPremium, isPremiumOpen, isSettin
       </section>
     )}
   </>
-);
+  );
+};
 
 export default Header;
