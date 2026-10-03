@@ -747,11 +747,10 @@
   .app-layout { padding: .75rem .75rem calc(1rem + env(safe-area-inset-bottom)); }
   .app-header { align-items: flex-start; flex-wrap: wrap; gap: .7rem; padding: .7rem; }
   .logo { font-size: .95rem; }
-  .header-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); flex: 1 1 100%; gap: .35rem; min-width: 0; width: 100%; }
+  .header-nav { display: grid; grid-template-columns: minmax(0, 1fr); flex: 1 1 100%; gap: .35rem; min-width: 0; width: 100%; }
   .header-nav a { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 2.1rem; padding: .42rem .35rem; border: 1px solid var(--border-color); border-radius: 10px; font-size: .58rem; letter-spacing: .02em; text-align: center; }
   .header-nav a::after { display: none; }
   .header-nav a:hover, .header-nav a[aria-expanded='true'], .header-nav .premium-toggle.active { border-color: var(--accent-color); background: var(--hover-bg); }
-  .header-nav .telegram-toggle { grid-column: 1 / -1; }
   .header-nav a span { display: none; }
   .app-content { margin-top: 2.3rem; }
   .stats-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; width: 100%; }
@@ -773,7 +772,6 @@
 }
 
 @media (max-width: 400px) {
-  .header-nav a { flex-basis: calc(50% - .2rem); }
   .focus-toolbar { align-items: flex-start; flex-wrap: wrap; }
   .focus-toolbar strong { margin-left: auto; }
   .focus-toolbar button { flex-basis: 100%; }
@@ -782,9 +780,8 @@
 @media (max-width: 640px) {
   .app-header { align-items: center; gap: .55rem; padding: .65rem .7rem; }
   .app-header .logo { flex: 1; min-width: 0; }
-  .app-header .header-nav.mobile-nav-open { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; margin-top: .25rem; padding: .55rem; border: 1px solid var(--border-color); border-radius: 14px; background: color-mix(in srgb, var(--bg-color) 90%, var(--hover-bg)); }
-  .app-header .header-nav.mobile-nav-open a { min-height: 2.35rem; border-radius: 9px; font-size: .6rem; font-weight: 500; }
-  .app-header .header-nav.mobile-nav-open .telegram-toggle { grid-column: 1 / -1; }
+  .app-header .header-nav.mobile-nav-open { grid-template-columns: minmax(0, 1fr); gap: .45rem; margin-top: .25rem; padding: .55rem; border: 1px solid var(--border-color); border-radius: 14px; background: color-mix(in srgb, var(--bg-color) 90%, var(--hover-bg)); }
+  .app-header .header-nav.mobile-nav-open a { width: 100%; max-width: none; min-height: 2.75rem; padding: .65rem .8rem; border-radius: 9px; font-size: .7rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 
 .status-badge {

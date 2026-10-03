@@ -693,6 +693,8 @@ function App() {
     setReviewSummary(getReviewSummary());
     setReviewWords(getReviewWords());
     if (isPremium) handlePremiumFinish(completedText, correctCharacters, isCorrect);
+    setHasStartedTyping(false);
+    setStartedAt(null);
   };
 
   const handleSaveReviewNote = () => {
