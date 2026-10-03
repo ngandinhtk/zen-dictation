@@ -83,7 +83,9 @@ The backend currently provides account registration, login, logout, the current-
 
 New accounts are Free by default. Premium entitlement is granted only after a valid license key is activated. The Premium payment screen now uses ZaloPay; the server creates orders and verifies ZaloPay callbacks before issuing a license.
 
-For local license testing, start the API with a configured key, for example \`PREMIUM_LICENSE_KEYS=ZEN-DEMO-2026   npm run server\`. Users can enter that key from the Premium page without creating an account. In production, license keys should be created by the payment webhook rather than configured manually.
+For local license testing, set `PREMIUM_LICENSE_KEYS` to a private test key in your untracked `.env` file, then run `npm run server:local`. Users can enter that key from the Premium page without creating an account. In production, license keys should be created by the payment webhook rather than configured manually.
+
+Keep `PREMIUM_LICENSE_KEYS` and `PREMIUM_DATA_KEY` on the API host, rather than in the frontend hosting environment. Generate a private random value for `PREMIUM_DATA_KEY`; leave secret values blank in `.env.example` and never commit them to documentation.
 
 ### ZaloPay configuration
 
