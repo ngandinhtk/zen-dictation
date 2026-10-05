@@ -102,6 +102,14 @@ PREMIUM_PRICE_VND=125000
 
 Use ZaloPay Sandbox first. The callback URL must be reachable from ZaloPay; a localhost URL will not receive callbacks. After the user returns from ZaloPay, the backend stores the generated license against the payment order, ready for the payment-result screen or an email delivery step.
 
+### Password reset
+
+The account form includes **Forgot password?**. Configure `BREVO_API_KEY`, `EMAIL_FROM` (an address on a verified Brevo sender domain, for example `Zen Dictation <no-reply@example.com>`), and `PUBLIC_APP_URL` (the frontend URL) on the backend to enable reset emails. Create an API key in Brevo and verify your sender domain before sending to users. Keep the API key backend-only. Restart the backend after deploying; it creates the protected `password_reset_tokens` table automatically. For local development, set `CLIENT_ORIGIN=http://localhost:5173`, `PUBLIC_APP_URL=http://localhost:5173/`, and `VITE_API_URL=http://localhost:3002/` in `.env`, then run `npm run server:local` and `npm run dev` in separate terminals.
+
+Reset links expire after 30 minutes and can only be used once. Tokens are stored as SHA-256 hashes. A successful reset invalidates all reset links and existing login sessions for that account. The request response does not disclose whether an email is registered.
+
+Run `node --test server/password-reset.test.mjs` to check reset validation, expiry, replay protection, rollback, and session revocation.
+
 ### Sentence bank
 
 Sentence metadata is normalized in `src/data/sentenceBank.ts`. The practice flow continues to consume text arrays, while `SENTENCE_BANK` and `VOCABULARY_SENTENCE_BANK` provide items with `id`, `text`, `difficulty`, `topic`, `source`, and optional `license` fields.

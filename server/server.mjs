@@ -21,6 +21,9 @@ if (isProduction && !process.env.PREMIUM_DATA_KEY) throw new Error('PREMIUM_DATA
 await query(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, is_premium BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL);
 CREATE TABLE IF NOT EXISTS auth_sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at TIMESTAMPTZ NOT NULL);
 CREATE INDEX IF NOT EXISTS auth_sessions_expiry ON auth_sessions(expires_at);
+CREATE TABLE IF NOT EXISTS password_reset_tokens (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at TIMESTAMPTZ NOT NULL);
+CREATE INDEX IF NOT EXISTS password_reset_tokens_expiry ON password_reset_tokens(expires_at);
+ALTER TABLE password_reset_tokens ENABLE ROW LEVEL SECURITY;
 CREATE TABLE IF NOT EXISTS practice_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, date TIMESTAMPTZ NOT NULL, difficulty TEXT NOT NULL, wpm INTEGER NOT NULL DEFAULT 0, accuracy INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS practice_sessions_user_date ON practice_sessions(user_id, date DESC);
 CREATE TABLE IF NOT EXISTS licenses (id TEXT PRIMARY KEY, key_hash TEXT NOT NULL UNIQUE, key_last4 TEXT NOT NULL, activated_by TEXT, activated_user_id TEXT REFERENCES users(id) ON DELETE SET NULL, activated_at TIMESTAMPTZ);
@@ -190,6 +193,22 @@ const getPayPalConfig = () => ({
   returnUrl: process.env.PUBLIC_APP_URL ? process.env.PUBLIC_APP_URL.replace(/\/$/, '') + '#payment-result' : '',
   cancelUrl: process.env.PUBLIC_APP_URL ? process.env.PUBLIC_APP_URL.replace(/\/$/, '') + '#payment' : '',
 });
+const getEmailSender = () => {
+  const value = process.env.EMAIL_FROM.trim();
+  const match = value.match(/^(.*?)\s*<([^<>]+)>$/);
+  return match
+    ? { name: match[1].trim().replace(/^["']|["']$/g, ''), email: match[2].trim() }
+    : { email: value };
+};
+const sendEmail = async (email, subject, textContent) => {
+  const result = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: { 'api-key': process.env.BREVO_API_KEY, 'Content-Type': 'application/json', accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
+    body: JSON.stringify({ sender: getEmailSender(), to: [{ email }], subject, textContent }),
+  });
+  if (!result.ok) throw new Error(`Brevo email failed: ${await result.text()}`);
+};
 const paypalToken = async config => {
   const result = await fetch(`${config.apiUrl}/v1/oauth2/token`, { method: 'POST', headers: { Authorization: `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'grant_type=client_credentials' });
   const payload = await result.json();
@@ -198,16 +217,11 @@ const paypalToken = async config => {
 };
 const sendLicenseEmail = async (email, licenseKey) => {
   if (!email) return;
-  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
-    console.warn('License email skipped: RESEND_API_KEY and EMAIL_FROM are not configured');
+  if (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM) {
+    console.warn('License email skipped: BREVO_API_KEY and EMAIL_FROM are not configured');
     return;
   }
-  const result = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: process.env.EMAIL_FROM, to: [email], subject: 'Your Zen Dictation Premium license', text: `Thank you for your purchase!\n\nYour Zen Dictation Premium license key is:\n${licenseKey}\n\nOpen Zen Dictation Premium and enter this key to activate your access.` }),
-  });
-  if (!result.ok) throw new Error(`License email failed: ${await result.text()}`);
+  await sendEmail(email, 'Your Zen Dictation Premium license', `Thank you for your purchase!\n\nYour Zen Dictation Premium license key is:\n${licenseKey}\n\nOpen Zen Dictation Premium and enter this key to activate your access.`);
 };
 const rawBody = async req => {
   let raw = '';
@@ -277,6 +291,7 @@ setInterval(() => {
 }, 120_000).unref();
 setInterval(() => {
   query('DELETE FROM auth_sessions WHERE expires_at <= $1', [new Date().toISOString()]).catch(error => console.error('Session cleanup failed:', error.message));
+  query('DELETE FROM password_reset_tokens WHERE expires_at <= $1', [new Date().toISOString()]).catch(error => console.error('Password reset cleanup failed:', error.message));
 }, 60 * 60 * 1000).unref();
 
 const server = createServer(async (req, res) => {
@@ -412,6 +427,58 @@ const server = createServer(async (req, res) => {
       await query('INSERT INTO users (id, email, password_hash, is_premium, created_at) VALUES ($1, $2, $3, $4, $5)', [user.id, user.email, user.passwordHash, false, user.createdAt]);
       const token = await createSession(user.id);
       return send(res, 201, { user: publicUser(user) }, { 'Set-Cookie': authCookie(token) });
+    }
+
+    if (url.pathname === '/api/auth/forgot-password' && req.method === 'POST') {
+      const input = await body(req);
+      const email = typeof input.email === 'string' ? input.email.trim().toLowerCase() : '';
+      if (email.length > 254 || !/^\S+@\S+\.\S+$/.test(email)) return send(res, 400, { error: 'Enter a valid email address' });
+      if (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM) return send(res, 503, { error: 'Password reset email is not configured. Please contact support.' });
+      const resetUrl = new URL(process.env.PUBLIC_APP_URL || process.env.CLIENT_ORIGIN || 'http://localhost:5173');
+      if (!['http:', 'https:'].includes(resetUrl.protocol)) throw new Error('Invalid PUBLIC_APP_URL');
+      const account = (await query('SELECT id FROM users WHERE email = $1', [email])).rows[0];
+      if (account) {
+        const token = randomBytes(32).toString('hex');
+        const tokenHash = hashSessionToken(token);
+        // Keep prior links valid until they expire; failed delivery must not invalidate them.
+        await query('INSERT INTO password_reset_tokens (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [tokenHash, account.id, new Date(Date.now() + 30 * 60 * 1000).toISOString()]);
+        resetUrl.hash = `reset-password=${token}`;
+        try {
+          await sendEmail(email, 'Reset your Zen Dictation password', `Open this link to reset your password:\n\n${resetUrl.href}\n\nThis link expires in 30 minutes and can only be used once. If you did not request this, ignore this email.`);
+        } catch (error) {
+          await query('DELETE FROM password_reset_tokens WHERE token_hash = $1', [tokenHash]);
+          console.error('Password reset email delivery failed:', error);
+        }
+      }
+      return send(res, 200, { message: 'If an account exists with this email, you will receive a password reset link. Check your inbox and spam folder.' });
+    }
+
+    if (url.pathname === '/api/auth/reset-password' && req.method === 'POST') {
+      const input = await body(req);
+      if (typeof input.token !== 'string' || !/^[a-f0-9]{64}$/.test(input.token)) return send(res, 400, { error: 'This reset link is invalid or has expired. Request a new link.' });
+      if (typeof input.password !== 'string' || input.password.length < 8 || input.password.length > 1024) return send(res, 400, { error: 'Password must be between 8 and 1024 characters' });
+      const passwordHash = await hashPassword(input.password);
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        // Lock the account to serialize simultaneous resets through different links.
+        const account = (await client.query('SELECT u.id FROM users u JOIN password_reset_tokens t ON t.user_id = u.id WHERE t.token_hash = $1 FOR UPDATE OF u', [hashSessionToken(input.token)])).rows[0];
+        const reset = (await client.query('DELETE FROM password_reset_tokens WHERE token_hash = $1 AND expires_at > NOW() RETURNING user_id', [hashSessionToken(input.token)])).rows[0];
+        if (!account || !reset) {
+          await client.query('ROLLBACK');
+          return send(res, 400, { error: 'This reset link is invalid or has expired. Request a new link.' });
+        }
+        await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, account.id]);
+        await client.query('DELETE FROM auth_sessions WHERE user_id = $1', [account.id]);
+        await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [account.id]);
+        await client.query('COMMIT');
+        return send(res, 200, { message: 'Password updated. Sign in with your new password.' }, { 'Set-Cookie': clearedAuthCookie });
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
     }
 
     if (url.pathname === '/api/auth/login' && req.method === 'POST') {

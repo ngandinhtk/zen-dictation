@@ -32,7 +32,7 @@
 .payment-method { flex: 1; padding: .55rem; border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); cursor: pointer; font: inherit; font-size: .7rem; }
 .payment-method.selected { background: var(--bg-color); color: var(--text-color); box-shadow: 0 2px 8px rgba(31, 41, 55, .1); }
 .bank-qr-payment { text-align: center; }
-.bank-qr-image { display: block; width: min(100%, 210px); aspect-ratio: 1; margin: 1.1rem auto; border-radius: 10px; background: #fff; object-fit: contain; }
+.bank-qr-image { display: block; width: min(100%, 210px); aspect-ratio: 1; margin: 1.1rem auto; border: 1px solid rgba(141, 110, 161, .25); border-radius: 10px; background: #fff; object-fit: contain; box-shadow: 0 12px 28px rgba(31, 41, 55, .08); }
 .bank-qr-missing { margin: 1rem 0; padding: 1rem; border: 1px dashed var(--border-color); border-radius: 10px; color: var(--text-muted); font-size: .7rem; line-height: 1.5; }
 .bank-qr-title { margin: .7rem 0 1rem; font-size: .8rem; font-weight: 600; }
 .bank-details { display: grid; gap: .45rem; margin: 0; text-align: left; font-size: .68rem; }

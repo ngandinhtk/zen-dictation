@@ -49,6 +49,8 @@ const authenticate = async (path: string, email: string, password: string) => {
 
 export const registerAccount = (email: string, password: string) => authenticate('/api/auth/register', email, password);
 export const loginAccount = (email: string, password: string) => authenticate('/api/auth/login', email, password);
+export const requestPasswordReset = (email: string) => request<{ message: string }>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
+export const resetAccountPassword = (token: string, password: string) => request<{ message: string }>('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) });
 export const getCurrentAccount = async () => {
   try {
     return (await request<{ user: AccountUser }>('/api/auth/me')).user;

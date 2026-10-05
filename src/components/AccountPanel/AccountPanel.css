@@ -1,4 +1,6 @@
 .account-panel { display: flex; flex-direction: column; gap: .8rem; }
+.account-fields { display: flex; flex-direction: column; gap: .8rem; border: 0; padding: 0; margin: 0; min-width: 0; }
+.password-reset-page { width: min(420px, calc(100% - 2rem)); margin: 4rem auto; padding: 1.5rem; border: 1px solid var(--border-color); border-radius: 16px; background: var(--bg-color); }
 .account-form { margin-top: .2rem; }
 .account-form h2 { margin: .25rem 0; font-size: 1.05rem; font-weight: 600; }
 .account-form p { color: var(--text-muted); font-size: .72rem; }
