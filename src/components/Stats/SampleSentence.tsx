@@ -9,13 +9,19 @@ export const CAMBRIDGE_LEVELS: Record<Difficulty, { label: string; cefr: string;
 
 const createSentences = (subjects: string[], endings: string[], count: number) =>
   Array.from({ length: count }, (_, index) => {
-    const subject = subjects[Math.floor(index / endings.length) % subjects.length];
-    const ending = endings[index % endings.length];
+    const subject = subjects[index % subjects.length];
+    const ending = endings[Math.floor(index / subjects.length) % endings.length];
     return `${subject} ${ending}`;
   });
 
 const createCombinationSentences = (subjects: string[], actions: string[], details: string[]) =>
-  subjects.flatMap(subject => actions.flatMap(action => details.map(detail => `${subject} ${action} ${detail}`)));
+  Array.from({ length: 30 }, (_, index) => {
+    const combinationIndex = Math.floor(index * subjects.length * actions.length * details.length / 30);
+    const detailIndex = combinationIndex % details.length;
+    const actionIndex = Math.floor(combinationIndex / details.length) % actions.length;
+    const subjectIndex = Math.floor(combinationIndex / (details.length * actions.length));
+    return `${subjects[subjectIndex]} ${actions[actionIndex]} ${details[detailIndex]}`;
+  });
 
 const cleanSentences = (sentences: string[]) =>
   sentences.map(sentence => sentence.replace(/[.!?]+$/, ''));
@@ -32,7 +38,7 @@ const easyGenerated = createSentences(
     'turn mistakes into lessons.', 'help us stay calm.', 'create better habits.',
     'make a real difference.', 'keep the mind active.', 'lead to good results.',
   ],
-  152,
+  24,
 );
 
 const mediumGenerated = createSentences(
@@ -49,7 +55,7 @@ const mediumGenerated = createSentences(
     'helps people learn from unexpected results.', 'builds confidence through small successes.',
     'makes room for creativity and careful thought.', 'can transform a routine into meaningful progress.',
   ],
-  152,
+  24,
 );
 
 const hardGenerated = createSentences(
@@ -75,7 +81,7 @@ const hardGenerated = createSentences(
     'we understand that consistency is often more powerful than intensity',
     'we listen carefully before deciding which conclusion the facts support',
   ],
-  151,
+  24,
 );
 
 const easyAdditional = createSentences(
@@ -92,7 +98,7 @@ const easyAdditional = createSentences(
     'remind us to slow down.', 'help everyone feel welcome.', 'turn a plan into action.',
     'make learning more enjoyable.',
   ],
-  167,
+  24,
 );
 
 const mediumAdditional = createSentences(
@@ -115,7 +121,7 @@ const mediumAdditional = createSentences(
     'can reveal opportunities that were hidden by routine assumptions.',
     'makes progress visible even when the final result is still distant.',
   ],
-  167,
+  24,
 );
 
 const hardAdditional = createSentences(
@@ -142,7 +148,7 @@ const hardAdditional = createSentences(
     'we acknowledge uncertainty instead of hiding it behind confident language',
     'we measure success by the value created for everyone affected by the outcome',
   ],
-  166,
+  24,
 );
 
 const cambridgeGenerated: Record<Difficulty, string[]> = {
@@ -307,27 +313,84 @@ const dailyVocabularySentences: Record<Difficulty, string[]> = {
   ],
 };
 
-const makeExpandedSentences = (subjects: string[], endings: string[]) =>
-  subjects.flatMap(subject => endings.map(ending => `${subject} ${ending}`));
-
-// Additional custom sentences live beside the original sentence bank.
-// They are grouped by topic in the normalized bank layer.
-const EXPANDED_SENTENCES: Record<Difficulty, string[]> = {
+const originalSentences: Record<Difficulty, string[]> = {
   easy: [
-    ...makeExpandedSentences(['The baker', 'The gardener', 'The nurse', 'The artist', 'The driver'], ['opens the shop before sunrise.', 'keeps a small notebook nearby.', 'greets each visitor with a smile.', 'checks the list before starting work.']),
-    ...makeExpandedSentences(['A morning walk', 'A glass of water', 'A quiet breakfast', 'Fresh vegetables', 'Regular sleep'], ['can give the body more energy.', 'helps us begin the day calmly.', 'makes a simple routine easier to follow.', 'supports a healthy daily habit.']),
-    ...makeExpandedSentences(['The traveler', 'Our family', 'The young couple', 'My class', 'A friendly guide'], ['packs a light bag for the journey.', 'checks the map before leaving.', 'waits beside the station entrance.', 'takes a photo near the old bridge.']),
-    ...makeExpandedSentences(['A new word', 'A short lesson', 'A clear example', 'This exercise', 'A patient teacher'], ['can make a difficult idea easier.', 'helps us remember useful details.', 'gives the learner a chance to practice.', 'makes the next question less confusing.']),
+    'A silver bicycle leans against the wall outside the bakery',
+    'Mina carries two library books in a canvas bag',
+    'Before breakfast the twins feed their rabbit in the garden',
+    'Our upstairs neighbor practices the violin after dinner',
+    'The blue umbrella belongs to someone in the front office',
+    'A small boat moves slowly across the quiet lake',
+    'Every Thursday the baker delivers warm bread to the cafe',
+    'My younger cousin collects smooth stones along the beach',
+    'The last bus leaves the station just before midnight',
+    'At lunchtime several students play chess beneath the oak tree',
+    'A friendly cashier helped us find the right change',
+    'The red scarf was hanging beside the classroom window',
+    'After school Daniel walks his dog around the block',
+    'Fresh paint gave the old bench a brighter color',
+    'Our class planted sunflowers near the playground fence',
+    'A paper map helped the visitors find the museum',
+    'The baby fell asleep while her father read a story',
+    'During the storm everyone waited inside the village hall',
+    'Nora keeps spare batteries in the kitchen drawer',
+    'The little shop sells postcards made by local artists',
+    'A warm blanket covered the sleeping puppy',
+    'We found a shaded table beside the swimming pool',
+    'The morning announcement reminded families about the school fair',
+    'Two brown horses rested beneath a wide tree',
   ],
   medium: [
-    ...makeExpandedSentences(['The project manager', 'A new employee', 'The design team', 'Our small company', 'The office assistant'], ['reviewed the schedule before the meeting began.', 'prepared a summary for the afternoon discussion.', 'created a clear system for sharing information.', 'asked for feedback before changing the plan.']),
-    ...makeExpandedSentences(['The software team', 'A careful user', 'The updated application', 'Many online services', 'A reliable backup system'], ['can protect important files from accidental loss.', 'makes routine tasks easier to complete.', 'requires regular testing before release.', 'should explain changes in language everyone understands.']),
-    ...makeExpandedSentences(['The local council', 'Several researchers', 'A responsible business', 'The community project', 'Many coastal towns'], ['is considering a practical response to the problem.', 'collected information before recommending a solution.', 'reduced unnecessary waste during the previous year.', 'must balance immediate needs with future concerns.']),
-    ...makeExpandedSentences(['A thoughtful speaker', 'The discussion group', 'An experienced teacher', 'The customer service team', 'A well-written message'], ['can prevent a misunderstanding from becoming a conflict.', 'examined several viewpoints before reaching an agreement.', 'encourages people to ask questions openly.', 'usually provides enough context for a useful response.']),
+    'After reviewing the survey results the committee revised its original recommendation',
+    'Several families share responsibility for maintaining the neighborhood garden',
+    'A delayed shipment forced the store to contact its customers individually',
+    'Although the instructions were brief most volunteers completed the task correctly',
+    'The documentary follows three musicians as they prepare for a national competition',
+    'Our travel plans changed when the mountain road closed unexpectedly',
+    'A weekly meeting gives the design team time to resolve practical concerns',
+    'The researcher compared local records with photographs from the previous decade',
+    'When demand increased the bakery hired two additional workers',
+    'A clear timetable helped participants arrange transportation in advance',
+    'The new library program encourages teenagers to discuss books with older residents',
+    'Rather than replace the equipment the school repaired it and extended its use',
+    'Several customers requested a quieter area where they could work',
+    'The coach adjusted the practice schedule to accommodate evening classes',
+    'Because the original estimate was incomplete the contractor provided a revised budget',
+    'A short conversation helped the neighbors settle their disagreement peacefully',
+    'The museum introduced audio guides in several languages for international visitors',
+    'Before publishing the article the editor checked every quotation with its source',
+    'Local businesses donated supplies after the community center announced its plans',
+    'The course combines individual assignments with discussions in small groups',
+    'Unexpected feedback led the team to reconsider how the service was presented',
+    'A reliable backup allowed the photographer to recover the missing files',
+    'The residents selected a new meeting place that was easier to reach',
+    'By sharing equipment the two research groups reduced their operating costs',
   ],
   hard: [
-    ...makeExpandedSentences(['A rigorous investigation', 'The independent study', 'The research committee', 'A carefully designed survey', 'The published analysis'], ['must distinguish reliable evidence from attractive assumptions.', 'revealed limitations that had been overlooked initially.', 'compared competing explanations before presenting its conclusion.', 'demonstrated why the original question required greater precision.']),
-    ...makeExpandedSentences(['A convincing argument', 'A nuanced interpretation', 'The strongest conclusion', 'An apparently minor detail', 'A balanced evaluation'], ['becomes weaker when it ignores evidence that complicates the narrative.', 'should acknowledge uncertainty rather than conceal it behind certainty.', 'emerges only after alternative explanations have been considered.', 'may reveal a deeper problem within the original reasoning.']),
+    'Despite limited funding the research team repeated the experiment under carefully controlled conditions',
+    'Several independent reviewers questioned whether the report adequately represented the available evidence',
+    'Only after the negotiations resumed did both parties acknowledge the cost of delaying an agreement',
+    'The revised framework distinguishes measurable outcomes from benefits that remain difficult to quantify',
+    'Whereas earlier surveys focused on city centers this study includes residents from remote districts',
+    'A seemingly minor change in the schedule created significant difficulties for international participants',
+    'By comparing archival records the historian traced how the policy evolved across several administrations',
+    'The proposal gained support once its authors explained how the safeguards would be enforced',
+    'Although the initial model performed well it failed to account for seasonal changes in demand',
+    'A comprehensive assessment should consider who benefits from the decision and who bears its costs',
+    'Before drawing a conclusion analysts must determine whether the sample reflects the wider population',
+    'The organization postponed its announcement until staff members had received accurate information',
+    'What appears efficient in the short term may create expenses that are overlooked during planning',
+    'The mediator encouraged both groups to identify shared interests before discussing disputed details',
+    'Because the evidence remained inconclusive the panel recommended further observation rather than immediate action',
+    'A transparent review process makes it easier to challenge assumptions without assigning personal blame',
+    'The architect redesigned the entrance so visitors with limited mobility could use the building independently',
+    'Had the warning reached local officials earlier they might have reduced the damage considerably',
+    'The investigation revealed that several departments had relied on different versions of the same data',
+    'While economic growth can improve living standards its effects are not distributed equally',
+    'Researchers should explain the limitations of their methods before others apply the findings elsewhere',
+    'The committee requested additional documentation before approving the proposed changes to the contract',
+    'Even a persuasive explanation deserves scrutiny when its underlying assumptions cannot be verified',
+    'Rather than treating disagreement as an obstacle the facilitator used it to clarify competing priorities',
   ],
 };
 
@@ -495,7 +558,7 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       ...grammarSentences.easy,
       ...vocabularySentences.easy,
       ...diverseSentenceBank.easy,
-      ...EXPANDED_SENTENCES.easy,
+      ...originalSentences.easy,
     ]),
     medium: cleanSentences([
       'Practice makes perfect when it comes to language learning',
@@ -519,7 +582,7 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       ...grammarSentences.medium,
       ...vocabularySentences.medium,
       ...diverseSentenceBank.medium,
-      ...EXPANDED_SENTENCES.medium,
+      ...originalSentences.medium,
     ]),
     hard: cleanSentences([
       'The only limit to our realization of tomorrow is our doubts of today',
@@ -543,7 +606,7 @@ const SAMPLE_SENTENCES: Record<'en-US', Record<Difficulty, string[]>> = {
       ...grammarSentences.hard,
       ...vocabularySentences.hard,
       ...diverseSentenceBank.hard,
-      ...EXPANDED_SENTENCES.hard,
+      ...originalSentences.hard,
     ]),
   },
 };

@@ -24,7 +24,7 @@ const Header = ({ accountUser, isAccountOpen, isPremium, isPremiumOpen, isSettin
   return (
   <>
     <header className="app-header">
-      <h1 className="logo">Zen Dictation</h1>
+      <h1 className="logo"><a className="logo-link" href={window.location.pathname + window.location.search}>Zen Dictation</a></h1>
       <button type="button" className="mobile-nav-toggle" onClick={() => setIsMobileNavOpen(open => !open)} aria-expanded={isMobileNavOpen} aria-controls="primary-navigation" aria-label={isMobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}><span /><span /><span /></button>
       <nav id="primary-navigation" className={`header-nav ${isMobileNavOpen ? 'mobile-nav-open' : ''}`} aria-label="Primary navigation">
         <a href="#review" className="review-toggle" onClick={event => { event.preventDefault(); onReviewOpen(); }} aria-expanded={isReviewOpen} aria-controls="review-page">

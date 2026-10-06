@@ -82,7 +82,7 @@ export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProp
   return <div className="payment-page">
     <header className="payment-header">
       <button type="button" className="payment-back" onClick={onBack} aria-label="Back to practice" title="Back to practice">←</button>
-      <span className="logo payment-logo">Zen Dictation</span>
+      <a className="logo payment-logo logo-link" href="#" onClick={event => { event.preventDefault(); onBack(); }}>Zen Dictation</a>
     </header>
     <main className="payment-result-content">
       <section className={`payment-result-card payment-result-${status}`} aria-live="polite">
@@ -125,7 +125,7 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
     return <div className="payment-page">
       <header className="payment-header">
         <button type="button" className="payment-back" onClick={() => setIsCheckoutOpen(false)} aria-label="Back to pricing" title="Back to pricing">←</button>
-        <span className="logo payment-logo">Zen Dictation</span>
+        <a className="logo payment-logo logo-link" href="#" onClick={event => { event.preventDefault(); onBack(); }}>Zen Dictation</a>
       </header>
       <main className="checkout-content">
         <div className="checkout-intro"><span className="premium-kicker">Secure checkout</span><h1>Your Premium, one simple payment.</h1><p>After payment is confirmed, we will generate a license key for you. No account is required.</p></div>
@@ -148,7 +148,7 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
   <div className="payment-page">
     <header className="payment-header">
       <button type="button" className="payment-back" onClick={onBack} aria-label="Back to practice" title="Back to practice">←</button>
-      <span className="logo payment-logo">Zen Dictation</span>
+      <a className="logo payment-logo logo-link" href="#" onClick={event => { event.preventDefault(); onBack(); }}>Zen Dictation</a>
     </header>
     <main className="payment-content">
       <div className="payment-intro">

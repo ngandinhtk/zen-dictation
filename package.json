@@ -8,6 +8,7 @@
     "server": "node server/server.mjs",
     "server:local": "node --env-file=.env server/server.mjs",
     "seed:sentences": "node --env-file=.env scripts/seed-sentences.mjs",
+    "sentence-bank:check": "node scripts/seed-sentences.mjs --check",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

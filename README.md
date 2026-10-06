@@ -87,21 +87,6 @@ For local license testing, set `PREMIUM_LICENSE_KEYS` to a private test key in y
 
 Keep `PREMIUM_LICENSE_KEYS` and `PREMIUM_DATA_KEY` on the API host, rather than in the frontend hosting environment. Generate a private random value for `PREMIUM_DATA_KEY`; leave secret values blank in `.env.example` and never commit them to documentation.
 
-### ZaloPay configuration
-
-ZaloPay secrets must stay on the backend. Configure these environment variables before using the checkout:
-
-```text
-ZALOPAY_APP_ID=your_app_id
-ZALOPAY_KEY1=your_key1
-ZALOPAY_KEY2=your_key2
-ZALOPAY_CALLBACK_URL=https://your-public-api.example.com/api/payments/zalopay/callback
-PUBLIC_APP_URL=https://your-app.example.com
-PREMIUM_PRICE_VND=125000
-```
-
-Use ZaloPay Sandbox first. The callback URL must be reachable from ZaloPay; a localhost URL will not receive callbacks. After the user returns from ZaloPay, the backend stores the generated license against the payment order, ready for the payment-result screen or an email delivery step.
-
 ### Password reset
 
 The account form includes **Forgot password?**. Configure `BREVO_API_KEY`, `EMAIL_FROM` (an address on a verified Brevo sender domain, for example `Zen Dictation <no-reply@example.com>`), and `PUBLIC_APP_URL` (the frontend URL) on the backend to enable reset emails. Create an API key in Brevo and verify your sender domain before sending to users. Keep the API key backend-only. Restart the backend after deploying; it creates the protected `password_reset_tokens` table automatically. For local development, set `CLIENT_ORIGIN=http://localhost:5173`, `PUBLIC_APP_URL=http://localhost:5173/`, and `VITE_API_URL=http://localhost:3002/` in `.env`, then run `npm run server:local` and `npm run dev` in separate terminals.
@@ -115,5 +100,7 @@ Run `node --test server/password-reset.test.mjs` to check reset validation, expi
 Sentence metadata is normalized in `src/data/sentenceBank.ts`. The practice flow continues to consume text arrays, while `SENTENCE_BANK` and `VOCABULARY_SENTENCE_BANK` provide items with `id`, `text`, `difficulty`, `topic`, `source`, and optional `license` fields.
 
 New external sentences must have commercial usage rights, record the license in the metadata, and pass manual checks for grammar, length, and difficulty before being added to the active bank. Existing sentences are marked as `custom`.
+
+The bank API caches each pack/level response for five minutes, validates it with an ETag, and serves gzip-compressed responses when supported; the browser keeps a matching five-minute session cache and preloads the next available level or free vocabulary pack after the current pool is ready. Core practice limits formula-generated examples and supplements them with hand-written topic variety. New curated items use practical CEFR-aligned targets: Easy A1–A2 (7–12 words), Medium B1–B2 (10–20 words), and Hard C1–C2 (14–30 words). Run `npm run sentence-bank:check` to validate curated sentence lengths/duplicates and report word-count medians, repeated openings, and JSON/gzip payload sizes without connecting to the database. After updating content, run `npm run seed:sentences`; it deactivates obsolete rows in the seeder's deterministic ID namespace without deleting them. Restart the API so its in-memory cache is refreshed.
 
 e6b9fa7ad2b1f0ad02daee7f96a9cf5e

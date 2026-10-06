@@ -9,6 +9,6 @@ const resetToken = new URLSearchParams(window.location.hash.slice(1)).get('reset
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {resetToken !== null ? <main className="password-reset-page"><h1>Zen Dictation</h1><AccountPanel user={null} resetToken={resetToken || 'invalid'} onAuthenticated={() => {}} onLogout={() => {}} /></main> : <App />}
+    {resetToken !== null ? <main className="password-reset-page"><h1><a className="logo-link" href={window.location.pathname + window.location.search}>Zen Dictation</a></h1><AccountPanel user={null} resetToken={resetToken || 'invalid'} onAuthenticated={() => {}} onLogout={() => {}} /></main> : <App />}
   </StrictMode>,
 )

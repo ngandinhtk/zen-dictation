@@ -3,6 +3,7 @@ import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, 
 import { promisify } from 'node:util';
 import { access, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import pg from 'pg';
 
 const scrypt = promisify(scryptCallback);
@@ -60,13 +61,23 @@ await seedConfiguredLicenses();
 const sentencePackCache = new Map();
 const warmSentencePackCache = async () => {
   const rows = (await query(`SELECT s.id, s.text, s.difficulty, s.topic, s.source, s.license, s.sort_order, p.id AS pack_id, p.name AS pack_name, p.is_premium FROM sentences s JOIN sentence_packs p ON p.id = s.pack_id WHERE p.is_active = TRUE AND s.is_active = TRUE ORDER BY s.pack_id, s.difficulty, s.sort_order`)).rows;
+  const seenSentences = new Map();
+  let duplicateCount = 0;
   rows.forEach(sentence => {
     const key = `${sentence.pack_id}:${sentence.difficulty}`;
+    const normalizedText = sentence.text.trim().toLocaleLowerCase('en-US').replace(/\s+/g, ' ');
+    const seen = seenSentences.get(key) || new Set();
+    if (seen.has(normalizedText)) {
+      duplicateCount += 1;
+      return;
+    }
+    seen.add(normalizedText);
+    seenSentences.set(key, seen);
     const pack = sentencePackCache.get(key) || [];
     pack.push(sentence);
     sentencePackCache.set(key, pack);
   });
-  console.log(`Warmed ${rows.length} sentences in memory`);
+  console.log(`Warmed ${rows.length - duplicateCount} unique sentences in memory (${duplicateCount} duplicates skipped)`);
 };
 await warmSentencePackCache();
 
@@ -81,11 +92,17 @@ const send = (res, status, payload, extraHeaders = {}) => {
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Credentials': 'true',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, If-None-Match',
+    'Access-Control-Expose-Headers': 'ETag',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
     ...extraHeaders,
   });
-  res.end(JSON.stringify(payload));
+  if (status === 204 || status === 304) {
+    res.end();
+    return;
+  }
+  const responseBody = JSON.stringify(payload);
+  res.end(extraHeaders['Content-Encoding'] === 'gzip' ? gzipSync(responseBody) : responseBody);
 };
 
 const body = async req => {
@@ -310,7 +327,21 @@ const server = createServer(async (req, res) => {
         : [...sentencePackCache.entries()]
           .filter(([key]) => key.startsWith(`${pack}:`))
           .flatMap(([, sentences]) => sentences);
-      return send(res, 200, { pack, sentences: rows });
+      const payload = { pack, sentences: rows };
+      const etag = `"${createHash('sha256').update(JSON.stringify(payload)).digest('hex')}"`;
+      const cacheHeaders = {
+        'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600',
+        ETag: `W/${etag}`,
+        Vary: 'Origin, Accept-Encoding',
+      };
+      const requestEtags = (req.headers['if-none-match'] || '').split(',').map(value => value.trim());
+      if (requestEtags.includes('*') || requestEtags.includes(etag) || requestEtags.includes(`W/${etag}`)) return send(res, 304, {}, cacheHeaders);
+      const acceptsGzip = (req.headers['accept-encoding'] || '').split(',').some(encoding => {
+        const [name, ...parameters] = encoding.trim().toLowerCase().split(';');
+        return name === 'gzip' && !parameters.some(parameter => /^q=0(?:\.0*)?$/.test(parameter.trim()));
+      });
+      if (acceptsGzip) cacheHeaders['Content-Encoding'] = 'gzip';
+      return send(res, 200, payload, cacheHeaders);
     }
 
     if (url.pathname === '/api/premium/status' && req.method === 'GET') {

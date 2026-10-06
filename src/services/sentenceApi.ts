@@ -14,14 +14,16 @@ export interface DatabaseSentence {
   is_premium: boolean;
 }
 
-const sentenceMemoryCache = new Map<string, DatabaseSentence[]>();
+const sentenceMemoryCache = new Map<string, { cachedAt: number; sentences: DatabaseSentence[] }>();
 const sentenceRequests = new Map<string, Promise<DatabaseSentence[]>>();
 const browserCachePrefix = 'zen-dictation-sentence-pack:';
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 const readBrowserCache = (key: string): DatabaseSentence[] | null => {
   try {
-    const cached = JSON.parse(sessionStorage.getItem(browserCachePrefix + key) || 'null') as DatabaseSentence[] | null;
-    return Array.isArray(cached) && cached.length > 0 ? cached : null;
+    const cached = JSON.parse(sessionStorage.getItem(browserCachePrefix + key) || 'null') as { cachedAt?: number; sentences?: DatabaseSentence[] } | null;
+    if (!cached || typeof cached.cachedAt !== 'number' || !Number.isFinite(cached.cachedAt) || Date.now() - cached.cachedAt >= CACHE_TTL_MS) return null;
+    return Array.isArray(cached.sentences) && cached.sentences.length > 0 ? cached.sentences : null;
   } catch {
     return null;
   }
@@ -30,10 +32,10 @@ const readBrowserCache = (key: string): DatabaseSentence[] | null => {
 export const fetchSentencePack = async (pack: string, difficulty?: Difficulty): Promise<DatabaseSentence[]> => {
   const key = `${pack}:${difficulty || 'all'}`;
   const memoryCached = sentenceMemoryCache.get(key);
-  if (memoryCached) return memoryCached;
+  if (memoryCached && Date.now() - memoryCached.cachedAt < CACHE_TTL_MS) return memoryCached.sentences;
   const browserCached = readBrowserCache(key);
   if (browserCached) {
-    sentenceMemoryCache.set(key, browserCached);
+    sentenceMemoryCache.set(key, { cachedAt: Date.now(), sentences: browserCached });
     return browserCached;
   }
   const pendingRequest = sentenceRequests.get(key);
@@ -45,8 +47,9 @@ export const fetchSentencePack = async (pack: string, difficulty?: Difficulty): 
       if (!response.ok) throw new Error('Sentence pack unavailable');
       const payload = await response.json() as { sentences?: DatabaseSentence[] };
       const sentences = payload.sentences || [];
-      sentenceMemoryCache.set(key, sentences);
-      try { sessionStorage.setItem(browserCachePrefix + key, JSON.stringify(sentences)); } catch { /* Storage can be unavailable in private browsing. */ }
+      const cached = { cachedAt: Date.now(), sentences };
+      sentenceMemoryCache.set(key, cached);
+      try { sessionStorage.setItem(browserCachePrefix + key, JSON.stringify(cached)); } catch { /* Storage can be unavailable in private browsing. */ }
       return sentences;
     })
     .finally(() => sentenceRequests.delete(key));

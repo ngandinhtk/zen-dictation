@@ -159,7 +159,7 @@ const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practi
   <div className="premium-page">
     <header className="premium-page-header">
       <button type="button" className="back-button" onClick={onBack} aria-label="Back to practice" title="Back to practice">←</button>
-      <span className="logo premium-page-mark">Zen Dictation</span>
+      <a className="logo premium-page-mark logo-link" href="#" onClick={event => { event.preventDefault(); onBack(); }}>Zen Dictation</a>
     </header>
     {isPremium ? (
       <main className="premium-dashboard">

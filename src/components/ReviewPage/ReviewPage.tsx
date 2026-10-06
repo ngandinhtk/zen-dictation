@@ -84,7 +84,7 @@ const ReviewPage = ({ words, onAddWord, onUpdateWord, onPracticeWord, initialWor
   return <div className="review-page">
     <header className="review-page-header">
       <button type="button" className="review-back" onClick={onBack} aria-label="Back to practice" title="Back to practice">←</button>
-      <span className="logo review-page-mark">Zen Dictation</span>
+      <a className="logo review-page-mark logo-link" href="#" onClick={event => { event.preventDefault(); onBack(); }}>Zen Dictation</a>
     </header>
     <main className="review-content">
       <div className="review-intro">

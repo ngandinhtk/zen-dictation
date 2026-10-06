@@ -110,7 +110,7 @@ function App() {
   const [difficulty, setDifficulty] = useState<Difficulty>(() => savedPractice?.difficulty || DEFAULT_DIFFICULTY);
   const [practiceFocus, setPracticeFocus] = useState<PracticeFocus>(() => savedPractice?.focus || 'mixed');
   const [isAdaptiveMode, setIsAdaptiveMode] = useState(false);
-  const [, setSentenceCatalogVersion] = useState(0);
+  const [sentenceCatalogVersion, setSentenceCatalogVersion] = useState(0);
   const [sentenceCatalogStatus, setSentenceCatalogStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [currentIndex, setCurrentIndex] = useState(() => {
     return 0;
@@ -348,6 +348,24 @@ function App() {
       })
       .catch(() => setSentenceCatalogStatus('error'));
   }, [difficulty, isPremium, practiceFocus]);
+
+  useEffect(() => {
+    const currentPool = databaseSentencePools[practiceFocus]?.[difficulty];
+    if (!currentPool?.length || ((practiceFocus === 'ielts' || practiceFocus === 'business') && !isPremium)) return;
+    const nextDifficulty: Difficulty | null = isPremium
+      ? difficulty === 'easy' ? 'medium' : difficulty === 'medium' ? 'hard' : null
+      : practiceFocus === 'mixed' ? difficulty : null;
+    if (!nextDifficulty) return;
+    const pack = !isPremium && practiceFocus === 'mixed' ? 'vocabulary' : practiceFocus === 'mixed' ? 'core' : practiceFocus;
+    const timeoutId = window.setTimeout(() => {
+      void fetchSentencePack(pack, nextDifficulty)
+        .then(sentences => {
+          if (sentences.length) updateDatabaseSentencePool(pack === 'core' ? 'mixed' : pack, sentences);
+        })
+        .catch(() => undefined);
+    }, 1200);
+    return () => window.clearTimeout(timeoutId);
+  }, [difficulty, isPremium, practiceFocus, sentenceCatalogVersion]);
 
   useEffect(() => {
     getCurrentAccount().then(setAccountUser);

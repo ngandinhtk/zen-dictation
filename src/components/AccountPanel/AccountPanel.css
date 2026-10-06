@@ -1,4 +1,6 @@
 .account-panel { display: flex; flex-direction: column; gap: .8rem; }
+.logo-link { background: linear-gradient(135deg, #927dc0 0%, #4479a7 38%, #71bd9c 100%); -webkit-background-clip: text; background-clip: text; color: transparent; opacity: .95; text-decoration: none; cursor: pointer; }
+.logo-link:focus-visible { outline: 2px solid var(--text-color); outline-offset: 4px; border-radius: 2px; }
 .account-fields { display: flex; flex-direction: column; gap: .8rem; border: 0; padding: 0; margin: 0; min-width: 0; }
 .password-reset-page { width: min(420px, calc(100% - 2rem)); margin: 4rem auto; padding: 1.5rem; border: 1px solid var(--border-color); border-radius: 16px; background: var(--bg-color); }
 .account-form { margin-top: .2rem; }
