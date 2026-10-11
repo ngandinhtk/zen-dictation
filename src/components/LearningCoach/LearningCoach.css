@@ -1,18 +1,74 @@
-.learning-coach { width: 100%; border: 1px solid var(--border-color); border-radius: 16px; padding: 20px; margin-bottom: 24px; background: var(--bg-color); color: var(--text-color); box-sizing: border-box; }
-.coach-heading { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.learning-coach h2 { font-size: 1.15rem; margin: 0; }
-.learning-coach h3 { font-size: 1rem; margin: 0 0 8px; }
-.learning-coach p { font-size: .9rem; line-height: 1.5; margin: 8px 0; }
-.learning-coach small { display: block; line-height: 1.5; opacity: .8; }
-.coach-heading > span { font-size: .8rem; }
-.coach-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 16px 0; }
-.learning-coach button { border: 1px solid #a9c4b6; border-radius: 8px; padding: 9px 12px; background: #edf6f0; color: #214c35; cursor: pointer; margin: 8px 8px 8px 0; }
-.learning-coach button:disabled { opacity: .5; cursor: default; }
-.learning-coach button[aria-pressed=true] { border-color: #287749; background: #d5eddd; }
-.learning-coach summary { cursor: pointer; font-weight: 600; }
-.coach-paths { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
-.coach-paths button { text-align: left; margin: 0; }
-.learning-coach progress { display: block; width: 100%; accent-color: #287749; }
-.error-coaching { padding: 12px; border-radius: 8px; background: #edf6f0; color: #214c35; margin-top: 12px; }
-.error-coaching button { margin: 6px; padding: 8px; border-radius: 6px; border: 1px solid #a9c4b6; background: white; color: #214c35; cursor: pointer; }
-@media (max-width: 640px) { .coach-grid, .coach-paths { grid-template-columns: 1fr; } .learning-coach { padding: 16px; } }
+﻿.learning-coach { width: 100%; margin-bottom: 1.25rem; border: 1px solid var(--border-color); border-radius: 18px; background: linear-gradient(120deg, color-mix(in srgb, var(--accent-color) 6%, var(--bg-color)), var(--bg-color) 70%); color: var(--text-color); overflow: hidden; }
+.coach-main { display: flex; align-items: center; gap: 14px; padding: 18px 20px; }
+.coach-symbol { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 13px; background: color-mix(in srgb, var(--accent-color) 12%, var(--bg-color)); color: var(--accent-color); }
+.coach-symbol svg { width: 24px; height: 24px; }
+.coach-symbol { border: 1px solid transparent; padding: 0; }
+.coach-symbol:hover { border-color: var(--accent-color); background: color-mix(in srgb, var(--accent-color) 20%, var(--bg-color)); }
+.coach-intro { flex: 1; min-width: 0; }
+.coach-eyebrow { display: block; color: var(--accent-color); font-size: .52rem; letter-spacing: .13em; font-weight: 650; margin-bottom: 3px; }
+.learning-coach h2 { margin: 0; font-size: .95rem; font-weight: 600; letter-spacing: -.025em; }
+.learning-coach h3 { font-size: .8rem; font-weight: 600; margin: 0; }
+.learning-coach p { color: var(--text-muted); font-size: .65rem; line-height: 1.6; margin: 4px 0 0; }
+.learning-coach small { display: block; color: var(--text-muted); font-size: .61rem; line-height: 1.6; }
+.learning-coach button { font: inherit; cursor: pointer; transition: background .18s ease, border-color .18s ease; }
+.learning-coach button:disabled { opacity: .45; cursor: default; }
+.learning-coach .coach-primary { display: inline-flex; align-items: center; justify-content: center; gap: 12px; border: 1px solid var(--accent-color); border-radius: 10px; padding: 10px 14px; background: var(--accent-color); color: var(--bg-color); font-size: .65rem; font-weight: 600; white-space: nowrap; }
+.coach-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-color) 85%, var(--text-color)); }
+.coach-shortcuts { display: grid; grid-template-columns: .9fr .95fr 1.15fr; border-top: 1px solid var(--border-color); background: color-mix(in srgb, var(--bg-color) 70%, transparent); }
+.coach-shortcuts button { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 12px 16px; border: 0; border-right: 1px solid var(--border-color); background: transparent; color: var(--text-muted); font-size: .59rem; text-align: left; }
+.coach-shortcuts button:last-child { border-right: 0; }
+.coach-shortcuts button:hover, .coach-shortcuts button[aria-expanded=true] { background: var(--hover-bg); }
+.coach-shortcuts b { display: block; color: var(--text-color); font-size: .63rem; font-weight: 500; margin-top: 2px; }
+.coach-shortcuts button > span:nth-child(2) { min-width: 0; }
+.coach-dot { height: 5px; width: 5px; flex-shrink: 0; border-radius: 50%; background: var(--correct-color); }
+.coach-dot-purple { background: var(--accent-color); }
+.coach-dot-gold { background: #bb8a54; }
+.coach-chevron { margin-left: auto; color: var(--text-muted); transition: transform .18s ease; }
+[aria-expanded=true] .coach-chevron { transform: rotate(180deg); }
+.coach-panel { padding: 16px 20px; border-top: 1px solid var(--border-color); }
+.coach-panel[hidden] { display: none; }
+.coach-panel-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.coach-panel-title > span { color: var(--accent-color); font-size: .58rem; text-transform: capitalize; }
+.coach-panel > small { margin-top: 8px; }
+.coach-secondary { margin-top: 12px; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--hover-bg); color: var(--text-color); font-size: .65rem !important; }
+.coach-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+.coach-metrics strong { display: block; font-family: var(--font-mono); color: var(--accent-color); font-size: 1.05rem; font-weight: 500; }
+.coach-paths { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.coach-paths button { padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-color); color: var(--text-color); text-align: left; }
+.coach-paths button[aria-pressed=true] { border-color: var(--accent-color); background: color-mix(in srgb, var(--accent-color) 6%, var(--bg-color)); }
+.coach-paths button:hover:not(:disabled) { background: var(--hover-bg); }
+.coach-path-heading { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.coach-path-heading strong { font-size: .68rem; font-weight: 600; flex: 1; }
+.coach-path-heading > span { color: var(--accent-color); font-size: .65rem; }
+.coach-path-heading .coach-premium { padding: 2px 5px; border-radius: 4px; background: var(--hover-bg); color: var(--text-muted); font-size: .5rem; }
+.learning-coach progress { display: block; width: 100%; height: 4px; border: 0; border-radius: 4px; overflow: hidden; appearance: none; background: var(--hover-bg); accent-color: var(--accent-color); }
+.learning-coach progress::-webkit-progress-bar { background: var(--hover-bg); }
+.learning-coach progress::-webkit-progress-value { background: var(--accent-color); border-radius: 4px; }
+.learning-coach progress::-moz-progress-bar { background: var(--accent-color); border-radius: 4px; }
+.coach-lesson-progress { margin: 0 20px 14px; max-width: calc(100% - 40px); }
+.coach-milestone { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.coach-milestone span { font-size: .61rem; white-space: nowrap; color: var(--text-muted); }
+.error-coaching { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-color); text-align: left; }
+.error-coaching-title { display: block; margin-bottom: 6px; }
+.error-coaching button { display: inline-flex; align-items: center; gap: 5px; margin: 3px 5px 3px 0; padding: 6px 9px; border-radius: 7px; border: 1px solid var(--border-color); background: var(--hover-bg); color: var(--text-color); font: inherit; cursor: pointer; }
+.error-coaching button:hover:not(:disabled) { border-color: var(--accent-color); color: var(--accent-color); }
+.error-coaching button:disabled { opacity: .45; cursor: default; }
+.error-coaching details { margin-top: 7px; }
+.error-coaching summary, .review-note-editor > summary { cursor: pointer; font-size: .62rem; color: var(--text-muted); }
+.error-coaching p { margin-top: 6px; line-height: 1.6; }
+.error-coaching > small { margin-top: 6px; }
+@media (max-width: 640px) {
+  .coach-main { gap: 10px; padding: 14px; flex-wrap: wrap; }
+  .coach-symbol { height: 34px; width: 34px; border-radius: 10px; }
+  .learning-coach h2 { font-size: .85rem; }
+  .learning-coach .coach-primary { padding: 9px 11px; }
+  .coach-shortcuts button { padding: 10px 9px; gap: 5px; }
+  .coach-shortcuts b { font-size: .59rem; }
+  .coach-shortcuts .coach-dot { display: none; }
+  .coach-panel { padding: 14px; }
+}
+@media (max-width: 380px) {
+  .coach-main .coach-primary { width: 100%; }
+  .coach-paths { grid-template-columns: 1fr; }
+  .coach-chevron { display: none; }
+}

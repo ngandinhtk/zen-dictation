@@ -2,6 +2,7 @@ import { getWeeklyReport, LEARNING_PATHS, type LearningFocus, type LearningState
 import type { Difficulty } from '../../utils/sentenceTranslations';
 import './LearningCoach.css';
 import { useEffect, useState } from 'react';
+import { applyTheme, getTheme } from '../../services/themeService';
 
 interface Props {
   state: LearningState;
@@ -18,6 +19,13 @@ interface Props {
 }
 export default function LearningCoach({ state, focus, difficulty, premium, ready, busy, lesson, onStart, onReview, onExit, onPath }: Props) {
   const [now, setNow] = useState(() => Date.now());
+  const [theme, setTheme] = useState(getTheme);
+  const toggleTheme = () => {
+    const nextTheme = getTheme() === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme, true);
+    setTheme(nextTheme);
+  };
+  const [panel, setPanel] = useState<'review' | 'progress' | 'goal' | null>(null);
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60000); return () => window.clearInterval(timer); }, []);
   const reportNow = Math.max(now, Date.parse(state.attempts[0]?.date || '') || now);
   const report = getWeeklyReport(state.attempts, focus, difficulty, reportNow);
@@ -25,17 +33,22 @@ export default function LearningCoach({ state, focus, difficulty, premium, ready
   const path = LEARNING_PATHS.find(item => item.focus === focus)!;
   const completed = new Set(state.attempts.filter(item => item.focus === focus && item.difficulty === difficulty && item.errors === 0).map(item => item.text)).size;
   const milestones = [5, 15, 30];
+  const milestone = milestones.find(target => completed < target) || 30;
+  const togglePanel = (next: 'review' | 'progress' | 'goal') => setPanel(current => current === next ? null : next);
   return <section className="learning-coach" aria-label="Your learning plan">
-    <div className="coach-heading"><div><h2>Your next step</h2><p>A short lesson, then a clear picture of your progress.</p></div><span>{difficulty} · {path.name}</span></div>
-    <div className="coach-grid">
-      <div><h3>Daily practice · about 5 minutes</h3>
-        {lesson ? <><p role="status">{lesson.completed ? `Lesson complete! You practised ${lesson.texts.length} sentences.` : `Sentence ${lesson.index + 1} of ${lesson.texts.length} · Submit your answer, then choose Next.`}</p><progress aria-label="Lesson progress" max={lesson.texts.length} value={lesson.completed ? lesson.texts.length : lesson.index} /><button type="button" onClick={onExit}>{lesson.completed ? 'Back to practice' : 'End lesson'}</button></> : <><p>Review up to 2 sentences due today, then practise new sentences at your selected level.</p><button type="button" disabled={!ready || busy} onClick={onStart}>Start daily lesson</button><button type="button" disabled={!ready || busy || !due} onClick={onReview}>Review sentences ({due} due)</button></>}
-        <small>Missed sentences return after 1 day; correct reviews return after 3, 7 and 14 days.</small>
-      </div>
-      <div><h3>Last 7 days</h3><p>Compared with the previous 7 days at the same level and goal.</p>
-        {report.count ? <><strong>{report.accuracy}% accuracy · {report.count} attempts</strong><p>{report.change === null ? 'Keep practising to build your first weekly comparison.' : `${report.change > 0 ? '+' : ''}${report.change} percentage points · ${report.errorChange! >= 0 ? `${report.errorChange} fewer` : `${Math.abs(report.errorChange!)} more`} word errors per attempt`}</p><small>{report.mastered} different sentences completed without word errors.</small></> : <p>Complete your first sentence to start tracking progress.</p>}
-      </div>
+    <div className="coach-main">
+      <button type="button" className="coach-symbol" onClick={toggleTheme} aria-label="Dark mode" aria-pressed={theme === 'dark'} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">{theme === 'dark' ? <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z" /> : <><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" /><circle cx="12" cy="12" r="4" /></>}</svg></button>
+      <div className="coach-intro"><span className="coach-eyebrow">A LITTLE EVERY DAY</span><h2>{lesson?.completed ? 'Nicely done.' : lesson ? 'Your daily lesson' : 'Make time for progress.'}</h2><p role={lesson ? 'status' : undefined}>{lesson ? lesson.completed ? `${lesson.texts.length} sentences practised today` : `Sentence ${lesson.index + 1} of ${lesson.texts.length} · Enter to check, then Next` : '5 minutes · a few reviews, something new'}</p></div>
+      {lesson ? <button type="button" className="coach-primary" onClick={onExit}>{lesson.completed ? 'Finish lesson' : 'End lesson'}</button> : <button type="button" className="coach-primary" disabled={!ready || busy} onClick={onStart}>Start lesson <span aria-hidden="true">↗</span></button>}
     </div>
-    <details><summary>Choose your learning goal · {completed} sentences mastered</summary><div className="coach-paths">{LEARNING_PATHS.map(item => <button type="button" key={item.focus} aria-pressed={focus === item.focus} disabled={busy || Boolean(lesson && !lesson.completed)} onClick={() => onPath(item.focus)}><strong>{item.name}{!premium && ['business', 'ielts'].includes(item.focus) ? ' · Premium' : ''}</strong><small>{item.description}</small></button>)}</div><p>{path.name}: {milestones.map((target, index) => `Stage ${index + 1}: ${Math.min(completed, target)}/${target}`).join(' · ')}</p><small>Finish 5, 15 and 30 different sentences without word errors at this level to complete each stage.</small></details>
+    {lesson && <progress className="coach-lesson-progress" aria-label="Lesson progress" max={lesson.texts.length} value={lesson.completed ? lesson.texts.length : lesson.index} />}
+    <div className="coach-shortcuts">
+      <button type="button" aria-expanded={panel === 'review'} aria-controls="coach-review-panel" onClick={() => togglePanel('review')}><span className="coach-dot" /><span>Review <b>{due ? `${due} due` : 'All caught up'}</b></span><span className="coach-chevron" aria-hidden="true">⌄</span></button>
+      <button type="button" aria-expanded={panel === 'progress'} aria-controls="coach-progress-panel" onClick={() => togglePanel('progress')}><span className="coach-dot coach-dot-purple" /><span>This week <b>{report.accuracy === null ? 'Your first step' : `${report.accuracy}% accuracy`}</b></span><span className="coach-chevron" aria-hidden="true">⌄</span></button>
+      <button type="button" aria-expanded={panel === 'goal'} aria-controls="coach-goal-panel" onClick={() => togglePanel('goal')}><span className="coach-dot coach-dot-gold" /><span>Learning goal <b>{path.name}</b></span><span className="coach-chevron" aria-hidden="true">⌄</span></button>
+    </div>
+    <div id="coach-review-panel" className="coach-panel" hidden={panel !== 'review'}><div className="coach-panel-title"><h3>{due ? `${due} sentences ready to revisit` : 'You’re all caught up'}</h3><span>{difficulty}</span></div><p>{due ? 'A little repetition makes yesterday’s mistakes easier today.' : 'Missed sentences will appear here when it’s time to practise again.'}</p><small>Review schedule: 1 day after a mistake, then 3, 7 and 14 days after correct reviews.</small><button type="button" className="coach-secondary" disabled={!ready || busy || !due || Boolean(lesson && !lesson.completed)} onClick={onReview}>Start review</button></div>
+    <div id="coach-progress-panel" className="coach-panel" hidden={panel !== 'progress'}><div className="coach-panel-title"><h3>Your week in practice</h3><span>{difficulty}</span></div><div className="coach-metrics"><div><strong>{report.accuracy === null ? '—' : `${report.accuracy}%`}</strong><small>Accuracy</small></div><div><strong>{report.count}</strong><small>Attempts</small></div><div><strong>{report.mastered}</strong><small>Sentences mastered</small></div></div><p>{report.change === null ? report.count ? 'Your weekly comparison will appear once you have practice in both weeks.' : 'Finish a sentence to start your progress story.' : `${report.change > 0 ? '+' : ''}${report.change} percentage points · ${report.errorChange! >= 0 ? `${report.errorChange} fewer` : `${Math.abs(report.errorChange!)} more`} word errors per attempt`}</p><small>Last 7 days versus the previous 7 · same goal and difficulty.</small></div>
+    <div id="coach-goal-panel" className="coach-panel" hidden={panel !== 'goal'}><div className="coach-panel-title"><h3>Find your direction</h3><span>{difficulty}</span></div><div className="coach-paths">{LEARNING_PATHS.map(item => <button type="button" key={item.focus} aria-pressed={focus === item.focus} disabled={busy || Boolean(lesson && !lesson.completed)} onClick={() => onPath(item.focus)}><span className="coach-path-heading"><strong>{item.name}</strong>{!premium && ['business', 'ielts'].includes(item.focus) && <span className="coach-premium">Premium</span>}{item.focus === focus && <span aria-hidden="true">✓</span>}</span><small>{item.description}</small></button>)}</div><div className="coach-milestone"><span>{completed >= 30 ? 'All stages complete' : `Stage ${milestones.indexOf(milestone) + 1}`} · {Math.min(completed, milestone)}/{milestone} mastered</span><progress aria-label="Learning goal progress" max={milestone} value={Math.min(completed, milestone)} /></div><small>Milestones: 5, 15 and 30 different sentences without errors.</small></div>
   </section>;
 }

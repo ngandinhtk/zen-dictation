@@ -17,31 +17,44 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg-color: #0f0f11; /* Soft, deep charcoal-black */
-    --text-color: #e3e3e6; /* Soft warm white */
-    --text-muted: #727376; /* Soft muted grey */
-    --primary-color: #929396; /* Muted silver grey */
+    --bg-color: #657494cc; /* Dim slate grey */
+    --text-color: #fefeff; /* Gentle off-white */
+    --text-muted: #cecfd1;
+    --primary-color: #d3d3d4;
     --correct-color: #52b788; /* Soft calming mint green */
     --incorrect-color: #f87171; /* Soft coral/red */
-    --pending-color: #3f4043; /* Dark grey for untyped characters */
+    --pending-color: #909296;
     --accent-color: #b39ddb; /* Soft pastel lavender */
-    --border-color: rgba(227, 227, 230, 0.08);
-    --hover-bg: rgba(227, 227, 230, 0.04);
+    --border-color: rgba(224, 226, 231, 0.12);
+    --hover-bg: rgba(224, 226, 231, 0.06);
   }
 }
 
 /* Also support manual theme overrides if needed */
+[data-theme='light'] {
+  --bg-color: #fcfbfa;
+  --text-color: #1e1e20;
+  --text-muted: #8e8d8a;
+  --primary-color: #5c5d60;
+  --correct-color: #29972e;
+  --incorrect-color: #cc3a3a;
+  --pending-color: #cbcac7;
+  --accent-color: #8d6ea1;
+  --border-color: rgba(30, 30, 32, 0.08);
+  --hover-bg: rgba(30, 30, 32, 0.04);
+}
+
 [data-theme='dark'] {
-  --bg-color: #0f0f11;
-  --text-color: #e3e3e3;
-  --text-muted: #727376;
-  --primary-color: #929396;
+  --bg-color: #484c55a6;
+  --text-color: #e0e2e7;
+  --text-muted: #a4a9b4;
+  --primary-color: #b0b5bf;
   --correct-color: #52b788;
   --incorrect-color: #f87171;
-  --pending-color: #3f4043;
+  --pending-color: #7d8491;
   --accent-color: #b39ddb;
-  --border-color: rgba(227, 227, 230, 0.08);
-  --hover-bg: rgba(227, 227, 230, 0.04);
+  --border-color: rgba(224, 226, 231, 0.12);
+  --hover-bg: rgba(224, 226, 231, 0.06);
 }
 
 * {

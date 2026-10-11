@@ -4,6 +4,9 @@ import './index.css'
 import App from './App.tsx'
 import AccountPanel from './components/AccountPanel/AccountPanel'
 import './styles/globals.css'
+import { applyTheme, getTheme } from './services/themeService'
+
+applyTheme(getTheme());
 
 const resetToken = new URLSearchParams(window.location.hash.slice(1)).get('reset-password');
 

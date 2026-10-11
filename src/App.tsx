@@ -1178,24 +1178,27 @@ function App() {
             </div>}
             {lastAttempt.missingWords.length > 0 && <div className="word-difference missing-words"><span>Missing</span><strong>{lastAttempt.missingWords.join(', ')}</strong></div>}
             {lastAttempt.extraWords.length > 0 && <div className="word-difference extra-words"><span>Extra</span><strong>{lastAttempt.extraWords.join(', ')}</strong></div>}
-            <p><small>Grammar focus: {lastAttempt.grammarTip}</small></p>
             <div className="error-coaching">
-              <strong>Understand your answer</strong>
+              <strong className="error-coaching-title">{lastAttempt.accuracy === 100 ? 'Well done' : 'Listen & improve'}</strong>
+              {[...new Set([...lastAttempt.incorrectWords.map(item => item.expected), ...lastAttempt.missingWords])].slice(0, 6).map(word => <button type="button" key={word} aria-label={`Listen to the correct word: ${word}`} disabled={voiceStatus === 'unsupported'} onClick={() => replayMistake(word)}><span aria-hidden="true">▷</span> {word}</button>)}
+              <details><summary>Explanation & meaning</summary>
+            {getVerifiedSentenceTranslation(lastAttemptTargetText) && <p lang="vi">   <i> <strong> {getVerifiedSentenceTranslation(lastAttemptTargetText)}</strong> </i> </p>}
               {lastAttempt.incorrectWords.length > 0 && <p>A different word or spelling was entered. Listen to the correct word slowly, then compare the letters.</p>}
               {lastAttempt.missingWords.length > 0 && <p>Words are missing. Listen for short connecting words and word endings.</p>}
               {lastAttempt.extraWords.length > 0 && <p>Extra words were entered. Replay the sentence and check exactly which words you hear.</p>}
               {!lastAttempt.incorrectWords.length && !lastAttempt.missingWords.length && !lastAttempt.extraWords.length && <p>{lastAttempt.accuracy === 100 ? 'All correct. Keep practising to make this feel natural.' : 'The words match. Check punctuation and spacing for a perfect answer.'}</p>}
-              {[...new Set([...lastAttempt.incorrectWords.map(item => item.expected), ...lastAttempt.missingWords])].slice(0, 6).map(word => <button type="button" key={word} disabled={voiceStatus === 'unsupported'} onClick={() => replayMistake(word)}>Listen: {word}</button>)}
-              {getVerifiedSentenceTranslation(lastAttemptTargetText) && <p lang="vi">{getVerifiedSentenceTranslation(lastAttemptTargetText)}</p>}
-              {lastAttempt.accuracy < 100 && <small>This sentence is saved for review tomorrow.</small>}
+              {/* <p><small>Grammar focus: {lastAttempt.grammarTip}</small></p> */}
+              </details>
+              {/* {lastAttempt.accuracy < 100 && <small>This sentence is saved for review tomorrow.</small>} */}
             </div>
             <button type="button" className="retry-attempt-button" onClick={handleRetry}>Try again</button>
-            {(lastAttempt.incorrectCharacters > 0 || lastAttempt.missingCharacters > 0) && <div className="review-note-editor">
+            {(lastAttempt.incorrectCharacters > 0 || lastAttempt.missingCharacters > 0) && <details className="review-note-editor">
+              <summary>{isReviewNoteSaved ? 'Review note saved' : 'Add a review note'}</summary>
               <label htmlFor="practice-review-note">Note for review <small>Saved with the words you missed</small></label>
               <textarea id="practice-review-note" value={reviewNote} onChange={event => { setReviewNote(event.target.value); setIsReviewNoteSaved(false); }} placeholder="e.g. Remember the spelling or meaning..." maxLength={240} />
               <button type="button" onClick={handleSaveReviewNote} disabled={!reviewNote.trim()}>Save note</button>
               {isReviewNoteSaved && <span role="status">Note saved to Review Words.</span>}
-            </div>}
+            </details>}
           </div>
         )}
 
