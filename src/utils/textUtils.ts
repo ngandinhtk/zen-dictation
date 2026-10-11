@@ -25,37 +25,49 @@ export interface AttemptAnalysis {
   extraWords: string[];
 }
 
-const getWordAlignment = (targetWords: string[], inputWords: string[]) => {
+export const getWordAlignment = (targetWords: string[], inputWords: string[]) => {
   const targetCount = targetWords.length;
   const inputCount = inputWords.length;
   const table = Array.from({ length: targetCount + 1 }, () => Array<number>(inputCount + 1).fill(0));
+  for (let i = 0; i <= targetCount; i++) table[i][inputCount] = targetCount - i;
+  for (let j = 0; j <= inputCount; j++) table[targetCount][j] = inputCount - j;
 
   for (let targetIndex = targetCount - 1; targetIndex >= 0; targetIndex -= 1) {
     for (let inputIndex = inputCount - 1; inputIndex >= 0; inputIndex -= 1) {
       table[targetIndex][inputIndex] = targetWords[targetIndex] === inputWords[inputIndex]
-        ? table[targetIndex + 1][inputIndex + 1] + 1
-        : Math.max(table[targetIndex + 1][inputIndex], table[targetIndex][inputIndex + 1]);
+        ? table[targetIndex + 1][inputIndex + 1]
+        : 1 + Math.min(table[targetIndex + 1][inputIndex + 1], table[targetIndex + 1][inputIndex], table[targetIndex][inputIndex + 1]);
     }
   }
 
   const missingWords: string[] = [];
   const extraWords: string[] = [];
+  const incorrectWords: Array<{ actual: string; expected: string }> = [];
+  const correctTargetIndices: number[] = [];
+  const errorTargetIndices: number[] = [];
   let targetIndex = 0;
   let inputIndex = 0;
   while (targetIndex < targetCount || inputIndex < inputCount) {
     if (targetIndex < targetCount && inputIndex < inputCount && targetWords[targetIndex] === inputWords[inputIndex]) {
+      correctTargetIndices.push(targetIndex);
       targetIndex += 1;
       inputIndex += 1;
-    } else if (targetIndex < targetCount && (inputIndex >= inputCount || table[targetIndex + 1][inputIndex] >= table[targetIndex][inputIndex + 1])) {
+    } else if (targetIndex < targetCount && (inputIndex >= inputCount || table[targetIndex][inputIndex] === 1 + table[targetIndex + 1][inputIndex])) {
+      errorTargetIndices.push(targetIndex);
       missingWords.push(targetWords[targetIndex]);
       targetIndex += 1;
-    } else if (inputIndex < inputCount) {
+    } else if (inputIndex < inputCount && (targetIndex >= targetCount || table[targetIndex][inputIndex] === 1 + table[targetIndex][inputIndex + 1])) {
       extraWords.push(inputWords[inputIndex]);
+      inputIndex += 1;
+    } else if (inputIndex < inputCount) {
+      errorTargetIndices.push(targetIndex);
+      incorrectWords.push({ actual: inputWords[inputIndex], expected: targetWords[targetIndex] });
+      targetIndex += 1;
       inputIndex += 1;
     }
   }
 
-  return { missingWords, extraWords };
+  return { missingWords, extraWords, incorrectWords, correctTargetIndices, errorTargetIndices };
 };
 
 export const getGrammarTip = (sentence: string): string => {
@@ -80,12 +92,9 @@ export const analyzeAttempt = (target: string, input: string): AttemptAnalysis =
   const correctCharacters = feedback.length - incorrectCharacters - missingCharacters;
   const targetWords = target.toLowerCase().match(/[a-z']+/g) || [];
   const inputWords = input.toLowerCase().match(/[a-z']+/g) || [];
-  const incorrectWords = inputWords
-    .map((word, index) => ({ actual: word, expected: targetWords[index] }))
-    .filter(detail => detail.expected !== undefined && detail.expected !== detail.actual);
-  const { missingWords, extraWords } = getWordAlignment(targetWords, inputWords);
+  const { missingWords, extraWords, incorrectWords } = getWordAlignment(targetWords, inputWords);
   return {
-    accuracy: Math.round((correctCharacters / Math.max(target.length, 1)) * 100),
+    accuracy: Math.round((correctCharacters / Math.max(target.length, input.length, 1)) * 100),
     incorrectCharacters,
     missingCharacters,
     grammarTip: getGrammarTip(target),

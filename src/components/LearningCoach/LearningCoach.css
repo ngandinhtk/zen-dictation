@@ -1,0 +1,18 @@
+.learning-coach { width: 100%; border: 1px solid var(--border-color); border-radius: 16px; padding: 20px; margin-bottom: 24px; background: var(--bg-color); color: var(--text-color); box-sizing: border-box; }
+.coach-heading { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.learning-coach h2 { font-size: 1.15rem; margin: 0; }
+.learning-coach h3 { font-size: 1rem; margin: 0 0 8px; }
+.learning-coach p { font-size: .9rem; line-height: 1.5; margin: 8px 0; }
+.learning-coach small { display: block; line-height: 1.5; opacity: .8; }
+.coach-heading > span { font-size: .8rem; }
+.coach-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 16px 0; }
+.learning-coach button { border: 1px solid #a9c4b6; border-radius: 8px; padding: 9px 12px; background: #edf6f0; color: #214c35; cursor: pointer; margin: 8px 8px 8px 0; }
+.learning-coach button:disabled { opacity: .5; cursor: default; }
+.learning-coach button[aria-pressed=true] { border-color: #287749; background: #d5eddd; }
+.learning-coach summary { cursor: pointer; font-weight: 600; }
+.coach-paths { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
+.coach-paths button { text-align: left; margin: 0; }
+.learning-coach progress { display: block; width: 100%; accent-color: #287749; }
+.error-coaching { padding: 12px; border-radius: 8px; background: #edf6f0; color: #214c35; margin-top: 12px; }
+.error-coaching button { margin: 6px; padding: 8px; border-radius: 6px; border: 1px solid #a9c4b6; background: white; color: #214c35; cursor: pointer; }
+@media (max-width: 640px) { .coach-grid, .coach-paths { grid-template-columns: 1fr; } .learning-coach { padding: 16px; } }

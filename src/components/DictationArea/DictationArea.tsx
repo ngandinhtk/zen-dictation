@@ -95,6 +95,13 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
     inputRef.current?.focus();
   };
 
+  const submitAttempt = () => {
+    if (!hasInput || disabled) return;
+    onFinish?.(userInput, feedback.filter(item => item.status === 'correct').length, isComplete);
+    setHasSubmitted(true);
+    if (isComplete) soundService.playSuccess();
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter' || disabled) {
       return;
@@ -107,9 +114,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
         onNext();
         return;
       }
-      onFinish?.(userInput, feedback.filter(item => item.status === 'correct').length, isComplete);
-      setHasSubmitted(true);
-      if (isComplete) soundService.playSuccess();
+      submitAttempt();
     }
   };
 

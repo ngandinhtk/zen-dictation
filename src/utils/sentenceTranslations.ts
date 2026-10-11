@@ -82,6 +82,24 @@ const TRANSLATION_MAP: Record<string, string> = {
   ...EASY_TRANSLATIONS,
   ...MEDIUM_TRANSLATIONS,
   ...HARD_TRANSLATIONS,
+  'Many students choose to study in another country': 'Nhiều sinh viên chọn học tập ở một quốc gia khác.',
+  'Public transport can reduce traffic in large cities': 'Giao thông công cộng có thể giảm ùn tắc ở các thành phố lớn.',
+  'Reading every day helps people develop a wider vocabulary': 'Đọc mỗi ngày giúp mọi người mở rộng vốn từ vựng.',
+  'Some people believe that online courses are more flexible than traditional classes': 'Một số người cho rằng các khóa học trực tuyến linh hoạt hơn các lớp học truyền thống.',
+  'Governments should invest in public transport before expanding city roads': 'Chính phủ nên đầu tư vào giao thông công cộng trước khi mở rộng đường phố.',
+  'The quality of education depends on both resources and effective teaching': 'Chất lượng giáo dục phụ thuộc vào cả nguồn lực và việc giảng dạy hiệu quả.',
+  'Although technology has transformed education, it cannot replace the motivation created by a supportive teacher': 'Mặc dù công nghệ đã thay đổi giáo dục, nó không thể thay thế động lực mà một giáo viên tận tâm mang lại.',
+  'The long-term consequences of rapid urbanization should be considered before further development is approved': 'Cần xem xét những hệ quả lâu dài của quá trình đô thị hóa nhanh trước khi phê duyệt việc phát triển thêm.',
+  'A balanced argument must acknowledge the immediate benefits as well as the potential social costs': 'Một lập luận cân bằng phải thừa nhận cả những lợi ích trước mắt lẫn những tổn thất xã hội có thể xảy ra.',
+  'Our team will discuss the project after lunch': 'Nhóm chúng tôi sẽ thảo luận về dự án sau bữa trưa.',
+  'Please send the updated report before Friday': 'Vui lòng gửi báo cáo đã cập nhật trước thứ Sáu.',
+  'The customer asked for a clearer explanation': 'Khách hàng yêu cầu một lời giải thích rõ ràng hơn.',
+  'The manager postponed the meeting because several figures needed to be checked': 'Người quản lý hoãn cuộc họp vì cần kiểm tra một số số liệu.',
+  'We should identify the main risk before presenting the proposal to the client': 'Chúng ta nên xác định rủi ro chính trước khi trình bày đề xuất với khách hàng.',
+  'Clear communication helps a team resolve problems before they affect the deadline': 'Giao tiếp rõ ràng giúp nhóm giải quyết vấn đề trước khi chúng ảnh hưởng đến thời hạn.',
+  'The revised strategy is viable only if the organization can measure its results consistently': 'Chiến lược đã điều chỉnh chỉ khả thi nếu tổ chức có thể đo lường kết quả một cách nhất quán.',
+  'Before entering a new market, the company should test its assumptions against several realistic scenarios': 'Trước khi bước vào thị trường mới, công ty nên kiểm chứng các giả định của mình qua một số tình huống thực tế.',
+  'A sustainable partnership requires transparent expectations, shared accountability, and a willingness to adapt': 'Một quan hệ hợp tác bền vững đòi hỏi kỳ vọng rõ ràng, trách nhiệm chung và sự sẵn sàng thích nghi.',
 };
 
 export const EASY_SENTENCE_TRANSLATIONS = EASY_TRANSLATIONS;
@@ -196,3 +214,5 @@ export const getSentenceTranslation = (sentence: string, difficulty: Difficulty 
 
   return translateGenericSentence(sentence);
 };
+
+export const getVerifiedSentenceTranslation = (sentence: string): string | null => TRANSLATION_MAP[sentence] || TRANSLATION_MAP[sentence.replace(/[.!?]+$/, '')] || null;

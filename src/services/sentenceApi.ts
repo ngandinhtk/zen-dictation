@@ -29,7 +29,7 @@ const readBrowserCache = (key: string): DatabaseSentence[] | null => {
   }
 };
 
-export const fetchSentencePack = async (pack: string, difficulty?: Difficulty): Promise<DatabaseSentence[]> => {
+export const getCachedSentencePack = (pack: string, difficulty?: Difficulty): DatabaseSentence[] | null => {
   const key = `${pack}:${difficulty || 'all'}`;
   const memoryCached = sentenceMemoryCache.get(key);
   if (memoryCached && Date.now() - memoryCached.cachedAt < CACHE_TTL_MS) return memoryCached.sentences;
@@ -38,6 +38,13 @@ export const fetchSentencePack = async (pack: string, difficulty?: Difficulty): 
     sentenceMemoryCache.set(key, { cachedAt: Date.now(), sentences: browserCached });
     return browserCached;
   }
+  return null;
+};
+
+export const fetchSentencePack = async (pack: string, difficulty?: Difficulty): Promise<DatabaseSentence[]> => {
+  const cached = getCachedSentencePack(pack, difficulty);
+  if (cached) return cached;
+  const key = `${pack}:${difficulty || 'all'}`;
   const pendingRequest = sentenceRequests.get(key);
   if (pendingRequest) return pendingRequest;
 

@@ -1,3 +1,5 @@
+import { getWordAlignment } from '../utils/textUtils';
+
 export interface ReviewWord {
   word: string;
   mistakes: number;
@@ -31,10 +33,11 @@ const nextReviewDate = (correctStreak: number) => {
 export const recordWordAttempt = (target: string, input: string) => {
   const targetWords = normalizeWords(target);
   const inputWords = normalizeWords(input);
+  const { correctTargetIndices } = getWordAlignment(targetWords, inputWords);
   const reviews = new Map(readReviews().map(item => [item.word, item]));
-  targetWords.forEach((word, index) => {
+  [...new Set(targetWords)].forEach(word => {
     const existing = reviews.get(word);
-    if (inputWords[index] === word) {
+    if (targetWords.every((targetWord, index) => targetWord !== word || correctTargetIndices.includes(index))) {
       if (!existing) return;
       existing.correctStreak += 1;
       if (existing.correctStreak > 8) {
@@ -59,9 +62,10 @@ export const saveReviewNoteForAttempt = (target: string, input: string, note: st
   if (!cleanNote) return;
   const targetWords = normalizeWords(target);
   const inputWords = normalizeWords(input);
+  const { correctTargetIndices } = getWordAlignment(targetWords, inputWords);
   const reviews = readReviews();
   targetWords.forEach((word, index) => {
-    if (inputWords[index] === word) return;
+    if (correctTargetIndices.includes(index)) return;
     const existing = reviews.find(item => item.word === word);
     if (existing && existing.mistakes > 0) existing.note = cleanNote;
   });
