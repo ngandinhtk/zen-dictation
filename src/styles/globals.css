@@ -10,23 +10,29 @@
   --accent-color: #8d6ea1; /* Subtle dusty mauve/violet */
   --border-color: rgba(30, 30, 32, 0.08);
   --hover-bg: rgba(30, 30, 32, 0.04);
+  --surface-color: rgba(255, 255, 255, 0.28);
+  --surface-border: rgba(109, 89, 122, 0.18);
+  color-scheme: light;
   
   --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg-color: #657494cc; /* Dim slate grey */
-    --text-color: #fefeff; /* Gentle off-white */
-    --text-muted: #cecfd1;
-    --primary-color: #d3d3d4;
-    --correct-color: #52b788; /* Soft calming mint green */
-    --incorrect-color: #f87171; /* Soft coral/red */
-    --pending-color: #909296;
-    --accent-color: #b39ddb; /* Soft pastel lavender */
-    --border-color: rgba(224, 226, 231, 0.12);
-    --hover-bg: rgba(224, 226, 231, 0.06);
+  :root:not([data-theme='light']) {
+    --bg-color: #15202b;
+    --text-color: #f7f9f9;
+    --text-muted: #a6b4c1;
+    --primary-color: #c8d2dc;
+    --correct-color: #70d6a0;
+    --incorrect-color: #ff8f95;
+    --pending-color: #8b98a5;
+    --accent-color: #79bfff;
+    --border-color: #38444d;
+    --hover-bg: rgba(247, 249, 249, 0.06);
+    --surface-color: #1e2732;
+    --surface-border: #38444d;
+    color-scheme: dark;
   }
 }
 
@@ -42,19 +48,25 @@
   --accent-color: #8d6ea1;
   --border-color: rgba(30, 30, 32, 0.08);
   --hover-bg: rgba(30, 30, 32, 0.04);
+  --surface-color: rgba(255, 255, 255, 0.28);
+  --surface-border: rgba(109, 89, 122, 0.18);
+  color-scheme: light;
 }
 
 [data-theme='dark'] {
-  --bg-color: #484c55a6;
-  --text-color: #e0e2e7;
-  --text-muted: #a4a9b4;
-  --primary-color: #b0b5bf;
-  --correct-color: #52b788;
-  --incorrect-color: #f87171;
-  --pending-color: #7d8491;
-  --accent-color: #b39ddb;
-  --border-color: rgba(224, 226, 231, 0.12);
-  --hover-bg: rgba(224, 226, 231, 0.06);
+  --bg-color: #15202b;
+  --text-color: #f7f9f9;
+  --text-muted: #a6b4c1;
+  --primary-color: #c8d2dc;
+  --correct-color: #70d6a0;
+  --incorrect-color: #ff8f95;
+  --pending-color: #8b98a5;
+  --accent-color: #79bfff;
+  --border-color: #38444d;
+  --hover-bg: rgba(247, 249, 249, 0.06);
+  --surface-color: #1e2732;
+  --surface-border: #38444d;
+  color-scheme: dark;
 }
 
 * {
@@ -106,5 +118,5 @@ input {
 }
 
 ::selection {
-  background: rgba(141, 110, 161, .22);
+  background: color-mix(in srgb, var(--accent-color) 28%, transparent);
 }

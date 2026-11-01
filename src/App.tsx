@@ -18,6 +18,9 @@ import { fetchSentencePack, getCachedSentencePack, type DatabaseSentence } from 
 import { getAccountLearningState, getCurrentAccount, saveAccountLearningState, saveAccountSession, syncAccountSessions, type AccountUser } from './services/accountService';
 import Header from './components/Header/Header';
 import LearningCoach from './components/LearningCoach/LearningCoach';
+import YoutubeImport from './components/YoutubeImport/YoutubeImport';
+import YoutubeVideo, { type YoutubeVideoHandle } from './components/YoutubeImport/YoutubeVideo';
+import type { YoutubeCaption } from './services/youtubeApi';
 import { buildDailyLesson, clearLearningState, readLearningState, recordLearningAttempt, type LearningFocus } from './services/learningCoach';
 import { getVerifiedSentenceTranslation } from './utils/sentenceTranslations';
 const PaymentPage = lazy(() => import('./components/PaymentPage/PaymentPage'));
@@ -30,6 +33,7 @@ const DEFAULT_TIME_LIMIT = 30;
 const LANG: VoiceLanguage = 'en-US';
 const DEFAULT_DIFFICULTY: Difficulty = 'easy';
 const SPEECH_SPEEDS = [0.5, 0.75, 1, 1.25];
+const SHOW_YOUTUBE_IMPORT = false;
 const ACHIEVEMENT_TOAST_DURATION_MS = 8000;
 type PracticeFocus = 'mixed' | 'vocabulary' | 'ielts' | 'business';
 const CAMBRIDGE_LEVELS: Record<Difficulty, { exams: string }> = {
@@ -123,7 +127,8 @@ function App() {
   const [practiceFocus, setPracticeFocus] = useState<PracticeFocus>(() => savedPractice?.focus || 'mixed');
   const [isAdaptiveMode, setIsAdaptiveMode] = useState(false);
   const [coachState, setCoachState] = useState(readLearningState);
-  const [lesson, setLesson] = useState<{ texts: string[]; index: number; completed: boolean } | null>(null);
+  const [lesson, setLesson] = useState<{ texts: string[]; index: number; completed: boolean; videoId?: string; captions?: YoutubeCaption[] } | null>(null);
+  const youtubeVideoRef = useRef<YoutubeVideoHandle>(null);
   const recordedAttemptRef = useRef(false);
   const [sentenceCatalogVersion, setSentenceCatalogVersion] = useState(0);
   const [sentenceLoadError, setSentenceLoadError] = useState<string | null>(null);
@@ -337,7 +342,7 @@ function App() {
     const updateVoices = () => {
       const availableVoices = speechService.getVoicesByLang(LANG);
       setVoices(availableVoices);
-      setSelectedVoice(current => current || availableVoices.find(voice => voice.name === 'Google US English')?.name || '');
+      setSelectedVoice(current => current || speechService.getPreferredVoice(LANG)?.name || '');
     };
     updateVoices();
     const unsubscribeVoices = speechService.subscribeToVoices(updateVoices);
@@ -496,6 +501,11 @@ function App() {
   }, [timeLimit]);
 
   const handleSpeak = useCallback(() => {
+    if (lesson?.videoId) {
+      speechService.stop();
+      youtubeVideoRef.current?.replay();
+      return;
+    }
     speechService.prime();
     if (speakTimeoutRef.current !== null) {
       window.clearTimeout(speakTimeoutRef.current);
@@ -505,9 +515,14 @@ function App() {
       speechService.speak(currentSentence, LANG, speed, selectedVoice);
       speakTimeoutRef.current = null;
     }, 120);
-  }, [currentSentence, selectedVoice, speed]);
+  }, [currentSentence, selectedVoice, speed, lesson?.videoId]);
 
   useEffect(() => {
+    if (lesson?.videoId) {
+      if (speakTimeoutRef.current !== null) window.clearTimeout(speakTimeoutRef.current);
+      speechService.stop();
+      return;
+    }
     const isMobileViewport = window.matchMedia('(max-width: 640px), (pointer: coarse)').matches;
     if (isMobileViewport) {
       speechService.stop();
@@ -531,7 +546,7 @@ function App() {
     // Voice and speed changes should apply on the next manual replay,
     // not trigger an automatic repeat of the current sentence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSentence]);
+  }, [currentSentence, lesson?.videoId]);
 
   useEffect(() => {
     const handleControlKey = (event: KeyboardEvent) => {
@@ -607,6 +622,7 @@ function App() {
         return;
       }
       setLesson({ ...lesson, index: lesson.index + 1 });
+      if (lesson.videoId) setIsSentenceHidden(true);
     }
     clearActivePractice();
     try { localStorage.setItem(LAST_SENTENCE_KEY, currentSentence); } catch { /* best effort */ }
@@ -1099,6 +1115,7 @@ function App() {
             <small className={`voice-status voice-status-${voiceStatus}`} role="status">
               {voiceStatus === 'loading' ? 'Loading voices…' : voiceStatus === 'unsupported' ? 'Speech unavailable' : voiceStatus === 'speaking' ? 'Speaking' : voiceStatus === 'error' ? 'Try Again' : 'Ready'}
             </small>
+            <small>Natural and neural English voices are preferred when available on your device.</small>
           </label>
           
         </section>
@@ -1106,7 +1123,20 @@ function App() {
       {isFocusMode && <div className="focus-toolbar"><span><b>Focus mode</b><small>Distraction-free practice</small></span><strong>{Math.floor(focusTimeLeft / 60)}:{String(focusTimeLeft % 60).padStart(2, '0')}</strong><button type="button" onClick={exitFocusMode}>Exit focus</button></div>}
       {isFocusMode && focusSessionComplete && <section className="focus-summary" role="status"><span className="premium-kicker">Session complete</span><h2>Well done. You stayed focused.</h2><p>You practiced for this session with {typingSpeed.toFixed(1)} WPM on the last attempt.</p><button type="button" className="action-btn next" onClick={exitFocusMode}>Back to practice</button></section>}
       <main className="app-content">
-        {!isFocusMode && <LearningCoach state={coachState} focus={practiceFocus} difficulty={difficulty} premium={isPremium}
+        {SHOW_YOUTUBE_IMPORT && !isFocusMode && <YoutubeImport busy={hasStartedTyping && !lastAttempt} lesson={lesson?.videoId ? lesson : null}
+          onExit={exitCoachLesson} onImport={(texts, videoId, captions) => {
+            speechService.stop();
+            clearActivePractice();
+            setLesson({ texts, videoId, captions, index: 0, completed: false });
+            setIsSentenceHidden(true);
+            setIsCompleted(false);
+            setIsTimeUp(false);
+            resetStats(timeLimit);
+            setKey(value => value + 1);
+          }} />}
+        {lesson?.videoId && lesson.captions?.[lesson.index] && <YoutubeVideo key={lesson.videoId} ref={youtubeVideoRef}
+          videoId={lesson.videoId} caption={lesson.captions[lesson.index]} speed={speed} completed={lesson.completed} />}
+        {!isFocusMode && !lesson?.videoId && <LearningCoach state={coachState} focus={practiceFocus} difficulty={difficulty} premium={isPremium}
           ready={Boolean(sentencePool.length)} busy={hasStartedTyping && !lastAttempt} lesson={lesson}
           onStart={() => startCoachLesson()} onReview={() => startCoachLesson(true)} onExit={exitCoachLesson} onPath={chooseLearningPath} />}
         {!isFocusMode && (
@@ -1145,13 +1175,13 @@ function App() {
           </>
         )}
 
-        {!sentencePool.length ? (
+        {!currentSentence ? (
           <section className="sentence-catalog-state" role="status">
             <strong>{sentenceCatalogStatus === 'error' ? 'Sentence bank unavailable' : 'Loading sentence bank…'}</strong>
             <small>{sentenceCatalogStatus === 'error' ? 'Check the API server and try refreshing the page.' : 'Connecting...'}</small>
           </section>
         ) : <>
-        <DictationArea key={key} targetText={currentSentence} onComplete={handlePerfectComplete} onFinish={handleAttemptFinish} onNext={handleNext} onTypingChange={handleTypingChange} isHidden={isSentenceHidden} disabled={isTimeUp || Boolean(lesson?.completed) || (isFocusMode && focusSessionComplete)} />
+        <DictationArea key={key} targetText={currentSentence} onComplete={handlePerfectComplete} onFinish={handleAttemptFinish} onNext={handleNext} onTypingChange={handleTypingChange} showCheckButton={Boolean(lesson?.videoId)} isHidden={isSentenceHidden && !(lesson?.videoId && lastAttempt)} disabled={isTimeUp || Boolean(lesson?.completed) || (isFocusMode && focusSessionComplete)} />
 
         {/* {!isFocusMode && (
           <div className="translation-panel">

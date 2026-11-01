@@ -11,9 +11,10 @@ interface DictationAreaProps {
   onTypingChange?: (value: string) => void;
   isHidden?: boolean;
   disabled?: boolean;
+  showCheckButton?: boolean;
 }
 
-const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, onFinish, onNext, onTypingChange, isHidden = false, disabled = false }) => {
+const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, onFinish, onNext, onTypingChange, isHidden = false, disabled = false, showCheckButton = false }) => {
   const draftKey = `zen-dictation-draft:${encodeURIComponent(targetText)}`;
   const [userInput, setUserInput] = useState(() => {
     try {
@@ -119,6 +120,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
   };
 
   return (
+    <>
     <div className="dictation-container" onClick={handleAreaClick} role="group" aria-label="Dictation practice area">
       <div className={`feedback-display ${shouldHidePrompt ? 'hidden' : ''}`}>
         {wordGroups.map((group, groupIndex) => {
@@ -159,6 +161,8 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
         disabled={disabled}
       />
     </div>
+    {showCheckButton && <button type="button" className="action-btn" disabled={!hasInput || disabled || hasSubmitted} onClick={submitAttempt}>Check answer (Enter)</button>}
+    </>
   );
 };
 

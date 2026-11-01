@@ -40,7 +40,8 @@ class SpeechService {
   };
 
   public speak(text: string, lang: VoiceLanguage, rate = 1, voiceName?: string) {
-    if (!text.trim()) return;
+    const speechText = text.trim().replace(/\s+/g, ' ');
+    if (!speechText) return;
     if (!this.synth) {
       this.setStatus('unsupported');
       return;
@@ -57,13 +58,13 @@ class SpeechService {
       return voiceLanguage === normalizedLanguage || voiceLanguage.startsWith(normalizedLanguage.split('-')[0]);
     };
     const voice = this.voices.find(item => item.name === voiceName && languageMatches(item))
-      ?? this.voices.find(item => item.name === 'Google US English' && languageMatches(item))
-      ?? this.voices.find(languageMatches);
+      ?? this.getPreferredVoice(lang);
 
     // If no matching voice is installed, leaving voice unset lets the browser
     // choose its default voice while the utterance language remains English.
     if (voice) utterance.voice = voice;
-    utterance.lang = lang;
+    utterance.lang = voice?.lang || lang;
+    utterance.text = /[.!?…]["')\]]*$/.test(speechText) ? speechText : `${speechText}.`;
     utterance.rate = Math.max(0.1, Math.min(rate, 10));
     utterance.onstart = () => this.setStatus('speaking');
     utterance.onend = () => {
@@ -105,6 +106,23 @@ class SpeechService {
   public getVoicesByLang(lang: string) {
     const normalizedLanguage = lang.toLowerCase();
     return this.voices.filter(voice => voice.lang.toLowerCase() === normalizedLanguage || voice.lang.toLowerCase().startsWith(normalizedLanguage.split('-')[0]));
+  }
+
+  public getPreferredVoice(lang: string) {
+    const normalizedLanguage = lang.toLowerCase();
+    const languageMatches = (voice: SpeechSynthesisVoice) => {
+      const voiceLanguage = voice.lang.toLowerCase();
+      return voiceLanguage === normalizedLanguage || voiceLanguage.startsWith(normalizedLanguage.split('-')[0]);
+    };
+    const score = (voice: SpeechSynthesisVoice) => {
+      const name = voice.name.toLowerCase();
+      return (voice.lang.toLowerCase() === normalizedLanguage ? 100 : 50)
+        + (/\b(natural|neural|premium|enhanced)\b/.test(name) ? 100 : 0)
+        + (name === 'google us english' ? 80 : name.includes('google') ? 40 : 0)
+        + (name.includes('microsoft') ? 20 : 0)
+        + (voice.default ? 5 : 0);
+    };
+    return this.voices.filter(languageMatches).sort((left, right) => score(right) - score(left))[0];
   }
 
   public getStatus() {

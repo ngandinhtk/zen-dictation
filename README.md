@@ -1,5 +1,25 @@
 # Zen Dictation
 
+## Database connection check
+
+Set the backend-only `DATABASE_URL` in your untracked `.env`, then run `npm run server:local`. Run `npm run db:check` to measure initial connection setup, five read-only `SELECT 1` round trips, and acquiring an existing pooled connection. The check does not start the API, create tables, or load sentence data, and does not print credentials. Run it on the API host as well to measure the network path used in production.
+
+Copy connection strings from Supabase Dashboard → Connect. For this persistent Node backend, use a direct connection when IPv6 is available, or the session pooler for IPv4-only environments. The existing transaction pooler also works with the current unnamed queries; compare measurements before switching. Keep the API host near the database region (currently Tokyo). See [Supabase connection guidance](https://supabase.com/docs/guides/database/connecting-to-postgres).
+
+Authenticated requests look up the session and user in one query, while still checking session expiry on every request. Schema initialization and sentence-cache loading still happen at API startup; the connection check measures them separately by excluding them.
+
+## YouTube dictation (temporarily hidden)
+
+The YouTube entry point is temporarily hidden while we investigate cases where YouTube returns an empty caption response (`EMPTY_CAPTIONS`). The implementation remains in the codebase and can be re-enabled after caption retrieval is reliable.
+
+When re-enabled, run the API (`npm run server:local` with your existing `.env`) and frontend (`npm run dev`). In **Practice from YouTube**, paste a video link and choose **Load captions**. Videos need accessible English captions and must allow embedded playback.
+
+The embedded player plays the current sentence using the original audio and stops at its end. Use **Play sentence / Replay** or **Replay (Ctrl)** to repeat it. Type your answer, choose **Check answer (Enter)** to reveal feedback, then **Next (Enter)** to continue. Captions are hidden again for the next sentence. If autoplay is blocked, press the play button. Playback speed uses the speed setting; voice selection applies to regular practice.
+
+Caption fragments are grouped using punctuation, pauses and length limits. Automatic captions may have imperfect wording and sentence boundaries. Run timing/parser checks with `node --test server/youtubeCaptions.test.mjs`.
+
+Caption loading retries transient network failures once and has a 60-second total backend deadline (the client waits 70 seconds). Errors distinguish a timeout, a blocked request and an empty caption response. If JSON captions are empty, the server tries the original caption format. YouTube can still return an empty response for a video with visible captions; a longer timeout does not resolve that restriction. Restart the API after updating server code. Run loading/error checks with `node --test server/youtubeTranscript.test.mjs`.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
@@ -102,5 +122,9 @@ Sentence metadata is normalized in `src/data/sentenceBank.ts`. The practice flow
 New external sentences must have commercial usage rights, record the license in the metadata, and pass manual checks for grammar, length, and difficulty before being added to the active bank. Existing sentences are marked as `custom`.
 
 The bank API caches each pack/level response for five minutes, validates it with an ETag, and serves gzip-compressed responses when supported; the browser keeps a matching five-minute session cache and preloads the next available level or free vocabulary pack after the current pool is ready. Core practice limits formula-generated examples and supplements them with hand-written topic variety. New curated items use practical CEFR-aligned targets: Easy A1–A2 (7–12 words), Medium B1–B2 (10–20 words), and Hard C1–C2 (14–30 words). Run `npm run sentence-bank:check` to validate curated sentence lengths/duplicates and report word-count medians, repeated openings, and JSON/gzip payload sizes without connecting to the database. After updating content, run `npm run seed:sentences`; it deactivates obsolete rows in the seeder's deterministic ID namespace without deleting them. Restart the API so its in-memory cache is refreshed.
+
+## Speech playback
+
+Speech uses the browser's Web Speech API. Zen Dictation prefers an available English voice labeled Natural or Neural, then Google US English, while keeping manual voice selection available. A sentence-ending pause is added when the practice text has no punctuation. Voice quality and available options depend on the browser and voices installed on the device; choose a Natural or Neural voice in Settings when one is available.
 
 e6b9fa7ad2b1f0ad02daee7f96a9cf5e
