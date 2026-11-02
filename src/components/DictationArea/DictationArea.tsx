@@ -8,17 +8,18 @@ interface DictationAreaProps {
   onComplete: (value?: string, correctCharacters?: number) => void;
   onFinish?: (value: string, correctCharacters: number, isComplete: boolean) => void;
   onNext?: () => void;
-  onTypingChange?: (value: string) => void;
+  onTypingChange?: (value: string) => boolean | void;
   isHidden?: boolean;
   disabled?: boolean;
-  showCheckButton?: boolean;
 }
 
-const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, onFinish, onNext, onTypingChange, isHidden = false, disabled = false, showCheckButton = false }) => {
+const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, onFinish, onNext, onTypingChange, isHidden = false, disabled = false }) => {
   const draftKey = `zen-dictation-draft:${encodeURIComponent(targetText)}`;
   const [userInput, setUserInput] = useState(() => {
     try {
-      return localStorage.getItem(draftKey) || '';
+      const draft = localStorage.getItem(draftKey) || '';
+      // Finished drafts from older versions must not reopen as unsubmitted attempts.
+      return draft.length >= targetText.length ? '' : draft;
     } catch {
       return '';
     }
@@ -50,15 +51,16 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
     return groups;
   }, [feedback]);
   const isComplete = userInput.length === targetText.length && userInput.toLowerCase() === targetText.toLowerCase();
-  const hasInput = userInput.length > 0;
   const shouldHidePrompt = isHidden && !isComplete;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (disabled) return;
+    if (disabled || hasSubmitted) return;
     const value = e.target.value;
     if (value.length > targetText.length) {
       return;
     }
+    // Check the deadline before accepting or grading a keystroke.
+    if (onTypingChange?.(value) === false) return;
 
     if (value.length > userInput.length) {
       soundService.playTyping();
@@ -78,7 +80,18 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
     } catch {
       // Draft persistence is best-effort when storage is unavailable.
     }
-    onTypingChange?.(value);
+
+    // A sentence-ending mark also finishes shorter answers with missing words.
+    const sentenceEnded = /[.!?]["'\u201d\u2019)]*\s*$/.test(value.trimEnd()) && !targetText.toLowerCase().startsWith(value.toLowerCase());
+    if (value.length === targetText.length || sentenceEnded) {
+      const correct = value.toLowerCase() === targetText.toLowerCase();
+      onFinish?.(value, getFeedback(targetText, value).filter(item => item.status === 'correct').length, correct);
+      setHasSubmitted(true);
+      try {
+        localStorage.removeItem(draftKey);
+      } catch { /* Best effort. */ }
+      if (correct) soundService.playSuccess();
+    }
 
     if (value.length === targetText.length && value.toLowerCase() === targetText.toLowerCase() && !perfectAttemptAwarded.current) {
       try {
@@ -96,27 +109,13 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
     inputRef.current?.focus();
   };
 
-  const submitAttempt = () => {
-    if (!hasInput || disabled) return;
-    onFinish?.(userInput, feedback.filter(item => item.status === 'correct').length, isComplete);
-    setHasSubmitted(true);
-    if (isComplete) soundService.playSuccess();
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== 'Enter' || disabled) {
+    if (e.key !== 'Enter' || disabled || e.nativeEvent.isComposing || e.repeat) {
       return;
     }
 
-    // The first Enter submits the attempt; a second Enter advances after feedback is visible.
-    if (hasInput) {
-      e.preventDefault();
-      if (hasSubmitted && onNext) {
-        onNext();
-        return;
-      }
-      submitAttempt();
-    }
+    e.preventDefault();
+    if (hasSubmitted) onNext?.();
   };
 
   return (
@@ -159,9 +158,9 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
         autoComplete="off"
         aria-label="Type the sentence you hear"
         disabled={disabled}
+        readOnly={hasSubmitted}
       />
     </div>
-    {showCheckButton && <button type="button" className="action-btn" disabled={!hasInput || disabled || hasSubmitted} onClick={submitAttempt}>Check answer (Enter)</button>}
     </>
   );
 };

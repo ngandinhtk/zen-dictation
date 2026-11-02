@@ -8,6 +8,7 @@ import './styles/globals.css';
 import './App.css';
 import {  type Difficulty } from './utils/sentenceTranslations';
 import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
+import { remainingSeconds, resolvePracticeSentence } from './utils/practiceState';
 import { addReviewWord, clearReviewWords, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, removeReviewWord, replaceReviewWords, saveReviewNoteForAttempt, updateReviewWord, type ReviewWord } from './services/spacedRepetitionService';
 import { addPoints, claimDailyTargetReward, clearPointsState, getDailyTarget, getPoints, getUnlockedAchievements, PERFECT_SENTENCE_POINTS, replaceDailyTarget, replacePoints, subtractPoints, TIMEOUT_PENALTY_POINTS, updateDailyTargetProgress, type DailyTarget } from './services/pointsService';
 import { clearPremiumLearningState, getGoalWpm, getPracticeHistory, getPracticeStreak, saveGoalWpm, savePracticeSession, type PracticeSession } from './services/premiumService';
@@ -134,6 +135,8 @@ function App() {
   const [sentenceLoadError, setSentenceLoadError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(() => {
     const pool = getSentencePool(initialFocus, initialDifficulty);
+    const savedIndex = savedPractice ? pool.indexOf(savedPractice.targetText) : -1;
+    if (savedIndex >= 0) return savedIndex;
     const previousText = savedPractice?.targetText;
     const indices = pool.map((_, index) => index).filter(index => pool.length < 2 || pool[index] !== previousText);
     return indices.length ? indices[Math.floor(Math.random() * indices.length)] : 0;
@@ -159,6 +162,7 @@ function App() {
   const [timeLeft, setTimeLeft] = useState(DEFAULT_TIME_LIMIT);
   const [typingSpeed, setTypingSpeed] = useState(0);
   const [startedAt, setStartedAt] = useState<number | null>(null);
+  const attemptStartedAtRef = useRef<number | null>(null);
   const [hasStartedTyping, setHasStartedTyping] = useState(false);
   const [isTimeUp, setIsTimeUp] = useState(false);
   const [isSentenceHidden, setIsSentenceHidden] = useState(false);
@@ -173,6 +177,7 @@ function App() {
   // const [showTranslation, setShowTranslation] = useState(false);
   const [reviewWord, setReviewWord] = useState<string | undefined>();
   const [focusTimeLeft, setFocusTimeLeft] = useState(20 * 60);
+  const [focusDeadline, setFocusDeadline] = useState<number | null>(null);
   const [goalWpm, setGoalWpm] = useState(getGoalWpm);
   const [practiceHistory, setPracticeHistory] = useState<PracticeSession[]>(getPracticeHistory);
   const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('zen-dictation-onboarding-seen') !== 'true');
@@ -209,10 +214,14 @@ function App() {
     }
     setLesson(null);
     setFocusTimeLeft(durationMinutes * 60);
+    // This callback runs only when the user starts a Focus session.
+    // eslint-disable-next-line react-hooks/purity
+    setFocusDeadline(Date.now() + durationMinutes * 60_000);
     setIsFocusMode(true);
     setIsCompleted(false);
     setIsTimeUp(false);
     resetStats(timeLimit);
+    setKey(value => value + 1);
     setIsPremiumOpen(false);
     setIsSettingsOpen(false);
     setIsAccountOpen(false);
@@ -282,14 +291,15 @@ function App() {
 
   const sentencePool = getSentencePool(practiceFocus, difficulty);
   const sentenceCatalogStatus = sentencePool.length ? 'ready' : sentenceLoadError === `${practiceFocus}:${difficulty}` ? 'error' : 'loading';
-  const currentSentence: string = String(lesson?.texts[lesson.index] || sentencePool[currentIndex] || sentencePool[0] || '');
+  const currentSentence = String(resolvePracticeSentence(sentencePool, currentIndex, lesson));
   // const currentTranslation = getSentenceTranslation(currentSentence, difficulty);
 
   useEffect(() => {
-    if (!isFocusMode || focusTimeLeft <= 0) return;
-    const timer = window.setTimeout(() => setFocusTimeLeft(value => Math.max(value - 1, 0)), 1000);
-    return () => window.clearTimeout(timer);
-  }, [isFocusMode, focusTimeLeft]);
+    if (!isFocusMode || focusDeadline === null) return;
+    const tick = () => setFocusTimeLeft(remainingSeconds(focusDeadline));
+    const timer = window.setInterval(tick, 250);
+    return () => window.clearInterval(timer);
+  }, [isFocusMode, focusDeadline]);
 
   useEffect(() => {
     if (!isFocusMode) return;
@@ -322,7 +332,7 @@ function App() {
     let nextIndex: number | undefined;
     while (deck.length > 0 && nextIndex === undefined) {
       const candidate = deck.pop();
-      if (candidate !== undefined && !recentIndices.includes(candidate)) nextIndex = candidate;
+      if (candidate !== undefined && candidate !== previousIndex && !recentIndices.includes(candidate)) nextIndex = candidate;
     }
     sentenceDecksRef.current[deckKey] = deck;
     if (nextIndex === undefined) {
@@ -368,7 +378,9 @@ function App() {
         const nextPool = getSentencePool(practiceFocus, difficulty);
         const lastSentence = localStorage.getItem(LAST_SENTENCE_KEY);
         const availableIndices = nextPool.map((_, index) => index).filter(index => nextPool.length < 2 || nextPool[index] !== lastSentence);
-        const nextIndex = availableIndices.length ? availableIndices[Math.floor(Math.random() * availableIndices.length)] : 0;
+        const active = readActivePractice();
+        const restoredIndex = active?.focus === practiceFocus && active.difficulty === difficulty ? nextPool.indexOf(active.targetText) : -1;
+        const nextIndex = restoredIndex >= 0 ? restoredIndex : availableIndices.length ? availableIndices[Math.floor(Math.random() * availableIndices.length)] : 0;
         setCurrentIndex(nextIndex);
         try { localStorage.setItem(LAST_SENTENCE_KEY, nextPool[nextIndex]); } catch { /* best effort */ }
         setSentenceLoadError(null);
@@ -491,6 +503,7 @@ function App() {
   }, [isAccountOpen]);
 
   const resetStats = useCallback((nextTimeLimit = timeLimit) => {
+    attemptStartedAtRef.current = null;
     recordedAttemptRef.current = false;
     setLastAttempt(null);
     setCorrectChars(0);
@@ -542,6 +555,7 @@ function App() {
         window.clearTimeout(speakTimeoutRef.current);
         speakTimeoutRef.current = null;
       }
+      speechService.stop();
     };
     // Voice and speed changes should apply on the next manual replay,
     // not trigger an automatic repeat of the current sentence.
@@ -552,7 +566,8 @@ function App() {
     const handleControlKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const isEditing = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable;
-      if (event.key === 'Control' && !event.repeat && !isEditing) {
+      const isDictationInput = target?.matches('input.hidden-input') ?? false;
+      if (event.key === 'Control' && !event.repeat && !event.isComposing && !event.altKey && !event.shiftKey && !event.metaKey && (!isEditing || isDictationInput)) {
         handleSpeak();
       }
     };
@@ -562,14 +577,14 @@ function App() {
   }, [handleSpeak]);
 
   useEffect(() => {
-    if (isFocusMode || !hasStartedTyping || !startedAt) return;
+    if (isFocusMode || !hasStartedTyping || startedAt === null) return;
     const tick = () => {
-      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
-      const remainingSeconds = Math.max(0, timeLimit - elapsedSeconds);
+      const elapsedSeconds = Math.max(0, (Date.now() - startedAt) / 1000);
+      const remaining = remainingSeconds(startedAt + timeLimit * 1000);
       const minutes = Math.max(elapsedSeconds / 60, 1 / 60);
-      setTimeLeft(remainingSeconds);
+      setTimeLeft(remaining);
       setTypingSpeed(correctChars > 0 ? (correctChars / 5) / minutes : 0);
-      if (remainingSeconds === 0) {
+      if (remaining === 0) {
         setIsTimeUp(true);
         setHasStartedTyping(false);
         setStartedAt(null);
@@ -624,6 +639,9 @@ function App() {
       setLesson({ ...lesson, index: lesson.index + 1 });
       if (lesson.videoId) setIsSentenceHidden(true);
     }
+    try {
+      localStorage.removeItem(`zen-dictation-draft:${encodeURIComponent(currentSentence)}`);
+    } catch { /* Best effort. */ }
     clearActivePractice();
     try { localStorage.setItem(LAST_SENTENCE_KEY, currentSentence); } catch { /* best effort */ }
     const attemptAccuracy = lastAttempt?.accuracy ?? (isCompleted ? 100 : 0);
@@ -687,7 +705,9 @@ function App() {
     const nextValue = Number(event.target.value);
     const safeValue = Number.isFinite(nextValue) ? Math.min(Math.max(nextValue, 10), 1800) : DEFAULT_TIME_LIMIT;
     clearActivePractice();
+    try { localStorage.removeItem(`zen-dictation-draft:${encodeURIComponent(currentSentence)}`); } catch { /* Best effort. */ }
     setTimeLimit(safeValue);
+    setIsCompleted(false);
     setIsTimeUp(false);
     resetStats(safeValue);
     setKey(prev => prev + 1);
@@ -756,6 +776,7 @@ function App() {
 
   const handleAttemptFinish = (completedText: string, correctCharacters: number, isCorrect: boolean) => {
     saveCoachAttempt(completedText);
+    clearActivePractice();
     setLastAttempt(analyzeAttempt(currentSentence, completedText));
     setLastAttemptText(completedText);
     setLastAttemptTargetText(currentSentence);
@@ -949,7 +970,19 @@ function App() {
   }
 
   const handleTypingChange = (nextValue: string) => {
-    if (isTimeUp) return;
+    if (isTimeUp) return false;
+    const now = Date.now();
+    if (isFocusMode && focusDeadline !== null && now >= focusDeadline) {
+      setFocusTimeLeft(0);
+      return false;
+    }
+    if (!isFocusMode && attemptStartedAtRef.current !== null && remainingSeconds(attemptStartedAtRef.current + timeLimit * 1000, now) === 0) {
+      setTimeLeft(0);
+      setIsTimeUp(true);
+      setHasStartedTyping(false);
+      setStartedAt(null);
+      return false;
+    }
     if (nextValue) {
       try {
         localStorage.setItem(ACTIVE_PRACTICE_KEY, JSON.stringify({ difficulty, focus: practiceFocus, index: currentIndex, targetText: currentSentence } satisfies ActivePractice));
@@ -963,17 +996,16 @@ function App() {
     }, 0);
     if (nextValue.length > 0) setLastAttempt(null);
     setCorrectChars(nextCorrectChars);
-    if (nextValue.length > 0 && !hasStartedTyping) {
+    if (nextValue.length > 0 && attemptStartedAtRef.current === null) {
+      attemptStartedAtRef.current = now;
       setHasStartedTyping(true);
-      setStartedAt(Date.now());
+      setStartedAt(now);
     }
     if (nextValue.length === 0) {
-      setHasStartedTyping(false);
-      setStartedAt(null);
       setTypingSpeed(0);
-      setTimeLeft(timeLimit);
       setCorrectChars(0);
     }
+    return true;
   };
 
   return (
@@ -1181,7 +1213,7 @@ function App() {
             <small>{sentenceCatalogStatus === 'error' ? 'Check the API server and try refreshing the page.' : 'Connecting...'}</small>
           </section>
         ) : <>
-        <DictationArea key={key} targetText={currentSentence} onComplete={handlePerfectComplete} onFinish={handleAttemptFinish} onNext={handleNext} onTypingChange={handleTypingChange} showCheckButton={Boolean(lesson?.videoId)} isHidden={isSentenceHidden && !(lesson?.videoId && lastAttempt)} disabled={isTimeUp || Boolean(lesson?.completed) || (isFocusMode && focusSessionComplete)} />
+        <DictationArea key={`${key}:${practiceFocus}:${difficulty}:${lesson?.index ?? ''}:${currentSentence}`} targetText={currentSentence} onComplete={handlePerfectComplete} onFinish={handleAttemptFinish} onNext={handleNext} onTypingChange={handleTypingChange} isHidden={isSentenceHidden && !isTimeUp && !focusSessionComplete && !(lesson?.videoId && lastAttempt)} disabled={isTimeUp || Boolean(lesson?.completed) || focusSessionComplete} />
 
         {/* {!isFocusMode && (
           <div className="translation-panel">
@@ -1193,8 +1225,8 @@ function App() {
           </div>
         )} */}
 
-        <button type="button" className="visibility-toggle" onClick={() => setIsSentenceHidden(prev => !prev)} aria-pressed={isSentenceHidden}>
-          {isSentenceHidden ? 'Show sentence' : 'Hide sentence'}
+        <button type="button" className="visibility-toggle" onClick={() => setIsSentenceHidden(prev => !prev)} aria-pressed={isSentenceHidden && !isTimeUp && !focusSessionComplete} disabled={isTimeUp || focusSessionComplete}>
+          {isSentenceHidden && !isTimeUp && !focusSessionComplete ? 'Show sentence' : 'Hide sentence'}
         </button>
 
         {!isFocusMode && lastAttempt && (
