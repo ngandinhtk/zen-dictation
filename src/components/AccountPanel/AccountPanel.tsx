@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { loginAccount, registerAccount, resetAccountPassword, type AccountUser } from '../../services/accountService';
 import './AccountPanel.css';
+import PrivacyNotice from '../PrivacyPage/PrivacyNotice';
 
 interface AccountPanelProps {
   user: AccountUser | null;
@@ -55,6 +56,7 @@ const AccountPanel = ({ user, onAuthenticated, onLogout, resetToken }: AccountPa
     {!resetComplete && <label>{resetToken ? 'New password' : 'Password'}<input type="password" value={password} onChange={event => setPassword(event.target.value)} minLength={8} maxLength={1024} autoComplete={isRegistering || resetToken ? 'new-password' : 'current-password'} required /><small>At least 8 characters</small></label>}
     {resetToken && !resetComplete && <label>Confirm new password<input type="password" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} minLength={8} maxLength={1024} autoComplete="new-password" required /></label>}
     </fieldset>
+    <PrivacyNotice />
     {error && <p className="account-error" role="alert">{error}</p>}
     {message && <p role="status">{message}</p>}
     {!resetComplete && <button type="submit" className="account-submit" disabled={isLoading}>{isLoading ? 'Please wait…' : resetToken ? 'Save new password' : isRegistering ? 'Create account' : 'Sign in'}</button>}

@@ -369,7 +369,7 @@ function App() {
     const updateVoices = () => {
       const availableVoices = speechService.getVoicesByLang(LANG);
       setVoices(availableVoices);
-      setSelectedVoice(current => current || speechService.getPreferredVoice(LANG)?.name || '');
+      setSelectedVoice(current => availableVoices.some(voice => voice.name === current) ? current : '');
     };
     updateVoices();
     const unsubscribeVoices = speechService.subscribeToVoices(updateVoices);
@@ -1060,7 +1060,7 @@ function App() {
       />}
       {!isFocusMode && showOnboarding && (
         <section className="onboarding-card" aria-label="How to practice">
-          <div><span className="premium-kicker">Welcome to Zen Dictation</span><h2>Three quiet steps to better listening.</h2><p>Listen, type what you hear, then use the feedback to improve your accuracy and speed.</p></div>
+          <div><span className="premium-kicker">Welcome to Zen Dictation</span><h2>Four quiet steps to better listening.</h2><p>Listen, type what you hear, then use the feedback to improve your accuracy and speed.</p></div>
           <div className="onboarding-steps"><span><b>1</b> Listen</span><span><b>2</b> Type</span><span><b>3</b> Repeat</span><span><b>4</b> Improve</span></div>
           <button type="button" onClick={() => { localStorage.setItem('zen-dictation-onboarding-seen', 'true'); setShowOnboarding(false); }}>Start practicing</button>
         </section>
@@ -1176,7 +1176,7 @@ function App() {
             <small className={`voice-status voice-status-${voiceStatus}`} role="status">
               {voiceStatus === 'loading' ? 'Loading voices…' : voiceStatus === 'unsupported' ? 'Speech unavailable' : voiceStatus === 'speaking' ? 'Speaking' : voiceStatus === 'error' ? 'Try Again' : 'Ready'}
             </small>
-            <small>Natural and neural English voices are preferred when available on your device.</small>
+            <small>Browser default uses your device’s voice. Try another English voice if playback is silent.</small>
           </label>
           
         </section>
@@ -1293,14 +1293,14 @@ function App() {
           </div>
         )}
 
-        {!isFocusMode && <Controls onReplay={handleSpeak} onNext={handleNext} nextDisabled={Boolean(lesson && ((!lastAttempt && !isCompleted) || lesson.completed))} />}
+        <Controls onReplay={handleSpeak} onNext={handleNext} nextDisabled={focusSessionComplete || Boolean(lesson && ((!lastAttempt && !isCompleted) || lesson.completed))} />
         {!lesson?.videoId && (voiceStatus === 'error' || voiceStatus === 'unsupported') && <p className="speech-playback-error" role="alert">
           {voiceStatus === 'unsupported' ? 'This browser cannot play speech. Open this page in Chrome and tap Replay.' : voiceError}
         </p>}
         </>}
         
       </main>
-      {!isFocusMode && <footer className="app-footer"><p> <i> Tip: Focus on the sounds, then the letters. Repeat three times for best results. </i> </p>  </footer>}
+      {!isFocusMode && <footer className="app-footer"><p> <i> Tip: Focus on the sounds, then the letters. Repeat three times for best results. </i> </p><a href={`${import.meta.env.BASE_URL}privacy.html`} target="_blank" rel="noopener noreferrer">Privacy Policy ↗</a></footer>}
     </div>
   );
 }

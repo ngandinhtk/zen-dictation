@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ReviewWord } from '../../services/spacedRepetitionService';
 import './ReviewPage.css';
+import PageHeader from '../PageHeader/PageHeader';
 
 interface ReviewPageProps {
   words: ReviewWord[];
@@ -82,10 +83,7 @@ const ReviewPage = ({ words, onAddWord, onUpdateWord, onPracticeWord, initialWor
   };
 
   return <div className="review-page">
-    <header className="review-page-header">
-      <button type="button" className="review-back" onClick={onBack} aria-label="Back to practice" title="Back to practice">←</button>
-      <a className="logo review-page-mark logo-link" href="#" onClick={event => { event.preventDefault(); onBack(); }}>Zen Dictation</a>
-    </header>
+    <PageHeader onBack={onBack} />
     <main className="review-content">
       <div className="review-intro">
         <span className="premium-kicker">Spaced repetition</span>

@@ -2,6 +2,7 @@
 
 export type VoiceLanguage = 'en-US';
 export type SpeechStatus = 'unsupported' | 'loading' | 'ready' | 'speaking' | 'paused' | 'error';
+const normalizeLanguage = (value: string) => value.toLowerCase().replace(/_/g, '-');
 
 class SpeechService {
   private synth: SpeechSynthesis | null = typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
@@ -42,7 +43,7 @@ class SpeechService {
     this.voices = this.synth.getVoices();
     if (this.voices.length === 0 && this.voiceRetryCount < 10) {
       this.voiceRetryCount += 1;
-      this.setStatus('loading');
+      if (!this.activeUtterance && this.status !== 'error') this.setStatus('loading');
       window.setTimeout(this.loadVoices, 250);
     } else {
       this.voiceRetryCount = 0;
@@ -59,33 +60,52 @@ class SpeechService {
     }
 
     const requestId = ++this.speakRequest;
+    // Android may expose its voices only after the first user interaction.
+    this.voices = this.synth.getVoices();
     this.clearStartTimer();
     this.errorMessage = '';
     if (this.replayTimer !== null) window.clearTimeout(this.replayTimer);
     this.replayTimer = null;
     let remaining = Number.isFinite(repeatCount) ? Math.max(1, Math.min(5, Math.floor(repeatCount))) : 1;
     const gap = Number.isFinite(repeatGapMs) ? Math.max(0, repeatGapMs) : 1000;
+    let recovered = false;
+    let preferSystemVoice = voiceName === '';
     // Do not cancel an idle Android TTS engine immediately before starting it.
     if (this.activeUtterance || this.synth.speaking || this.synth.pending) this.synth.cancel();
     if (this.synth.paused) this.synth.resume();
 
-    const play = (useDefaultVoice = false) => {
+    const retry = () => {
+      if (recovered || requestId !== this.speakRequest) return false;
+      recovered = true;
+      preferSystemVoice = true;
+      this.clearStartTimer();
+      // Invalidate the old utterance before cancel(), which may fire events synchronously.
+      this.activeUtterance = null;
+      this.synth?.cancel();
+      this.replayTimer = window.setTimeout(() => {
+        if (requestId !== this.speakRequest) return;
+        if (this.synth?.paused) this.synth.resume();
+        play();
+      }, 150);
+      return true;
+    };
+    const play = () => {
       if (requestId !== this.speakRequest) return;
       this.replayTimer = null;
       const utterance = new SpeechSynthesisUtterance(text);
       this.activeUtterance = utterance;
-      const normalizedLanguage = lang.toLowerCase();
+      const normalizedLanguage = normalizeLanguage(lang);
       const languageMatches = (voice: SpeechSynthesisVoice) => {
-        const voiceLanguage = voice.lang.toLowerCase();
+        const voiceLanguage = normalizeLanguage(voice.lang);
         return voiceLanguage === normalizedLanguage || voiceLanguage.startsWith(normalizedLanguage.split('-')[0]);
       };
-      const voice = this.voices.find(item => item.name === voiceName && languageMatches(item))
+      const voice = preferSystemVoice ? undefined : this.voices.find(item => item.name === voiceName && languageMatches(item))
         ?? this.getPreferredVoice(lang);
 
       // If no matching voice is installed, leaving voice unset lets the browser
       // choose its default voice while the utterance language remains English.
-      if (voice && !useDefaultVoice) utterance.voice = voice;
-      utterance.lang = useDefaultVoice ? lang : voice?.lang || lang;
+      if (voice) utterance.voice = voice;
+      utterance.lang = voice ? voice.lang.replace(/_/g, '-') : lang;
       utterance.text = /[.!?…]["')\]]*$/.test(speechText) ? speechText : `${speechText}.`;
       utterance.rate = Math.max(0.1, Math.min(rate, 10));
       const isCurrent = () => requestId === this.speakRequest && this.activeUtterance === utterance;
@@ -102,17 +122,13 @@ class SpeechService {
         remaining -= 1;
         if (remaining > 0) this.replayTimer = window.setTimeout(() => play(), gap);
       };
-      utterance.onpause = () => this.setStatus('paused');
-      utterance.onresume = () => this.setStatus('speaking');
+      utterance.onpause = () => { if (isCurrent()) this.setStatus('paused'); };
+      utterance.onresume = () => { if (isCurrent()) this.setStatus('speaking'); };
       utterance.onerror = event => {
         if (!isCurrent()) return;
         this.clearStartTimer();
+        if (['canceled', 'interrupted', 'voice-unavailable', 'language-unavailable', 'synthesis-unavailable', 'synthesis-failed', 'network'].includes(event.error) && retry()) return;
         this.activeUtterance = null;
-        if (event.error === 'canceled' || event.error === 'interrupted') return;
-        if (voice && !useDefaultVoice && ['voice-unavailable', 'language-unavailable', 'synthesis-unavailable', 'synthesis-failed', 'network'].includes(event.error)) {
-          play(true);
-          return;
-        }
         this.errorMessage = event.error === 'not-allowed'
           ? 'Playback was blocked. Open this page in Chrome and tap Replay.'
           : ['voice-unavailable', 'language-unavailable', 'synthesis-unavailable', 'synthesis-failed'].includes(event.error)
@@ -127,11 +143,20 @@ class SpeechService {
       this.setStatus('loading');
       this.startTimer = window.setTimeout(() => {
         if (!isCurrent()) return;
+        if (retry()) return;
         this.stop();
         this.errorMessage = 'Speech did not start. Open this page in Chrome, check media volume and your phone’s English text-to-speech voice, then tap Replay.';
         this.setStatus('error');
       }, 8000);
-      this.synth?.speak(utterance);
+      try {
+        this.synth?.speak(utterance);
+      } catch {
+        if (retry()) return;
+        this.clearStartTimer();
+        this.activeUtterance = null;
+        this.errorMessage = 'Speech could not start. Check your phone’s English text-to-speech voice and tap Replay.';
+        this.setStatus('error');
+      }
     };
     // Manual playback must stay in the tap/click call stack on mobile.
     // Keep the short cancel-to-speak delay for automatic desktop playback.
@@ -160,14 +185,14 @@ class SpeechService {
   }
 
   public getVoicesByLang(lang: string) {
-    const normalizedLanguage = lang.toLowerCase();
-    return this.voices.filter(voice => voice.lang.toLowerCase() === normalizedLanguage || voice.lang.toLowerCase().startsWith(normalizedLanguage.split('-')[0]));
+    const normalizedLanguage = normalizeLanguage(lang);
+    return this.voices.filter(voice => normalizeLanguage(voice.lang) === normalizedLanguage || normalizeLanguage(voice.lang).startsWith(normalizedLanguage.split('-')[0]));
   }
 
   public getPreferredVoice(lang: string) {
-    const normalizedLanguage = lang.toLowerCase();
+    const normalizedLanguage = normalizeLanguage(lang);
     const languageMatches = (voice: SpeechSynthesisVoice) => {
-      const voiceLanguage = voice.lang.toLowerCase();
+      const voiceLanguage = normalizeLanguage(voice.lang);
       return voiceLanguage === normalizedLanguage || voiceLanguage.startsWith(normalizedLanguage.split('-')[0]);
     };
     const score = (voice: SpeechSynthesisVoice) => {

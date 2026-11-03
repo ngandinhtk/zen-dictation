@@ -1,4 +1,5 @@
 /* Minimalist App Styles */
+.app-footer a { display: inline-block; padding: .5rem; color: var(--accent-color); font-size: .75rem; text-underline-offset: .2em; }
 .app-layout {
   max-width: 800px;
   width: 100%;

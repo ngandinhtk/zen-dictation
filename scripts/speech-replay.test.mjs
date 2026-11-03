@@ -9,8 +9,9 @@ const timers = new Map();
 const spoken = [];
 let cancellations = 0;
 const voice = { name: 'English', lang: 'en-US', default: true };
+let availableVoices = [voice];
 globalThis.window = {
-  speechSynthesis: { getVoices: () => [voice], cancel() { cancellations++; }, resume() {}, speak: utterance => spoken.push(utterance) },
+  speechSynthesis: { getVoices: () => availableVoices, cancel() { cancellations++; }, resume() {}, speak: utterance => spoken.push(utterance) },
   setTimeout(callback, delay) { const id = ++timerId; timers.set(id, { callback, at: now + delay }); return id; },
   clearTimeout: id => timers.delete(id),
 };
@@ -29,7 +30,7 @@ const advance = milliseconds => {
 const source = await readFile(new URL('../src/services/speechService.ts', import.meta.url), 'utf8');
 const javascript = ts.transpile(source, { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 });
 const { speechService } = await import(`data:text/javascript;base64,${Buffer.from(javascript).toString('base64')}`);
-beforeEach(() => { speechService.stop(); timers.clear(); spoken.length = 0; now = 0; cancellations = 0; });
+beforeEach(() => { speechService.stop(); timers.clear(); spoken.length = 0; now = 0; cancellations = 0; availableVoices = [voice]; });
 
 test('starting an idle Android engine does not cancel it first', () => {
   speechService.speak('Hello.', 'en-US', 1, undefined, 1, 1000, true);
@@ -42,6 +43,7 @@ test('an unavailable selected voice falls back once to the system voice', () => 
   const first = spoken[0];
   assert.equal(first.voice, voice);
   first.onerror({ error: 'voice-unavailable' });
+  advance(150);
   assert.equal(spoken.length, 2);
   assert.equal(spoken[1].voice, undefined);
   first.onend();
@@ -56,9 +58,61 @@ test('an unavailable selected voice falls back once to the system voice', () => 
 test('a silent engine timeout reports actionable guidance', () => {
   speechService.speak('Hello.', 'en-US', 1, undefined, 1, 1000, true);
   advance(8000);
+  assert.equal(speechService.getStatus(), 'loading', 'Try the system voice before reporting failure');
+  advance(8150);
   assert.equal(speechService.getStatus(), 'error');
   assert.match(speechService.getErrorMessage(), /Speech did not start/);
-  assert.equal(cancellations, 1);
+  assert.equal(cancellations, 2);
+});
+
+test('Browser default voice stays unset across repeated reads', () => {
+  speechService.speak('Hello.', 'en-US', 1, '', 2, 1000, true);
+  assert.equal(spoken[0].voice, undefined);
+  spoken[0].onend();
+  advance(1000);
+  assert.equal(spoken[1].voice, undefined);
+});
+
+test('unexpected mobile cancellation retries once and then reports failure', () => {
+  speechService.speak('Hello.', 'en-US', 1, 'English', 1, 1000, true);
+  spoken[0].onerror({ error: 'interrupted' });
+  advance(150);
+  assert.equal(spoken.length, 2);
+  assert.equal(spoken[1].voice, undefined);
+  spoken[1].onerror({ error: 'canceled' });
+  advance(10000);
+  assert.equal(spoken.length, 2);
+  assert.equal(speechService.getStatus(), 'error');
+});
+
+test('changing sentences during recovery prevents the old sentence from replaying', () => {
+  speechService.speak('Old sentence.', 'en-US', 1, '', 1, 1000, true);
+  spoken[0].onerror({ error: 'interrupted' });
+  speechService.stop();
+  speechService.speak('New sentence.', 'en-US', 1, '', 1, 1000, true);
+  spoken[1].onstart();
+  advance(10000);
+  assert.deepEqual(spoken.map(item => item.text), ['Old sentence.', 'New sentence.']);
+});
+
+test('voices that load after initialization are refreshed on the next tap', () => {
+  const androidVoice = { name: 'Installed English', lang: 'en_US', localService: true };
+  availableVoices = [androidVoice];
+  speechService.speak('Hello.', 'en-US', 1, androidVoice.name, 1, 1000, true);
+  assert.equal(spoken[0].voice, androidVoice);
+  assert.equal(spoken[0].lang, 'en-US');
+});
+
+test('late pause and resume events from an old sentence cannot change current status', () => {
+  speechService.speak('Old sentence.', 'en-US', 1, '', 1, 1000, true);
+  const old = spoken[0];
+  speechService.speak('New sentence.', 'en-US', 1, '', 1, 1000, true);
+  spoken[1].onstart();
+  old.onpause();
+  assert.equal(speechService.getStatus(), 'speaking');
+  speechService.stop();
+  old.onresume();
+  assert.equal(speechService.getStatus(), 'ready');
 });
 
 test('blocked speech reports the browser restriction without retrying forever', () => {
@@ -148,6 +202,8 @@ test('a new sentence cancels pending repeats and ignores stale end events', () =
   old.onend();
   speechService.speak('New sentence.', 'en-US');
   old.onend();
+  advance(50);
+  spoken[1].onstart();
   advance(10_000);
   assert.deepEqual(spoken.map(item => item.text), ['Old sentence.', 'New sentence.']);
 });

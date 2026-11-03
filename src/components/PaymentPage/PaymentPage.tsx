@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import './PaymentPage.css';
+import PrivacyNotice from '../PrivacyPage/PrivacyNotice';
 import { activatePremiumLicense, capturePayPalOrder, createPayPalOrder, getPayPalPaymentStatus } from '../../services/premiumAccess';
 
 interface PaymentPageProps {
@@ -97,6 +98,7 @@ export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProp
         </>}
         <button type="button" className="license-button" onClick={onBack}>{status === 'paid' ? 'I will activate later' : 'Return to practice'}</button>
       </section>
+      <PrivacyNotice />
     </main>
   </div>;
 };
@@ -140,6 +142,7 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
           <button type="button" className="license-button" onClick={onLicenseClick}>Already paid? Enter your license key</button>
         </section>
         <p className="payment-note">You will be redirected to PayPal to complete the payment. Your email is optional and is only used for the receipt.</p>
+        <PrivacyNotice />
       </main>
     </div>;
   }
@@ -173,6 +176,7 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
         <button type="button" className="license-button" onClick={onLicenseClick}>Already have a license key?</button>
       </section>
       {/* <p className="payment-note">Your Premium license will work without creating an account. An account is optional for syncing your progress across devices.</p> */}
+      <PrivacyNotice />
     </main>
   </div>
   );
