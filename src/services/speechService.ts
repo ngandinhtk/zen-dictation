@@ -12,6 +12,8 @@ class SpeechService {
   private speakRequest = 0;
   private replayTimer: number | null = null;
   private activeUtterance: SpeechSynthesisUtterance | null = null;
+  private startTimer: number | null = null;
+  private errorMessage = '';
   private status: SpeechStatus = this.synth ? 'loading' : 'unsupported';
 
   constructor() {
@@ -28,6 +30,13 @@ class SpeechService {
     this.statusListeners.forEach(listener => listener(status));
   };
 
+  public getErrorMessage() { return this.errorMessage; }
+
+  private clearStartTimer = () => {
+    if (this.startTimer !== null) window.clearTimeout(this.startTimer);
+    this.startTimer = null;
+  };
+
   private loadVoices = () => {
     if (!this.synth) return;
     this.voices = this.synth.getVoices();
@@ -37,7 +46,7 @@ class SpeechService {
       window.setTimeout(this.loadVoices, 250);
     } else {
       this.voiceRetryCount = 0;
-      this.setStatus('ready');
+      if (!this.activeUtterance && this.status !== 'error') this.setStatus('ready');
     }
   };
 
@@ -50,14 +59,17 @@ class SpeechService {
     }
 
     const requestId = ++this.speakRequest;
+    this.clearStartTimer();
+    this.errorMessage = '';
     if (this.replayTimer !== null) window.clearTimeout(this.replayTimer);
     this.replayTimer = null;
     let remaining = Number.isFinite(repeatCount) ? Math.max(1, Math.min(5, Math.floor(repeatCount))) : 1;
     const gap = Number.isFinite(repeatGapMs) ? Math.max(0, repeatGapMs) : 1000;
-    this.synth.cancel();
-    this.synth.resume();
+    // Do not cancel an idle Android TTS engine immediately before starting it.
+    if (this.activeUtterance || this.synth.speaking || this.synth.pending) this.synth.cancel();
+    if (this.synth.paused) this.synth.resume();
 
-    const play = () => {
+    const play = (useDefaultVoice = false) => {
       if (requestId !== this.speakRequest) return;
       this.replayTimer = null;
       const utterance = new SpeechSynthesisUtterance(text);
@@ -72,35 +84,59 @@ class SpeechService {
 
       // If no matching voice is installed, leaving voice unset lets the browser
       // choose its default voice while the utterance language remains English.
-      if (voice) utterance.voice = voice;
-      utterance.lang = voice?.lang || lang;
+      if (voice && !useDefaultVoice) utterance.voice = voice;
+      utterance.lang = useDefaultVoice ? lang : voice?.lang || lang;
       utterance.text = /[.!?…]["')\]]*$/.test(speechText) ? speechText : `${speechText}.`;
       utterance.rate = Math.max(0.1, Math.min(rate, 10));
-      utterance.onstart = () => this.setStatus('speaking');
+      const isCurrent = () => requestId === this.speakRequest && this.activeUtterance === utterance;
+      utterance.onstart = () => {
+        if (!isCurrent()) return;
+        this.clearStartTimer();
+        this.setStatus('speaking');
+      };
       utterance.onend = () => {
-        if (requestId !== this.speakRequest) return;
+        if (!isCurrent()) return;
+        this.clearStartTimer();
         this.activeUtterance = null;
         this.setStatus('ready');
         remaining -= 1;
-        if (remaining > 0) this.replayTimer = window.setTimeout(play, gap);
+        if (remaining > 0) this.replayTimer = window.setTimeout(() => play(), gap);
       };
       utterance.onpause = () => this.setStatus('paused');
       utterance.onresume = () => this.setStatus('speaking');
       utterance.onerror = event => {
-        if (requestId !== this.speakRequest) return;
+        if (!isCurrent()) return;
+        this.clearStartTimer();
         this.activeUtterance = null;
         if (event.error === 'canceled' || event.error === 'interrupted') return;
+        if (voice && !useDefaultVoice && ['voice-unavailable', 'language-unavailable', 'synthesis-unavailable', 'synthesis-failed', 'network'].includes(event.error)) {
+          play(true);
+          return;
+        }
+        this.errorMessage = event.error === 'not-allowed'
+          ? 'Playback was blocked. Open this page in Chrome and tap Replay.'
+          : ['voice-unavailable', 'language-unavailable', 'synthesis-unavailable', 'synthesis-failed'].includes(event.error)
+            ? 'English speech is unavailable. Enable or update your phone’s text-to-speech engine and install an English voice, then tap Replay.'
+            : event.error === 'network'
+              ? 'The voice could not connect. Check your connection or choose an installed English voice in Settings.'
+              : 'Speech could not play. Try Replay or open this page in Chrome.';
         this.setStatus('error');
         console.warn('Speech synthesis error:', event.error);
       };
 
-      this.synth?.resume();
-      this.synth?.speak(this.activeUtterance);
+      this.setStatus('loading');
+      this.startTimer = window.setTimeout(() => {
+        if (!isCurrent()) return;
+        this.stop();
+        this.errorMessage = 'Speech did not start. Open this page in Chrome, check media volume and your phone’s English text-to-speech voice, then tap Replay.';
+        this.setStatus('error');
+      }, 8000);
+      this.synth?.speak(utterance);
     };
     // Manual playback must stay in the tap/click call stack on mobile.
     // Keep the short cancel-to-speak delay for automatic desktop playback.
     if (startImmediately) play();
-    else this.replayTimer = window.setTimeout(play, 50);
+    else this.replayTimer = window.setTimeout(() => play(), 50);
   }
 
   /** Resume the browser speech engine from a user gesture (important on iOS/Safari). */
@@ -109,15 +145,16 @@ class SpeechService {
       this.setStatus('unsupported');
       return;
     }
-    this.synth.resume();
+    if (this.synth.paused) this.synth.resume();
     if (this.voices.length === 0) this.loadVoices();
   }
 
   public stop() {
     this.speakRequest += 1;
+    this.clearStartTimer();
     if (this.replayTimer !== null) window.clearTimeout(this.replayTimer);
     this.replayTimer = null;
-    this.synth?.cancel();
+    if (this.activeUtterance || this.synth?.speaking || this.synth?.pending) this.synth?.cancel();
     this.activeUtterance = null;
     if (this.synth) this.setStatus('ready');
   }

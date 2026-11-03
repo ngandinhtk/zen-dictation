@@ -160,6 +160,7 @@ function App() {
   }, [repeatCount, repeatGap]);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceStatus, setVoiceStatus] = useState<SpeechStatus>(() => speechService.getStatus());
+  const [voiceError, setVoiceError] = useState('');
   const [selectedVoice, setSelectedVoice] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
   const [lastAttempt, setLastAttempt] = useState<AttemptAnalysis | null>(null);
@@ -372,7 +373,10 @@ function App() {
     };
     updateVoices();
     const unsubscribeVoices = speechService.subscribeToVoices(updateVoices);
-    const unsubscribeStatus = speechService.subscribeToStatus(setVoiceStatus);
+    const unsubscribeStatus = speechService.subscribeToStatus(status => {
+      setVoiceStatus(status);
+      setVoiceError(speechService.getErrorMessage());
+    });
     return () => {
       unsubscribeVoices();
       unsubscribeStatus();
@@ -1290,6 +1294,9 @@ function App() {
         )}
 
         {!isFocusMode && <Controls onReplay={handleSpeak} onNext={handleNext} nextDisabled={Boolean(lesson && ((!lastAttempt && !isCompleted) || lesson.completed))} />}
+        {!lesson?.videoId && (voiceStatus === 'error' || voiceStatus === 'unsupported') && <p className="speech-playback-error" role="alert">
+          {voiceStatus === 'unsupported' ? 'This browser cannot play speech. Open this page in Chrome and tap Replay.' : voiceError}
+        </p>}
         </>}
         
       </main>

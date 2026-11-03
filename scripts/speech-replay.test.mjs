@@ -7,9 +7,10 @@ let now = 0;
 let timerId = 0;
 const timers = new Map();
 const spoken = [];
+let cancellations = 0;
 const voice = { name: 'English', lang: 'en-US', default: true };
 globalThis.window = {
-  speechSynthesis: { getVoices: () => [voice], cancel() {}, resume() {}, speak: utterance => spoken.push(utterance) },
+  speechSynthesis: { getVoices: () => [voice], cancel() { cancellations++; }, resume() {}, speak: utterance => spoken.push(utterance) },
   setTimeout(callback, delay) { const id = ++timerId; timers.set(id, { callback, at: now + delay }); return id; },
   clearTimeout: id => timers.delete(id),
 };
@@ -28,7 +29,46 @@ const advance = milliseconds => {
 const source = await readFile(new URL('../src/services/speechService.ts', import.meta.url), 'utf8');
 const javascript = ts.transpile(source, { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 });
 const { speechService } = await import(`data:text/javascript;base64,${Buffer.from(javascript).toString('base64')}`);
-beforeEach(() => { speechService.stop(); timers.clear(); spoken.length = 0; now = 0; });
+beforeEach(() => { speechService.stop(); timers.clear(); spoken.length = 0; now = 0; cancellations = 0; });
+
+test('starting an idle Android engine does not cancel it first', () => {
+  speechService.speak('Hello.', 'en-US', 1, undefined, 1, 1000, true);
+  assert.equal(cancellations, 0);
+  assert.equal(spoken.length, 1);
+});
+
+test('an unavailable selected voice falls back once to the system voice', () => {
+  speechService.speak('Hello.', 'en-US', 1, 'English', 2, 1000, true);
+  const first = spoken[0];
+  assert.equal(first.voice, voice);
+  first.onerror({ error: 'voice-unavailable' });
+  assert.equal(spoken.length, 2);
+  assert.equal(spoken[1].voice, undefined);
+  first.onend();
+  spoken[1].onstart();
+  advance(1500);
+  assert.equal(spoken.length, 2, 'Stale end event must not schedule another read');
+  spoken[1].onend();
+  advance(1000);
+  assert.equal(spoken.length, 3);
+});
+
+test('a silent engine timeout reports actionable guidance', () => {
+  speechService.speak('Hello.', 'en-US', 1, undefined, 1, 1000, true);
+  advance(8000);
+  assert.equal(speechService.getStatus(), 'error');
+  assert.match(speechService.getErrorMessage(), /Speech did not start/);
+  assert.equal(cancellations, 1);
+});
+
+test('blocked speech reports the browser restriction without retrying forever', () => {
+  speechService.speak('Hello.', 'en-US', 1, undefined, 1, 1000, true);
+  spoken[0].onerror({ error: 'not-allowed' });
+  assert.equal(speechService.getStatus(), 'error');
+  assert.match(speechService.getErrorMessage(), /blocked/);
+  advance(10000);
+  assert.equal(spoken.length, 1);
+});
 
 test('single read remains the default', () => {
   speechService.speak('Hello.', 'en-US');
