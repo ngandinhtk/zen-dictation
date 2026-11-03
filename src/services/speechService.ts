@@ -10,6 +10,8 @@ class SpeechService {
   private statusListeners = new Set<(status: SpeechStatus) => void>();
   private voiceRetryCount = 0;
   private speakRequest = 0;
+  private replayTimer: number | null = null;
+  private activeUtterance: SpeechSynthesisUtterance | null = null;
   private status: SpeechStatus = this.synth ? 'loading' : 'unsupported';
 
   constructor() {
@@ -39,7 +41,7 @@ class SpeechService {
     }
   };
 
-  public speak(text: string, lang: VoiceLanguage, rate = 1, voiceName?: string) {
+  public speak(text: string, lang: VoiceLanguage, rate = 1, voiceName?: string, repeatCount = 1, repeatGapMs = 1000, startImmediately = false) {
     const speechText = text.trim().replace(/\s+/g, ' ');
     if (!speechText) return;
     if (!this.synth) {
@@ -48,43 +50,57 @@ class SpeechService {
     }
 
     const requestId = ++this.speakRequest;
+    if (this.replayTimer !== null) window.clearTimeout(this.replayTimer);
+    this.replayTimer = null;
+    let remaining = Number.isFinite(repeatCount) ? Math.max(1, Math.min(5, Math.floor(repeatCount))) : 1;
+    const gap = Number.isFinite(repeatGapMs) ? Math.max(0, repeatGapMs) : 1000;
     this.synth.cancel();
     this.synth.resume();
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    const normalizedLanguage = lang.toLowerCase();
-    const languageMatches = (voice: SpeechSynthesisVoice) => {
-      const voiceLanguage = voice.lang.toLowerCase();
-      return voiceLanguage === normalizedLanguage || voiceLanguage.startsWith(normalizedLanguage.split('-')[0]);
-    };
-    const voice = this.voices.find(item => item.name === voiceName && languageMatches(item))
-      ?? this.getPreferredVoice(lang);
-
-    // If no matching voice is installed, leaving voice unset lets the browser
-    // choose its default voice while the utterance language remains English.
-    if (voice) utterance.voice = voice;
-    utterance.lang = voice?.lang || lang;
-    utterance.text = /[.!?…]["')\]]*$/.test(speechText) ? speechText : `${speechText}.`;
-    utterance.rate = Math.max(0.1, Math.min(rate, 10));
-    utterance.onstart = () => this.setStatus('speaking');
-    utterance.onend = () => {
-      if (requestId === this.speakRequest) this.setStatus('ready');
-    };
-    utterance.onpause = () => this.setStatus('paused');
-    utterance.onresume = () => this.setStatus('speaking');
-    utterance.onerror = event => {
-      if (event.error === 'canceled' || event.error === 'interrupted') return;
-      this.setStatus('error');
-      console.warn('Speech synthesis error:', event.error);
-    };
-
-    // Chrome/WebKit can discard a new utterance if it follows cancel() too
-    // closely, so schedule it on the next short task.
-    window.setTimeout(() => {
+    const play = () => {
       if (requestId !== this.speakRequest) return;
+      this.replayTimer = null;
+      const utterance = new SpeechSynthesisUtterance(text);
+      this.activeUtterance = utterance;
+      const normalizedLanguage = lang.toLowerCase();
+      const languageMatches = (voice: SpeechSynthesisVoice) => {
+        const voiceLanguage = voice.lang.toLowerCase();
+        return voiceLanguage === normalizedLanguage || voiceLanguage.startsWith(normalizedLanguage.split('-')[0]);
+      };
+      const voice = this.voices.find(item => item.name === voiceName && languageMatches(item))
+        ?? this.getPreferredVoice(lang);
+
+      // If no matching voice is installed, leaving voice unset lets the browser
+      // choose its default voice while the utterance language remains English.
+      if (voice) utterance.voice = voice;
+      utterance.lang = voice?.lang || lang;
+      utterance.text = /[.!?…]["')\]]*$/.test(speechText) ? speechText : `${speechText}.`;
+      utterance.rate = Math.max(0.1, Math.min(rate, 10));
+      utterance.onstart = () => this.setStatus('speaking');
+      utterance.onend = () => {
+        if (requestId !== this.speakRequest) return;
+        this.activeUtterance = null;
+        this.setStatus('ready');
+        remaining -= 1;
+        if (remaining > 0) this.replayTimer = window.setTimeout(play, gap);
+      };
+      utterance.onpause = () => this.setStatus('paused');
+      utterance.onresume = () => this.setStatus('speaking');
+      utterance.onerror = event => {
+        if (requestId !== this.speakRequest) return;
+        this.activeUtterance = null;
+        if (event.error === 'canceled' || event.error === 'interrupted') return;
+        this.setStatus('error');
+        console.warn('Speech synthesis error:', event.error);
+      };
+
       this.synth?.resume();
-      this.synth?.speak(utterance);
-    }, 50);
+      this.synth?.speak(this.activeUtterance);
+    };
+    // Manual playback must stay in the tap/click call stack on mobile.
+    // Keep the short cancel-to-speak delay for automatic desktop playback.
+    if (startImmediately) play();
+    else this.replayTimer = window.setTimeout(play, 50);
   }
 
   /** Resume the browser speech engine from a user gesture (important on iOS/Safari). */
@@ -99,7 +115,10 @@ class SpeechService {
 
   public stop() {
     this.speakRequest += 1;
+    if (this.replayTimer !== null) window.clearTimeout(this.replayTimer);
+    this.replayTimer = null;
     this.synth?.cancel();
+    this.activeUtterance = null;
     if (this.synth) this.setStatus('ready');
   }
 

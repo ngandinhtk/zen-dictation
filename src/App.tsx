@@ -34,6 +34,14 @@ const DEFAULT_TIME_LIMIT = 30;
 const LANG: VoiceLanguage = 'en-US';
 const DEFAULT_DIFFICULTY: Difficulty = 'easy';
 const SPEECH_SPEEDS = [0.5, 0.75, 1, 1.25];
+const REPEAT_COUNTS = [1, 2, 3, 4, 5];
+const REPEAT_GAPS = [0.5, 1, 2, 3, 5];
+const readReplaySetting = (key: string, allowed: number[], fallback: number) => {
+  try {
+    const value = Number(localStorage.getItem(key));
+    return allowed.includes(value) ? value : fallback;
+  } catch { return fallback; }
+};
 const SHOW_YOUTUBE_IMPORT = false;
 const ACHIEVEMENT_TOAST_DURATION_MS = 8000;
 type PracticeFocus = 'mixed' | 'vocabulary' | 'ielts' | 'business';
@@ -142,6 +150,14 @@ function App() {
     return indices.length ? indices[Math.floor(Math.random() * indices.length)] : 0;
   });
   const [speed, setSpeed] = useState(1);
+  const [repeatCount, setRepeatCount] = useState(() => readReplaySetting('zen-dictation-repeat-count', REPEAT_COUNTS, 1));
+  const [repeatGap, setRepeatGap] = useState(() => readReplaySetting('zen-dictation-repeat-gap', REPEAT_GAPS, 1));
+  useEffect(() => {
+    try {
+      localStorage.setItem('zen-dictation-repeat-count', String(repeatCount));
+      localStorage.setItem('zen-dictation-repeat-gap', String(repeatGap));
+    } catch { /* Settings still work when storage is unavailable. */ }
+  }, [repeatCount, repeatGap]);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceStatus, setVoiceStatus] = useState<SpeechStatus>(() => speechService.getStatus());
   const [selectedVoice, setSelectedVoice] = useState('');
@@ -522,41 +538,38 @@ function App() {
     speechService.prime();
     if (speakTimeoutRef.current !== null) {
       window.clearTimeout(speakTimeoutRef.current);
-    }
-    speechService.stop();
-    speakTimeoutRef.current = window.setTimeout(() => {
-      speechService.speak(currentSentence, LANG, speed, selectedVoice);
       speakTimeoutRef.current = null;
-    }, 120);
-  }, [currentSentence, selectedVoice, speed, lesson?.videoId]);
+    }
+    speechService.speak(currentSentence, LANG, speed, selectedVoice, repeatCount, repeatGap * 1000, true);
+  }, [currentSentence, selectedVoice, speed, lesson?.videoId, repeatCount, repeatGap]);
 
   useEffect(() => {
-    if (lesson?.videoId) {
-      if (speakTimeoutRef.current !== null) window.clearTimeout(speakTimeoutRef.current);
-      speechService.stop();
-      return;
-    }
-    const isMobileViewport = window.matchMedia('(max-width: 640px), (pointer: coarse)').matches;
-    if (isMobileViewport) {
-      speechService.stop();
-      return;
-    }
-    if (speakTimeoutRef.current !== null) {
-      window.clearTimeout(speakTimeoutRef.current);
-    }
-    speechService.stop();
-    speakTimeoutRef.current = window.setTimeout(() => {
-      speechService.speak(currentSentence, LANG, speed, selectedVoice);
-      speakTimeoutRef.current = null;
-    }, 120);
-
-    return () => {
+    const stopPlayback = () => {
       if (speakTimeoutRef.current !== null) {
         window.clearTimeout(speakTimeoutRef.current);
         speakTimeoutRef.current = null;
       }
       speechService.stop();
     };
+    if (lesson?.videoId) {
+      stopPlayback();
+      return stopPlayback;
+    }
+    const isMobileViewport = window.matchMedia('(max-width: 640px), (pointer: coarse)').matches;
+    if (isMobileViewport) {
+      stopPlayback();
+      return stopPlayback;
+    }
+    if (speakTimeoutRef.current !== null) {
+      window.clearTimeout(speakTimeoutRef.current);
+    }
+    speechService.stop();
+    speakTimeoutRef.current = window.setTimeout(() => {
+      speechService.speak(currentSentence, LANG, speed, selectedVoice, repeatCount, repeatGap * 1000);
+      speakTimeoutRef.current = null;
+    }, 120);
+
+    return stopPlayback;
     // Voice and speed changes should apply on the next manual replay,
     // not trigger an automatic repeat of the current sentence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -835,7 +848,7 @@ function App() {
     if (speakTimeoutRef.current !== null) window.clearTimeout(speakTimeoutRef.current);
     speechService.prime();
     speechService.stop();
-    speechService.speak(word, LANG, Math.min(speed, 0.75), selectedVoice);
+    speechService.speak(word, LANG, Math.min(speed, 0.75), selectedVoice, 1, 1000, true);
   };
 
   const handleSaveReviewNote = () => {
@@ -1123,6 +1136,18 @@ function App() {
               <button type="button" className="review-words-button" onClick={() => openReviewPage()}>Open review page</button>
             </section>
           )}
+                  <label className="settings-field">
+            <span>count</span>
+            <select value={repeatCount} onChange={event => setRepeatCount(Number(event.target.value))}>
+              {REPEAT_COUNTS.map(count => <option key={count} value={count}>{count} {count === 1 ? 'time' : 'times'}</option>)}
+            </select>
+          </label>
+          <label className="settings-field">
+            <span>Pause</span>
+            <select value={repeatGap} onChange={event => setRepeatGap(Number(event.target.value))}>
+              {REPEAT_GAPS.map(gap => <option key={gap} value={gap}>{gap} {gap === 1 ? 'second' : 'seconds'}</option>)}
+            </select>
+          </label>
           <div className="settings-field settings-speed-field">
             <span>speed</span>
             <div className="settings-speed-options">
