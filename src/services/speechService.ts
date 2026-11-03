@@ -1,6 +1,7 @@
 /** Web Speech API wrapper with voice loading and playback fallbacks. */
 
 export type VoiceLanguage = 'en-US';
+export const DEFAULT_VOICE_NAME = 'Google US English';
 export type SpeechStatus = 'unsupported' | 'loading' | 'ready' | 'speaking' | 'paused' | 'error';
 const normalizeLanguage = (value: string) => value.toLowerCase().replace(/_/g, '-');
 
@@ -129,13 +130,20 @@ class SpeechService {
         this.clearStartTimer();
         if (['canceled', 'interrupted', 'voice-unavailable', 'language-unavailable', 'synthesis-unavailable', 'synthesis-failed', 'network'].includes(event.error) && retry()) return;
         this.activeUtterance = null;
+        // Autoplay restrictions are expected before a playback gesture.
+        // Leave the app ready for Replay rather than showing an opening error.
+        if (event.error === 'not-allowed' && !startImmediately) {
+          this.errorMessage = '';
+          this.setStatus('ready');
+          return;
+        }
         this.errorMessage = event.error === 'not-allowed'
-          ? 'Playback was blocked. Open this page in Chrome and tap Replay.'
+          ? 'Tap Replay to start audio.'
           : ['voice-unavailable', 'language-unavailable', 'synthesis-unavailable', 'synthesis-failed'].includes(event.error)
             ? 'English speech is unavailable. Enable or update your phone’s text-to-speech engine and install an English voice, then tap Replay.'
             : event.error === 'network'
               ? 'The voice could not connect. Check your connection or choose an installed English voice in Settings.'
-              : 'Speech could not play. Try Replay or open this page in Chrome.';
+              : 'Speech could not play. Tap Replay to try again.';
         this.setStatus('error');
         console.warn('Speech synthesis error:', event.error);
       };
@@ -145,7 +153,7 @@ class SpeechService {
         if (!isCurrent()) return;
         if (retry()) return;
         this.stop();
-        this.errorMessage = 'Speech did not start. Open this page in Chrome, check media volume and your phone’s English text-to-speech voice, then tap Replay.';
+        this.errorMessage = 'Speech did not start. Check media volume and your device’s English text-to-speech voice, then tap Replay.';
         this.setStatus('error');
       }, 8000);
       try {
@@ -203,7 +211,9 @@ class SpeechService {
         + (name.includes('microsoft') ? 20 : 0)
         + (voice.default ? 5 : 0);
     };
-    return this.voices.filter(languageMatches).sort((left, right) => score(right) - score(left))[0];
+    const matchingVoices = this.voices.filter(languageMatches);
+    return matchingVoices.find(voice => voice.name.toLowerCase() === DEFAULT_VOICE_NAME.toLowerCase())
+      ?? matchingVoices.sort((left, right) => score(right) - score(left))[0];
   }
 
   public getStatus() {

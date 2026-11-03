@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
-import { speechService } from './services/speechService';
+import { flushSync } from 'react-dom';
+import { DEFAULT_VOICE_NAME, speechService } from './services/speechService';
 import { soundService } from './services/soundService';
 import type { SpeechStatus, VoiceLanguage } from './services/speechService';
 import DictationArea from './components/DictationArea/DictationArea';
@@ -161,7 +162,8 @@ function App() {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceStatus, setVoiceStatus] = useState<SpeechStatus>(() => speechService.getStatus());
   const [voiceError, setVoiceError] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState('');
+  const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE_NAME);
+  const speechPlaybackRequestedRef = useRef(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [lastAttempt, setLastAttempt] = useState<AttemptAnalysis | null>(null);
   const [reviewSummary, setReviewSummary] = useState<ReturnType<typeof getReviewSummary>>(() => getReviewSummary());
@@ -369,7 +371,7 @@ function App() {
     const updateVoices = () => {
       const availableVoices = speechService.getVoicesByLang(LANG);
       setVoices(availableVoices);
-      setSelectedVoice(current => availableVoices.some(voice => voice.name === current) ? current : '');
+      setSelectedVoice(current => current === DEFAULT_VOICE_NAME || current === '' || availableVoices.some(voice => voice.name === current) ? current : DEFAULT_VOICE_NAME);
     };
     updateVoices();
     const unsubscribeVoices = speechService.subscribeToVoices(updateVoices);
@@ -534,6 +536,7 @@ function App() {
   }, [timeLimit]);
 
   const handleSpeak = useCallback(() => {
+    speechPlaybackRequestedRef.current = true;
     if (lesson?.videoId) {
       speechService.stop();
       youtubeVideoRef.current?.replay();
@@ -560,7 +563,7 @@ function App() {
       return stopPlayback;
     }
     const isMobileViewport = window.matchMedia('(max-width: 640px), (pointer: coarse)').matches;
-    if (isMobileViewport) {
+    if (isMobileViewport || !speechPlaybackRequestedRef.current) {
       stopPlayback();
       return stopPlayback;
     }
@@ -653,9 +656,8 @@ function App() {
         setLesson({ ...lesson, completed: true });
         return;
       }
-      setLesson({ ...lesson, index: lesson.index + 1 });
-      if (lesson.videoId) setIsSentenceHidden(true);
     }
+    speechPlaybackRequestedRef.current = true;
     try {
       localStorage.removeItem(`zen-dictation-draft:${encodeURIComponent(currentSentence)}`);
     } catch { /* Best effort. */ }
@@ -663,13 +665,31 @@ function App() {
     try { localStorage.setItem(LAST_SENTENCE_KEY, currentSentence); } catch { /* best effort */ }
     const attemptAccuracy = lastAttempt?.accuracy ?? (isCompleted ? 100 : 0);
     const nextDifficulty = isAdaptiveMode && !lesson ? getAdaptiveDifficulty(difficulty, attemptAccuracy) : difficulty;
-    if (nextDifficulty !== difficulty) setDifficulty(nextDifficulty);
-    setCurrentIndex(getNextSentenceIndex(nextDifficulty, currentIndex));
-    // setShowTranslation(false);
-    setIsCompleted(false);
-    setIsTimeUp(false);
-    resetStats(timeLimit);
-    setKey(prev => prev + 1);
+    const nextIndex = getNextSentenceIndex(nextDifficulty, currentIndex);
+    const nextLesson = lesson ? { ...lesson, index: lesson.index + 1 } : null;
+    const nextSentence = resolvePracticeSentence(getSentencePool(practiceFocus, nextDifficulty), nextIndex, nextLesson);
+    const isMobileViewport = window.matchMedia('(max-width: 640px), (pointer: coarse)').matches;
+    const updateSentence = () => {
+      if (nextLesson) {
+        setLesson(nextLesson);
+        if (nextLesson.videoId) setIsSentenceHidden(true);
+      }
+      if (nextDifficulty !== difficulty) setDifficulty(nextDifficulty);
+      setCurrentIndex(nextIndex);
+      setIsCompleted(false);
+      setIsTimeUp(false);
+      resetStats(timeLimit);
+      setKey(prev => prev + 1);
+    };
+    if (isMobileViewport && !lesson?.videoId) {
+      // Finish the previous sentence's effect cleanup before starting speech.
+      // Playback must remain in the tap handler for mobile browser permissions.
+      flushSync(updateSentence);
+      speechService.prime();
+      speechService.speak(nextSentence, LANG, speed, selectedVoice, repeatCount, repeatGap * 1000, true);
+    } else {
+      updateSentence();
+    }
   };
 
 
@@ -1170,13 +1190,14 @@ function App() {
           <label className="settings-field">
             <span>Voice</span>
             <select value={selectedVoice} onChange={event => setSelectedVoice(event.target.value)} disabled={voiceStatus === 'unsupported'}>
+              <option value={DEFAULT_VOICE_NAME}>Google US English (default)</option>
               <option value="">Browser default voice</option>
-              {voices.map(voice => <option key={`${voice.name}-${voice.voiceURI}`} value={voice.name}>{voice.name}</option>)}
+              {voices.filter(voice => voice.name !== DEFAULT_VOICE_NAME).map(voice => <option key={`${voice.name}-${voice.voiceURI}`} value={voice.name}>{voice.name}</option>)}
             </select>
             <small className={`voice-status voice-status-${voiceStatus}`} role="status">
               {voiceStatus === 'loading' ? 'Loading voices…' : voiceStatus === 'unsupported' ? 'Speech unavailable' : voiceStatus === 'speaking' ? 'Speaking' : voiceStatus === 'error' ? 'Try Again' : 'Ready'}
             </small>
-            <small>Browser default uses your device’s voice. Try another English voice if playback is silent.</small>
+            <small>Google US English is preferred when available; otherwise another English voice is used. Browser default uses your device’s voice.</small>
           </label>
           
         </section>
@@ -1295,7 +1316,7 @@ function App() {
 
         <Controls onReplay={handleSpeak} onNext={handleNext} nextDisabled={focusSessionComplete || Boolean(lesson && ((!lastAttempt && !isCompleted) || lesson.completed))} />
         {!lesson?.videoId && (voiceStatus === 'error' || voiceStatus === 'unsupported') && <p className="speech-playback-error" role="alert">
-          {voiceStatus === 'unsupported' ? 'This browser cannot play speech. Open this page in Chrome and tap Replay.' : voiceError}
+          {voiceStatus === 'unsupported' ? 'Speech playback is unavailable in this browser.' : voiceError}
         </p>}
         </>}
         

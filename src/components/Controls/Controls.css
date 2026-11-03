@@ -62,6 +62,7 @@
 @media (max-width: 640px) {
   .controls-container { gap: 1rem; }
   .main-actions { gap: .55rem; }
+  .main-actions .action-btn { min-height: 44px; }
 }
 
 .action-btn:hover {
@@ -81,6 +82,7 @@
   box-shadow: 0 6px 16px rgba(77, 126, 168, 0.18);
 }
 
+@media (hover: hover) and (pointer: fine) {
 .action-btn.next:hover {
   background: linear-gradient(135deg, #7b6b9d 0%, #3d719c 48%, #62aa8b 100%);
   color: #ffffff;
@@ -88,6 +90,9 @@
   box-shadow: 0 10px 22px rgba(31, 41, 55, 0.2);
   transform: translateY(-2px);
 }
+}
+
+.action-btn:disabled { opacity: .5; cursor: not-allowed; }
 
 .action-btn.replay {
   color: var(--text-color);

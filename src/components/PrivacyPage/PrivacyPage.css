@@ -1,5 +1,8 @@
 .privacy-page { width: 100%; min-height: 100vh; padding: 2rem max(2rem, calc((100vw - 900px) / 2)); color: var(--text-color); }
 .privacy-content { max-width: 760px; margin: 3rem auto; }
+.privacy-languages { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; margin-bottom: 1.75rem; font-size: .9rem; }
+.privacy-languages select { padding: .6rem .75rem; border: 1px solid var(--surface-border); border-radius: 8px; background: var(--bg-color); color: var(--text-color); font: inherit; cursor: pointer; }
+.privacy-languages select:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 3px; }
 .privacy-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .privacy-page a:not(.page-header-brand):not(.page-header-back) { color: var(--accent-color); text-underline-offset: .22em; overflow-wrap: anywhere; }
 .privacy-intro { padding-bottom: 1.75rem; }

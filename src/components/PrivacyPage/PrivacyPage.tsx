@@ -1,5 +1,7 @@
 import './PrivacyPage.css';
 import PageHeader from '../PageHeader/PageHeader';
+import EnglishPrivacyPage from './EnglishPrivacyPage';
+import PrivacyLanguageSelect from './PrivacyLanguageSelect';
 
 const sections = [
   ['about', 'Bạn có thể liên hệ với ai?'],
@@ -14,6 +16,7 @@ const sections = [
 ];
 
 export default function PrivacyPage() {
+  if (new URLSearchParams(window.location.search).get('lang') !== 'vi') return <EnglishPrivacyPage />;
   const telegram = (import.meta.env.VITE_TELEGRAM_URL as string | undefined)?.trim();
   const contactUrl = telegram && /^https:\/\/t\.me\//i.test(telegram) ? telegram : undefined;
 
@@ -21,6 +24,7 @@ export default function PrivacyPage() {
     <a className="privacy-skip" href="#privacy-content">Đến nội dung chính</a>
     <PageHeader backLabel="Về luyện tập" />
     <main id="privacy-content" className="privacy-content">
+      <PrivacyLanguageSelect language="vi" />
       <div className="privacy-intro">
         <span className="privacy-eyebrow">PRIVACY POLICY</span>
         <h1>Chính sách<br />quyền riêng tư</h1>
