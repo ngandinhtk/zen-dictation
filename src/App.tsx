@@ -280,7 +280,7 @@ function App() {
     setLesson(null);
     const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const wordPattern = new RegExp(`\\b${escapedWord}\\b`, 'i');
-    const availableDifficulties: Difficulty[] = isPremium ? ['easy', 'medium', 'hard'] : ['easy'];
+    const availableDifficulties: Difficulty[] = isPremium ? ['easy', 'medium', 'hard'] : ['easy', 'medium'];
     const matchingDifficulty = availableDifficulties.find(level => {
       const pool = getSentencePool(practiceFocus, level);
       return pool.some(sentence => wordPattern.test(sentence));
@@ -695,7 +695,7 @@ function App() {
 
   const handleDifficultyChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const nextDifficulty = event.target.value as Difficulty;
-    if (nextDifficulty !== 'easy' && !isPremium) {
+    if (nextDifficulty === 'hard' && !isPremium) {
       openPremiumDashboard();
       return;
     }
@@ -1120,7 +1120,7 @@ function App() {
             <span>Level</span>
             <select value={difficulty} onChange={handleDifficultyChange}>
               <option value="easy">Easy · A1–A2</option>
-              <option value="medium" disabled={!isPremium}>Medium · B1–B2 {isPremium ? '' : '(Premium)'}</option>
+              <option value="medium">Medium · B1–B2</option>
               <option value="hard" disabled={!isPremium}>Hard · C1–C2 {isPremium ? '' : '(Premium)'}</option>
             </select>
             <small className="level-guide" role="note">{CAMBRIDGE_LEVELS[difficulty].exams}</small>
