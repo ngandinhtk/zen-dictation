@@ -45,7 +45,7 @@ const readReplaySetting = (key: string, allowed: number[], fallback: number) => 
 };
 const SHOW_YOUTUBE_IMPORT = false;
 const ACHIEVEMENT_TOAST_DURATION_MS = 8000;
-type PracticeFocus = 'mixed' | 'vocabulary' | 'ielts' | 'business';
+type PracticeFocus = 'mixed' | 'vocabulary' | 'idioms' | 'ielts' | 'business';
 const CAMBRIDGE_LEVELS: Record<Difficulty, { exams: string }> = {
   easy: { exams: 'Starters · A2 Key' },
   medium: { exams: 'B1 Preliminary · B2 First' },
@@ -70,7 +70,7 @@ type ActivePractice = { difficulty: Difficulty; focus: PracticeFocus; index: num
 const readActivePractice = (): ActivePractice | null => {
   try {
     const saved = JSON.parse(localStorage.getItem(ACTIVE_PRACTICE_KEY) || 'null') as Partial<ActivePractice> | null;
-    if (!saved || !['easy', 'medium', 'hard'].includes(saved.difficulty || '') || !['mixed', 'vocabulary', 'ielts', 'business'].includes(saved.focus || '') || !Number.isInteger(saved.index) || !saved.targetText) return null;
+    if (!saved || !['easy', 'medium', 'hard'].includes(saved.difficulty || '') || !['mixed', 'vocabulary', 'idioms', 'ielts', 'business'].includes(saved.focus || '') || !Number.isInteger(saved.index) || !saved.targetText) return null;
     return saved as ActivePractice;
   } catch {
     return null;
@@ -1130,6 +1130,7 @@ function App() {
             <select value={practiceFocus} onChange={handleFocusChange}>
               <option value="mixed">Mixed practice</option>
               <option value="vocabulary">Vocabulary</option>
+              <option value="idioms">Idioms</option>
               <option value="ielts" disabled={!isPremium}>IELTS pack · Premium</option>
               <option value="business" disabled={!isPremium}>Business pack · Premium</option>
             </select>
