@@ -201,6 +201,7 @@ const BankQrPayment = () => {
   const transferNote = (import.meta.env.VITE_BANK_TRANSFER_NOTE as string | undefined) || 'Buy ZENTATION a coffee';
   const telegramUrl = import.meta.env.VITE_TELEGRAM_URL as string | undefined;
   const confirmationMessage = encodeURIComponent(`Xin chào, tôi đã chuyển khoản ủng hộ Zen Dictation. Nội dung: ${transferNote}. Vui lòng kiểm tra và hỗ trợ kích hoạt Premium cho tôi.`);
+  const premiumMessage = encodeURIComponent('Xin chào, tôi muốn liên hệ nhà phát triển để đăng ký/kích hoạt Zen Dictation Premium.');
   const handleQrError = () => {
     if (qrSrc !== fallbackQrUrl) {
       setQrSrc(fallbackQrUrl);
@@ -213,6 +214,7 @@ const BankQrPayment = () => {
     <dl className="bank-details"><div><dt>Bank</dt><dd>{bankName}</dd></div><div><dt>Account</dt><dd>{accountNumber}</dd></div><div><dt>Transfer note</dt><dd>{transferNote}</dd></div></dl>
     {telegramUrl && <a className="bank-confirm-button" href={`${telegramUrl}${telegramUrl.includes('?') ? '&' : '?'}text=${confirmationMessage}`} target="_blank" rel="noreferrer">I&apos;ve completed the transfer — Contact Telegram</a>}
     <p className="bank-qr-note">Thank you for supporting Zen Dictation! This contribution is separate from the automatic Premium purchase.</p>
+    {telegramUrl && <p className="bank-premium-contact">Want Premium? <a href={`${telegramUrl}${telegramUrl.includes('?') ? '&' : '?'}text=${premiumMessage}`} target="_blank" rel="noreferrer">Contact the developer on Telegram</a> to arrange access.</p>}
   </div>;
 };
 

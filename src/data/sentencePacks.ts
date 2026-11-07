@@ -3,6 +3,39 @@ import type { Difficulty } from '../utils/sentenceTranslations';
 export type PremiumSentencePack = 'ielts' | 'business';
 export type SentencePack = Record<Difficulty, string[]>;
 
+export const IDIOM_SENTENCE_PACK: SentencePack = {
+  easy: [
+    'I was feeling under the weather, so I stayed home.',
+    'She let the cat out of the bag about the surprise.',
+    'We are all ears, so tell us your idea.',
+    'He decided to break the ice with a friendly joke.',
+    'They hit the road before sunrise.',
+    'I am a little short on time this morning.',
+    'Do not worry, the test was a piece of cake.',
+    'Let us call it a day and finish tomorrow.',
+  ],
+  medium: [
+    'When the plan changed at the last minute, we had to think on our feet.',
+    'Maya has been burning the midnight oil to finish her research.',
+    'The neighbors made themselves at home during the picnic.',
+    'After several delays, the project is finally back on track.',
+    'He missed the point because he took her lighthearted comment literally.',
+    'We should take that estimate with a grain of salt until it is confirmed.',
+    'The new assistant learned the ropes by shadowing an experienced colleague.',
+    'I wanted to help, but I did not want to add fuel to the fire.',
+  ],
+  hard: [
+    'Although the proposal looked promising, the committee asked us to go back to the drawing board.',
+    'She was walking on eggshells around her teammate after their disagreement.',
+    'Because the launch date was moved forward, everyone had to pull out all the stops.',
+    'I thought the revised schedule would be difficult, but we managed to get the ball rolling.',
+    'If the supplier misses another deadline, the whole team could be left in the lurch.',
+    'He tends to beat around the bush, so I asked him directly for a decision.',
+    'The manager’s suggestion seemed risky at first, but it turned out to be a blessing in disguise.',
+    'We could not afford to cut corners, even though we were under pressure to finish on time.',
+  ],
+};
+
 // These packs are original practice content owned by the app.
 export const PREMIUM_SENTENCE_PACKS: Record<PremiumSentencePack, SentencePack> = {
   ielts: {

@@ -40,6 +40,8 @@
 .bank-details dt { color: var(--text-muted); }
 .bank-details dd { margin: 0; font-family: var(--font-mono); text-align: right; }
 .bank-qr-note { margin: 1rem 0 0; font-size: .68rem !important; }
+.bank-premium-contact { margin: .65rem 0 0; font-size: .72rem !important; line-height: 1.5; }
+.bank-premium-contact a { color: var(--accent-color); font-weight: 600; }
 .bank-confirm-button { display: flex; align-items: center; justify-content: center; margin-top: 1rem; padding: .7rem .8rem; border-radius: 999px; background: linear-gradient(135deg, #229ed9, #168acd); color: #fff; font-size: .7rem; font-weight: 600; text-decoration: none; transition: transform .2s ease, box-shadow .2s ease; }
 .bank-confirm-button:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(34, 158, 217, .25); }
 .checkout-card-header { display: flex; align-items: center; justify-content: space-between; font-size: .85rem; font-weight: 600; }
