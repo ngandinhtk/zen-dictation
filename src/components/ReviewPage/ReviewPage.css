@@ -21,6 +21,7 @@
 .review-list-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding-bottom: .75rem; border-bottom: 1px solid var(--border-color); }
 .review-list-heading h2, .review-empty h2 { font-size: 1rem; font-weight: 600; }
 .review-list-heading span { color: var(--text-muted); font-size: .68rem; }
+.review-practice-error { margin: .8rem 0 0; color: var(--incorrect-color); font-size: .72rem; }
 .review-list { display: flex; flex-direction: column; }
 .review-card { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .9rem .65rem; border-bottom: 1px solid var(--border-color); border-left: 2px solid transparent; transition: background .2s ease, border-color .2s ease; }
 .review-card:hover { background: var(--hover-bg); }

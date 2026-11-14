@@ -9,7 +9,7 @@ import './styles/globals.css';
 import './App.css';
 import {  type Difficulty } from './utils/sentenceTranslations';
 import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
-import { remainingSeconds, resolvePracticeSentence } from './utils/practiceState';
+import { isNextButtonDisabled, remainingSeconds, resolvePracticeSentence } from './utils/practiceState';
 import { addReviewWord, clearReviewWords, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, removeReviewWord, replaceReviewWords, saveReviewNoteForAttempt, updateReviewWord, type ReviewWord } from './services/spacedRepetitionService';
 import { addPoints, claimDailyTargetReward, clearPointsState, getDailyTarget, getPoints, getUnlockedAchievements, mergeDailyTarget, PERFECT_SENTENCE_POINTS, replaceDailyTarget, replacePoints, subtractPoints, TIMEOUT_PENALTY_POINTS, updateDailyTargetProgress, type DailyTarget } from './services/pointsService';
 import { clearPremiumLearningState, getGoalWpm, getPracticeHistory, getPracticeStreak, saveGoalWpm, savePracticeSession, type PracticeSession } from './services/premiumService';
@@ -25,6 +25,9 @@ import YoutubeVideo, { type YoutubeVideoHandle } from './components/YoutubeImpor
 import type { YoutubeCaption } from './services/youtubeApi';
 import { buildDailyLesson, clearLearningState, readLearningState, recordLearningAttempt, type LearningFocus } from './services/learningCoach';
 import { getVerifiedSentenceTranslation } from './utils/sentenceTranslations';
+import { findReviewSentence } from './services/reviewSentence';
+import { chooseRandomSentenceIndex, isRecentlyUsedSentence, loadRecentSentenceHistory, rememberRecentSentence, saveRecentSentenceHistory } from './services/sentenceRotation';
+import { getPracticeNotesForSentence, savePracticeNoteForSentence } from './services/practiceNotesService';
 const PaymentPage = lazy(() => import('./components/PaymentPage/PaymentPage'));
 const SupportPage = lazy(() => import('./components/SupportPage/SupportPage'));
 const PaymentResultPage = lazy(async () => {
@@ -46,7 +49,7 @@ const readReplaySetting = (key: string, allowed: number[], fallback: number) => 
 };
 const SHOW_YOUTUBE_IMPORT = false;
 const ACHIEVEMENT_TOAST_DURATION_MS = 8000;
-type PracticeFocus = 'mixed' | 'vocabulary' | 'ielts' | 'business';
+type PracticeFocus = 'mixed' | 'vocabulary' | 'idioms' | 'ielts' | 'business';
 const CAMBRIDGE_LEVELS: Record<Difficulty, { exams: string }> = {
   easy: { exams: 'Starters · A2 Key' },
   medium: { exams: 'B1 Preliminary · B2 First' },
@@ -71,7 +74,7 @@ type ActivePractice = { difficulty: Difficulty; focus: PracticeFocus; index: num
 const readActivePractice = (): ActivePractice | null => {
   try {
     const saved = JSON.parse(localStorage.getItem(ACTIVE_PRACTICE_KEY) || 'null') as Partial<ActivePractice> | null;
-    if (!saved || !['easy', 'medium', 'hard'].includes(saved.difficulty || '') || !['mixed', 'vocabulary', 'ielts', 'business'].includes(saved.focus || '') || !Number.isInteger(saved.index) || !saved.targetText) return null;
+    if (!saved || !['easy', 'medium', 'hard'].includes(saved.difficulty || '') || !['mixed', 'vocabulary', 'idioms', 'ielts', 'business'].includes(saved.focus || '') || !Number.isInteger(saved.index) || !saved.targetText) return null;
     return saved as ActivePractice;
   } catch {
     return null;
@@ -106,17 +109,6 @@ const mergeReviewWords = (localWords: ReviewWord[], remoteWords: ReviewWord[]) =
   });
   return [...merged.values()];
 };
-const getRandomSentenceIndex = (sentences: string[], currentIndex?: number) => {
-  const sentenceCount = sentences.length;
-  if (sentenceCount < 2) return 0;
-
-  let nextIndex = Math.floor(Math.random() * sentenceCount);
-  while (nextIndex === currentIndex) {
-    nextIndex = Math.floor(Math.random() * sentenceCount);
-  }
-  return nextIndex;
-};
-
 const shuffleSentenceIndices = (sentences: string[], excludedIndex?: number) => {
   const indices = Array.from({ length: sentences.length }, (_, index) => index)
     .filter(index => index !== excludedIndex);
@@ -148,8 +140,10 @@ function App() {
     const savedIndex = savedPractice ? pool.indexOf(savedPractice.targetText) : -1;
     if (savedIndex >= 0) return savedIndex;
     const previousText = savedPractice?.targetText;
-    const indices = pool.map((_, index) => index).filter(index => pool.length < 2 || pool[index] !== previousText);
-    return indices.length ? indices[Math.floor(Math.random() * indices.length)] : 0;
+    const recentSentences = previousText
+      ? rememberRecentSentence(loadRecentSentenceHistory(), previousText)
+      : loadRecentSentenceHistory();
+    return pool.length ? chooseRandomSentenceIndex(pool, recentSentences) : 0;
   });
   const [speed, setSpeed] = useState(1);
   const [repeatCount, setRepeatCount] = useState(() => readReplaySetting('zen-dictation-repeat-count', REPEAT_COUNTS, 1));
@@ -169,11 +163,13 @@ function App() {
   const [lastAttempt, setLastAttempt] = useState<AttemptAnalysis | null>(null);
   const [reviewSummary, setReviewSummary] = useState<ReturnType<typeof getReviewSummary>>(() => getReviewSummary());
   const [reviewWords, setReviewWords] = useState<ReviewWord[]>(getReviewWords);
+  const [reviewPracticeError, setReviewPracticeError] = useState('');
   const [reviewNow] = useState(() => Date.now());
   const [lastAttemptText, setLastAttemptText] = useState('');
   const [lastAttemptTargetText, setLastAttemptTargetText] = useState('');
   const [reviewNote, setReviewNote] = useState('');
   const [isReviewNoteSaved, setIsReviewNoteSaved] = useState(false);
+  const [isReviewNoteEditorOpen, setIsReviewNoteEditorOpen] = useState(false);
   const [points, setPoints] = useState(getPoints);
   const [dailyTarget, setDailyTarget] = useState(() => getDailyTarget());
   const [key, setKey] = useState(0);
@@ -310,21 +306,36 @@ function App() {
     setReviewWords(nextWords.filter(review => review.mistakes > 0));
     setReviewSummary(getReviewSummary());
   };
-  const startDueWordPractice = (word: string) => {
+  const startDueWordPractice = async (word: string) => {
+    setReviewPracticeError('');
+    const candidateFocuses: PracticeFocus[] = [practiceFocus, 'mixed', 'vocabulary', 'idioms'];
+    if (isPremium) candidateFocuses.push('ielts', 'business');
+    const focusOrder = [...new Set(candidateFocuses)];
+    const availableDifficulties: Difficulty[] = isPremium ? ['easy', 'medium', 'hard'] : ['easy', 'medium'];
+    const findMatch = () => findReviewSentence(word, focusOrder.flatMap(focus => availableDifficulties.map(level => ({
+      focus,
+      difficulty: level,
+      sentences: getSentencePool(focus, level),
+    }))));
+    let matchingSentence = findMatch();
+
+    if (!matchingSentence) {
+      const results = await Promise.allSettled(focusOrder.map(async focus => {
+        const sentences = await fetchSentencePack(focus === 'mixed' ? 'core' : focus);
+        updateDatabaseSentencePool(focus, sentences);
+      }));
+      matchingSentence = findMatch();
+      if (!matchingSentence) {
+        const failedToLoad = results.some(result => result.status === 'rejected');
+        setReviewPracticeError(failedToLoad ? 'Could not load practice sentences. Please try again.' : `No available sentence contains “${word}”.`);
+        return;
+      }
+    }
+
     setLesson(null);
-    const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const wordPattern = new RegExp(`\\b${escapedWord}\\b`, 'i');
-    const availableDifficulties: Difficulty[] = isPremium ? ['easy', 'medium', 'hard'] : ['easy'];
-    const matchingDifficulty = availableDifficulties.find(level => {
-      const pool = getSentencePool(practiceFocus, level);
-      return pool.some(sentence => wordPattern.test(sentence));
-    });
-    const nextDifficulty = matchingDifficulty || difficulty;
-    const nextPool = getSentencePool(practiceFocus, nextDifficulty);
-    const matchingIndex = nextPool.findIndex(sentence => wordPattern.test(sentence));
-    setDifficulty(nextDifficulty);
-    setCurrentIndex(matchingIndex >= 0 ? matchingIndex : getRandomSentenceIndex(nextPool));
-    // setShowTranslation(false);
+    setPracticeFocus(matchingSentence.focus);
+    setDifficulty(matchingSentence.difficulty);
+    setCurrentIndex(matchingSentence.index);
     setIsCompleted(false);
     setIsTimeUp(false);
     resetStats(timeLimit);
@@ -339,13 +350,33 @@ function App() {
   const timeUpSoundPlayedRef = useRef(false);
   const timeoutPenaltyAppliedRef = useRef(false);
   const sentenceDecksRef = useRef<Record<string, number[]>>({});
-  const recentSentenceIndicesRef = useRef<Record<string, number[]>>({});
+  const recentSentenceHistoryRef = useRef<string[] | null>(null);
+  if (recentSentenceHistoryRef.current === null) recentSentenceHistoryRef.current = loadRecentSentenceHistory();
   const focusSessionComplete = isFocusMode && focusTimeLeft === 0;
 
   const sentencePool = getSentencePool(practiceFocus, difficulty);
   const sentenceCatalogStatus = sentencePool.length ? 'ready' : sentenceLoadError === `${practiceFocus}:${difficulty}` ? 'error' : 'loading';
   const currentSentence = String(resolvePracticeSentence(sentencePool, currentIndex, lesson));
+  const practiceNotes = getPracticeNotesForSentence(currentSentence);
+  useEffect(() => {
+    if (!isReviewNoteEditorOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsReviewNoteEditorOpen(false);
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isReviewNoteEditorOpen]);
+  const attemptDeadline = !isFocusMode && hasStartedTyping && startedAt !== null
+    ? startedAt + timeLimit * 1000
+    : null;
+  const nextButtonDisabled = isNextButtonDisabled(isTimeUp, focusSessionComplete, attemptDeadline);
   // const currentTranslation = getSentenceTranslation(currentSentence, difficulty);
+  const rememberPracticeSentence = useCallback((sentence: string) => {
+    const nextHistory = rememberRecentSentence(recentSentenceHistoryRef.current || [], sentence);
+    recentSentenceHistoryRef.current = nextHistory;
+    saveRecentSentenceHistory(nextHistory);
+    try { localStorage.setItem(LAST_SENTENCE_KEY, sentence); } catch { /* Best effort. */ }
+  }, []);
 
   useEffect(() => {
     if (!isFocusMode || focusDeadline === null) return;
@@ -366,40 +397,41 @@ function App() {
   const getNextSentenceIndex = (nextDifficulty: Difficulty, previousIndex?: number) => {
     const nextPool = getSentencePool(practiceFocus, nextDifficulty);
     const deckKey = `${practiceFocus}-${nextDifficulty}`;
-    const recentIndices = recentSentenceIndicesRef.current[deckKey] || [];
-    const rememberSentence = (index: number) => {
-      recentSentenceIndicesRef.current[deckKey] = [...recentIndices.filter(value => value !== index), index].slice(-3);
-    };
+    const recentSentences = recentSentenceHistoryRef.current || [];
+    const wasRecentlyUsed = (sentence: string) => isRecentlyUsedSentence(recentSentences, sentence);
     const dueWords = getDueReviewWords();
     const reviewCandidates = nextPool.map((sentence, index) => ({ sentence, index })).filter(item => dueWords.some(word => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(item.sentence)) && item.index !== previousIndex);
-    const freshReviewCandidates = reviewCandidates.filter(item => !recentIndices.includes(item.index));
+    const freshReviewCandidates = reviewCandidates.filter(item => !wasRecentlyUsed(item.sentence));
     if (freshReviewCandidates.length > 0 || reviewCandidates.length > 0) {
       const candidates = freshReviewCandidates.length > 0 ? freshReviewCandidates : reviewCandidates;
-      const candidateIndex = getRandomSentenceIndex(candidates.map(item => item.sentence));
+      const candidateIndex = chooseRandomSentenceIndex(candidates.map(item => item.sentence), recentSentences);
       const nextIndex = candidates[candidateIndex].index;
-      rememberSentence(nextIndex);
+      if (nextPool[nextIndex]) rememberPracticeSentence(nextPool[nextIndex]);
       return nextIndex;
     }
     let deck = sentenceDecksRef.current[deckKey];
-    if (!deck || deck.length === 0) deck = shuffleSentenceIndices(nextPool, previousIndex).filter(index => !recentIndices.includes(index));
+    if (!deck || deck.length === 0) deck = shuffleSentenceIndices(nextPool, previousIndex).filter(index => !wasRecentlyUsed(nextPool[index]));
     let nextIndex: number | undefined;
     while (deck.length > 0 && nextIndex === undefined) {
       const candidate = deck.pop();
-      if (candidate !== undefined && candidate !== previousIndex && !recentIndices.includes(candidate)) nextIndex = candidate;
+      if (candidate !== undefined && candidate < nextPool.length && candidate !== previousIndex && !wasRecentlyUsed(nextPool[candidate])) nextIndex = candidate;
     }
     sentenceDecksRef.current[deckKey] = deck;
     if (nextIndex === undefined) {
-      const fallbackCandidates = nextPool.map((sentence, index) => ({ sentence, index })).filter(item => item.index !== previousIndex && !recentIndices.includes(item.index));
+      const fallbackCandidates = nextPool.map((sentence, index) => ({ sentence, index })).filter(item => item.index !== previousIndex && !wasRecentlyUsed(item.sentence));
       if (fallbackCandidates.length > 0) {
-        const fallbackIndex = getRandomSentenceIndex(fallbackCandidates.map(item => item.sentence));
+        const fallbackIndex = chooseRandomSentenceIndex(fallbackCandidates.map(item => item.sentence), recentSentences);
         nextIndex = fallbackCandidates[fallbackIndex].index;
       } else {
-        nextIndex = getRandomSentenceIndex(nextPool, previousIndex);
+        nextIndex = chooseRandomSentenceIndex(nextPool, recentSentences, previousIndex);
       }
     }
-    rememberSentence(nextIndex);
+    if (nextPool[nextIndex]) rememberPracticeSentence(nextPool[nextIndex]);
     return nextIndex;
   };
+  useEffect(() => {
+    if (sentenceCatalogStatus === 'ready' && !lesson && currentSentence) rememberPracticeSentence(currentSentence);
+  }, [currentSentence, difficulty, lesson, practiceFocus, rememberPracticeSentence, sentenceCatalogStatus]);
 
   useEffect(() => {
     const updateVoices = () => {
@@ -433,18 +465,20 @@ function App() {
         if (cancelled) return;
         const nextPool = getSentencePool(practiceFocus, difficulty);
         const lastSentence = localStorage.getItem(LAST_SENTENCE_KEY);
-        const availableIndices = nextPool.map((_, index) => index).filter(index => nextPool.length < 2 || nextPool[index] !== lastSentence);
+        const recentSentences = lastSentence
+          ? rememberRecentSentence(recentSentenceHistoryRef.current || [], lastSentence)
+          : recentSentenceHistoryRef.current || [];
         const active = readActivePractice();
         const restoredIndex = active?.focus === practiceFocus && active.difficulty === difficulty ? nextPool.indexOf(active.targetText) : -1;
-        const nextIndex = restoredIndex >= 0 ? restoredIndex : availableIndices.length ? availableIndices[Math.floor(Math.random() * availableIndices.length)] : 0;
+        const nextIndex = restoredIndex >= 0 ? restoredIndex : chooseRandomSentenceIndex(nextPool, recentSentences);
         setCurrentIndex(nextIndex);
-        try { localStorage.setItem(LAST_SENTENCE_KEY, nextPool[nextIndex]); } catch { /* best effort */ }
+        rememberPracticeSentence(nextPool[nextIndex]);
         setSentenceLoadError(null);
         setSentenceCatalogVersion(version => version + 1);
       })
       .catch(() => { if (!cancelled) setSentenceLoadError(`${practiceFocus}:${difficulty}`); });
     return () => { cancelled = true; };
-  }, [difficulty, isPremium, practiceFocus]);
+  }, [difficulty, isPremium, practiceFocus, rememberPracticeSentence]);
 
   useEffect(() => {
     const currentPool = databaseSentencePools[practiceFocus]?.[difficulty];
@@ -574,6 +608,9 @@ function App() {
     setTypingSpeed(0);
     setStartedAt(null);
     setHasStartedTyping(false);
+    setReviewNote('');
+    setIsReviewNoteSaved(false);
+    setIsReviewNoteEditorOpen(false);
   }, [timeLimit]);
 
   const handleSpeak = useCallback(() => {
@@ -736,7 +773,7 @@ function App() {
 
   const handleDifficultyChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const nextDifficulty = event.target.value as Difficulty;
-    if (nextDifficulty !== 'easy' && !isPremium) {
+    if (nextDifficulty === 'hard' && !isPremium) {
       openPremiumDashboard();
       return;
     }
@@ -761,7 +798,7 @@ function App() {
     const nextPool = getSentencePool(nextFocus, difficulty);
     clearActivePractice();
     setPracticeFocus(nextFocus);
-    setCurrentIndex(getRandomSentenceIndex(nextPool));
+    setCurrentIndex(chooseRandomSentenceIndex(nextPool, recentSentenceHistoryRef.current || []));
     // setShowTranslation(false);
     setIsCompleted(false);
     setIsTimeUp(false);
@@ -916,10 +953,15 @@ function App() {
     speechService.speak(word, LANG, Math.min(speed, 0.75), selectedVoice, 1, 1000, true);
   };
 
+  const canSaveReviewNote = Boolean(lastAttempt && (lastAttempt.incorrectCharacters > 0 || lastAttempt.missingCharacters > 0));
   const handleSaveReviewNote = () => {
-    saveReviewNoteForAttempt(lastAttemptTargetText, lastAttemptText, reviewNote);
-    setReviewWords(getReviewWords());
-    setReviewSummary(getReviewSummary());
+    if (!currentSentence || !reviewNote.trim()) return;
+    savePracticeNoteForSentence(currentSentence, reviewNote);
+    if (canSaveReviewNote) {
+      saveReviewNoteForAttempt(lastAttemptTargetText, lastAttemptText, reviewNote);
+      setReviewWords(getReviewWords());
+      setReviewSummary(getReviewSummary());
+    }
     setIsReviewNoteSaved(Boolean(reviewNote.trim()));
   };
 
@@ -1025,6 +1067,7 @@ function App() {
         onUpdateWord={handleUpdateReviewWord}
         onRemoveWord={handleRemoveReviewWord}
         onPracticeWord={startDueWordPractice}
+        practiceError={reviewPracticeError}
         initialWord={reviewWord}
         onBack={closeReviewPage}
       />
@@ -1183,7 +1226,7 @@ function App() {
             <span>Level</span>
             <select value={difficulty} onChange={handleDifficultyChange}>
               <option value="easy">Easy · A1–A2</option>
-              <option value="medium" disabled={!isPremium}>Medium · B1–B2 {isPremium ? '' : '(Premium)'}</option>
+              <option value="medium">Medium · B1–B2</option>
               <option value="hard" disabled={!isPremium}>Hard · C1–C2 {isPremium ? '' : '(Premium)'}</option>
             </select>
             <small className="level-guide" role="note">{CAMBRIDGE_LEVELS[difficulty].exams}</small>
@@ -1193,6 +1236,7 @@ function App() {
             <select value={practiceFocus} onChange={handleFocusChange}>
               <option value="mixed">Mixed practice</option>
               <option value="vocabulary">Vocabulary</option>
+              <option value="idioms">Idioms</option>
               <option value="ielts" disabled={!isPremium}>IELTS pack · Premium</option>
               <option value="business" disabled={!isPremium}>Business pack · Premium</option>
             </select>
@@ -1219,6 +1263,7 @@ function App() {
                   return <div className="review-word" key={review.word}><strong>{review.word}</strong>{isDue ? <button type="button" className="review-due-button" onClick={() => startDueWordPractice(review.word)}>{review.mistakes} mistake{review.mistakes === 1 ? '' : 's'} · Due now</button> : <span>{review.mistakes} mistake{review.mistakes === 1 ? '' : 's'} · Streak {review.correctStreak}</span>}</div>;
                 })}
               </div>
+              {reviewPracticeError && <small className="review-practice-error" role="alert">{reviewPracticeError}</small>}
               {reviewWords.length > 8 && <small className="review-words-more">Showing 8 of {reviewWords.length} words</small>}
               <button type="button" className="review-words-button" onClick={() => openReviewPage()}>Open review page</button>
             </section>
@@ -1314,9 +1359,33 @@ function App() {
               ) : isCompleted ? '🎉 Done! +10 points perfect sentence' : '🎧 Listen and type...'}
             </div>
 
-            <button type="button" className="reset-timer-btn" onClick={handleResetTimer}>
-              Reset Timer
-            </button>
+            <div className="timer-action-group">
+              <button type="button" className="reset-timer-btn" onClick={handleResetTimer}>Reset Timer</button>
+              <button type="button" className="add-note-btn" onClick={() => setIsReviewNoteEditorOpen(open => !open)} aria-expanded={isReviewNoteEditorOpen}>
+                {isReviewNoteEditorOpen ? 'Close Note' : 'Add Note'}
+              </button>
+            </div>
+            {isReviewNoteEditorOpen && (
+              <div className="practice-note-modal-backdrop" onClick={event => {
+                if (event.target === event.currentTarget) setIsReviewNoteEditorOpen(false);
+              }}>
+                <section className="practice-note-modal" role="dialog" aria-modal="true" aria-labelledby="practice-note-title">
+                  <header className="practice-note-modal-header">
+                    <div><h2 id="practice-note-title">Add a note</h2><p>Saved with this sentence for future reference.</p></div>
+                    <button type="button" className="practice-note-modal-close" onClick={() => setIsReviewNoteEditorOpen(false)} aria-label="Close note popup">×</button>
+                  </header>
+                  <div className="review-note-editor">
+                    <label htmlFor="practice-review-note">Your note</label>
+                    <textarea id="practice-review-note" value={reviewNote} onChange={event => { setReviewNote(event.target.value); setIsReviewNoteSaved(false); }} placeholder="Add a thought or reminder..." maxLength={240} autoFocus />
+                    <button type="button" onClick={handleSaveReviewNote} disabled={!currentSentence || !reviewNote.trim()}>Save note</button>
+                    {isReviewNoteSaved && <span role="status">Note saved.</span>}
+                    {practiceNotes.length > 0 && <ul className="saved-practice-notes" aria-label="Saved notes for this sentence">
+                      {practiceNotes.map((note, index) => <li key={`${note.createdAt}-${index}`}>{note.note}</li>)}
+                    </ul>}
+                  </div>
+                </section>
+              </div>
+            )}
           </>
         )}
 
@@ -1326,7 +1395,7 @@ function App() {
             <small>{sentenceCatalogStatus === 'error' ? 'Check the API server and try refreshing the page.' : 'Connecting...'}</small>
           </section>
         ) : <>
-        <DictationArea key={`${key}:${practiceFocus}:${difficulty}:${lesson?.index ?? ''}:${currentSentence}`} targetText={currentSentence} onComplete={handlePerfectComplete} onFinish={handleAttemptFinish} onNext={handleNext} onTypingChange={handleTypingChange} isHidden={isSentenceHidden && !isTimeUp && !focusSessionComplete && !(lesson?.videoId && lastAttempt)} disabled={isTimeUp || Boolean(lesson?.completed) || focusSessionComplete} />
+        <DictationArea key={`${key}:${practiceFocus}:${difficulty}:${lesson?.index ?? ''}:${currentSentence}`} targetText={currentSentence} onComplete={handlePerfectComplete} onFinish={handleAttemptFinish} onNext={handleNext} onTypingChange={handleTypingChange} isHidden={isSentenceHidden && !isTimeUp && !focusSessionComplete && !(lesson?.videoId && lastAttempt)} disabled={Boolean(lesson?.completed) || focusSessionComplete} readOnly={isTimeUp} />
 
         {/* {!isFocusMode && (
           <div className="translation-panel">
@@ -1367,17 +1436,10 @@ function App() {
               {/* {lastAttempt.accuracy < 100 && <small>This sentence is saved for review tomorrow.</small>} */}
             </div>
             <button type="button" className="retry-attempt-button" onClick={handleRetry}>Try again</button>
-            {(lastAttempt.incorrectCharacters > 0 || lastAttempt.missingCharacters > 0) && <details className="review-note-editor">
-              <summary>{isReviewNoteSaved ? 'Review note saved' : 'Add a review note'}</summary>
-              <label htmlFor="practice-review-note">Note for review <small>Saved with the words you missed</small></label>
-              <textarea id="practice-review-note" value={reviewNote} onChange={event => { setReviewNote(event.target.value); setIsReviewNoteSaved(false); }} placeholder="e.g. Remember the spelling or meaning..." maxLength={240} />
-              <button type="button" onClick={handleSaveReviewNote} disabled={!reviewNote.trim()}>Save note</button>
-              {isReviewNoteSaved && <span role="status">Note saved to Review Words.</span>}
-            </details>}
           </div>
         )}
 
-        <Controls onReplay={handleSpeak} onNext={handleNext} nextDisabled={focusSessionComplete || Boolean(lesson && ((!lastAttempt && !isCompleted) || lesson.completed))} />
+        <Controls onReplay={handleSpeak} onNext={handleNext} nextDisabled={nextButtonDisabled || Boolean(lesson && ((!lastAttempt && !isCompleted) || lesson.completed))} />
         {!lesson?.videoId && (voiceStatus === 'error' || voiceStatus === 'unsupported') && <p className="speech-playback-error" role="alert">
           {voiceStatus === 'unsupported' ? 'Speech playback is unavailable in this browser.' : voiceError}
         </p>}

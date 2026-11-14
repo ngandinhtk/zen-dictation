@@ -8,12 +8,13 @@ interface ReviewPageProps {
   onAddWord: (word: string) => void;
   onUpdateWord: (currentWord: string, nextWord: string, note: string) => void;
   onRemoveWord: (word: string) => void;
-  onPracticeWord: (word: string) => void;
+  onPracticeWord: (word: string) => void | Promise<void>;
+  practiceError: string;
   initialWord?: string;
   onBack: () => void;
 }
 
-const ReviewPage = ({ words, onAddWord, onUpdateWord, onPracticeWord, initialWord, onBack }: ReviewPageProps) => {
+const ReviewPage = ({ words, onAddWord, onUpdateWord, onPracticeWord, practiceError, initialWord, onBack }: ReviewPageProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const selectedWord = initialWord;
   const [reviewNow] = useState(() => Date.now());
@@ -108,6 +109,7 @@ const ReviewPage = ({ words, onAddWord, onUpdateWord, onPracticeWord, initialWor
       ) : (
         <section className="review-list-card" aria-label="Words to review">
           <div className="review-list-heading"><h2>Words to practice</h2><span>{dueWords.length ? 'Start with the due words' : 'Nothing due right now'}</span></div>
+          {practiceError && <p className="review-practice-error" role="alert">{practiceError}</p>}
           <div className="review-list">
             {visibleWords.map(word => {
               const isDue = word.correctStreak < 4 || new Date(word.nextReviewAt).getTime() <= reviewNow;
@@ -119,7 +121,7 @@ const ReviewPage = ({ words, onAddWord, onUpdateWord, onPracticeWord, initialWor
                   {editError && <small className="review-edit-error" role="alert">{editError}</small>}
                 </form> : <><strong>{word.word}</strong><span>{word.mistakes} mistake{word.mistakes === 1 ? '' : 's'}</span>{word.note && <small className="review-card-note">Note: {word.note}</small>}<div className="review-card-actions"><button type="button" className="review-action" onClick={() => startEditing(word)}>Edit</button></div></>}</div>
                 <div className="review-card-status">
-                  {isDue ? <button type="button" className="review-status-pill" onClick={() => onPracticeWord(word.word)}>Duo now</button> : <span className="review-status-pill">Streak {word.correctStreak}</span>}
+                  {isDue ? <button type="button" className="review-status-pill" onClick={() => void onPracticeWord(word.word)}>Practice now</button> : <span className="review-status-pill">Streak {word.correctStreak}</span>}
                   <small>{formatNextReview(word, isDue)}</small>
                 </div>
               </article>;

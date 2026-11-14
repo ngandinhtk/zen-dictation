@@ -31,11 +31,12 @@ const loadTypeScriptModule = (filePath) => {
 };
 
 const sentenceBank = loadTypeScriptModule(resolve(root, 'src/data/sentenceBank.ts'));
-const premiumPacks = loadTypeScriptModule(resolve(root, 'src/data/sentencePacks.ts'));
+const sentencePacks = loadTypeScriptModule(resolve(root, 'src/data/sentencePacks.ts'));
 const packs = [
   { id: 'core', name: 'Core practice', description: 'General listening and dictation practice.', isPremium: false, source: sentenceBank.SENTENCE_BANK },
   { id: 'vocabulary', name: 'Vocabulary practice', description: 'Vocabulary-focused dictation practice.', isPremium: false, source: sentenceBank.VOCABULARY_SENTENCE_BANK },
-  ...Object.entries(premiumPacks.PREMIUM_SENTENCE_PACKS).map(([id, source]) => ({ id, name: id === 'ielts' ? 'IELTS practice' : 'Business English', description: `Premium ${id} sentence pack.`, isPremium: true, source: { 'en-US': source } })),
+  { id: 'idioms', name: 'Idioms practice', description: 'Learn common English idioms in context.', isPremium: false, source: { 'en-US': sentencePacks.IDIOM_SENTENCE_PACK } },
+  ...Object.entries(sentencePacks.PREMIUM_SENTENCE_PACKS).map(([id, source]) => ({ id, name: id === 'ielts' ? 'IELTS practice' : 'Business English', description: `Premium ${id} sentence pack.`, isPremium: true, source: { 'en-US': source } })),
 ];
 
 const difficulties = ['easy', 'medium', 'hard'];

@@ -1,6 +1,6 @@
 import type { Difficulty } from '../utils/sentenceTranslations';
 
-export type LearningFocus = 'mixed' | 'vocabulary' | 'ielts' | 'business';
+export type LearningFocus = 'mixed' | 'vocabulary' | 'idioms' | 'ielts' | 'business';
 export interface LearningAttempt {
   text: string;
   focus: LearningFocus;
@@ -70,6 +70,7 @@ export const getWeeklyReport = (attempts: LearningAttempt[], focus: LearningFocu
 export const LEARNING_PATHS: { focus: LearningFocus; name: string; description: string }[] = [
   { focus: 'mixed', name: 'Everyday listening', description: 'Build confidence with everyday sentences.' },
   { focus: 'vocabulary', name: 'Vocabulary builder', description: 'Practise spelling and recognise words in context.' },
+  { focus: 'idioms', name: 'English idioms', description: 'Learn common English idioms in context.' },
   { focus: 'business', name: 'English at work', description: 'Practise meetings, reports and professional communication.' },
   { focus: 'ielts', name: 'IELTS listening', description: 'Practise academic topics and longer sentence structures.' },
 ];

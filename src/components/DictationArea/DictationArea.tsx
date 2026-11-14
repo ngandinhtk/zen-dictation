@@ -11,9 +11,10 @@ interface DictationAreaProps {
   onTypingChange?: (value: string) => boolean | void;
   isHidden?: boolean;
   disabled?: boolean;
+  readOnly?: boolean;
 }
 
-const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, onFinish, onNext, onTypingChange, isHidden = false, disabled = false }) => {
+const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, onFinish, onNext, onTypingChange, isHidden = false, disabled = false, readOnly = false }) => {
   const draftKey = `zen-dictation-draft:${encodeURIComponent(targetText)}`;
   const [userInput, setUserInput] = useState(() => {
     try {
@@ -54,7 +55,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
   const shouldHidePrompt = isHidden && !isComplete;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (disabled || hasSubmitted) return;
+    if (disabled || readOnly || hasSubmitted) return;
     const value = e.target.value;
     if (value.length > targetText.length) {
       return;
@@ -115,7 +116,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
     }
 
     e.preventDefault();
-    if (hasSubmitted) onNext?.();
+    onNext?.();
   };
 
   return (
@@ -158,7 +159,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
         autoComplete="off"
         aria-label="Type the sentence you hear"
         disabled={disabled}
-        readOnly={hasSubmitted}
+        readOnly={readOnly || hasSubmitted}
       />
     </div>
     </>
