@@ -219,12 +219,32 @@ const rawBody = async req => {
   return raw;
 };
 const completePayment = async (orderId, captureId) => {
-  const order = (await query('SELECT * FROM payment_orders WHERE app_trans_id = $1', [orderId])).rows[0];
-  if (!order || order.status === 'paid') return Boolean(order);
-  const licenseKey = createLicenseKey();
-  await query('INSERT INTO licenses (id, key_hash, key_last4) VALUES ($1, $2, $3)', [randomUUID(), hashLicense(licenseKey), licenseKey.slice(-4)]);
-  await query('UPDATE payment_orders SET status = $1, zp_trans_id = $2, delivery_key = $3, paid_at = $4 WHERE app_trans_id = $5', ['paid', captureId, encryptLicenseKey(licenseKey), new Date().toISOString(), orderId]);
-  try { await sendLicenseEmail(order.email, licenseKey); } catch (error) { console.error('License email delivery failed:', error.message); }
+  const client = await pool.connect();
+  let email;
+  let licenseKey;
+  try {
+    await client.query('BEGIN');
+    const order = (await client.query('SELECT * FROM payment_orders WHERE app_trans_id = $1 FOR UPDATE', [orderId])).rows[0];
+    if (!order) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    if (order.status === 'paid') {
+      await client.query('COMMIT');
+      return true;
+    }
+    licenseKey = createLicenseKey();
+    await client.query('INSERT INTO licenses (id, key_hash, key_last4) VALUES ($1, $2, $3)', [randomUUID(), hashLicense(licenseKey), licenseKey.slice(-4)]);
+    await client.query('UPDATE payment_orders SET status = $1, zp_trans_id = $2, delivery_key = $3, paid_at = $4 WHERE app_trans_id = $5', ['paid', captureId, encryptLicenseKey(licenseKey), new Date().toISOString(), orderId]);
+    email = order.email;
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+  try { await sendLicenseEmail(email, licenseKey); } catch (error) { console.error('License email delivery failed:', error.message); }
   return true;
 };
 const createLicenseKey = () => {

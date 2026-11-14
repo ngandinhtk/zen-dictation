@@ -2,7 +2,7 @@
 :root {
   --bg-color: #fcfbfa; /* Warm, soft off-white/cream */
   --text-color: #1e1e20; /* Deep, elegant charcoal */
-  --text-muted: #8e8d8a; /* Soft medium grey for labels */
+  --text-muted: #6f6e6b; /* Muted text with readable contrast on light backgrounds */
   --primary-color: #5c5d60; /* Quiet grey for secondary actions */
   --correct-color: #29972e; /* Rich, organic forest green */
   --incorrect-color: #cc3a3a; /* Deep, muted rust-red */
@@ -40,7 +40,7 @@
 [data-theme='light'] {
   --bg-color: #fcfbfa;
   --text-color: #1e1e20;
-  --text-muted: #8e8d8a;
+  --text-muted: #6f6e6b;
   --primary-color: #5c5d60;
   --correct-color: #29972e;
   --incorrect-color: #cc3a3a;

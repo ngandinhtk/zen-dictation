@@ -2,6 +2,7 @@ import './PrivacyPage.css';
 import PageHeader from '../PageHeader/PageHeader';
 import EnglishPrivacyPage from './EnglishPrivacyPage';
 import PrivacyLanguageSelect from './PrivacyLanguageSelect';
+import { getTelegramContactUrl } from '../../services/telegramService';
 
 const sections = [
   ['about', 'Bạn có thể liên hệ với ai?'],
@@ -17,8 +18,7 @@ const sections = [
 
 export default function PrivacyPage() {
   if (new URLSearchParams(window.location.search).get('lang') !== 'vi') return <EnglishPrivacyPage />;
-  const telegram = (import.meta.env.VITE_TELEGRAM_URL as string | undefined)?.trim();
-  const contactUrl = telegram && /^https:\/\/t\.me\//i.test(telegram) ? telegram : undefined;
+  const contactUrl = getTelegramContactUrl(import.meta.env.VITE_TELEGRAM_URL);
 
   return <div className="privacy-page" lang="vi">
     <a className="privacy-skip" href="#privacy-content">Đến nội dung chính</a>

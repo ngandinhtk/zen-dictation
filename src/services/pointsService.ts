@@ -23,6 +23,18 @@ export type DailyTarget = {
   rewardClaimed: boolean;
 };
 
+export const mergeDailyTarget = (localTarget: DailyTarget, remoteTarget: DailyTarget | null): DailyTarget => {
+  if (!remoteTarget || remoteTarget.date !== localTarget.date) return localTarget;
+
+  return {
+    ...localTarget,
+    ...remoteTarget,
+    progress: Math.max(localTarget.progress, remoteTarget.progress),
+    rewardClaimed: localTarget.rewardClaimed || remoteTarget.rewardClaimed,
+    completed: localTarget.completed || remoteTarget.completed,
+  };
+};
+
 export const POINT_ACHIEVEMENTS: Achievement[] = [
   { id: 'starter', title: 'Starter', points: 1000, description: 'Reach 1,000 points', icon: '○' },
   { id: 'committed', title: 'Committed', points: 5000, description: 'Reach 5,000 points', icon: '◆' },

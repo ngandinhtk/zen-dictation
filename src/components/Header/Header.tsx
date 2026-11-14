@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AccountUser } from '../../services/accountService';
 import { logoutAccount } from '../../services/accountService';
+import { getTelegramContactUrl } from '../../services/telegramService';
 import AccountPanel from '../AccountPanel/AccountPanel';
 import './Header.css';
 
@@ -11,16 +12,19 @@ interface HeaderProps {
   isPremiumOpen: boolean;
   isSettingsOpen: boolean;
   isReviewOpen: boolean;
+  isSupportOpen: boolean;
   onAccountToggle: () => void;
   onAuthenticated: (user: AccountUser) => void;
   onLoggedOut: () => void;
   onPremiumOpen: () => void;
   onSettingsToggle: () => void;
   onReviewOpen: () => void;
+  onSupportOpen: () => void;
 }
 
-const Header = ({ accountUser, isAccountOpen, isPremium, isPremiumOpen, isSettingsOpen, isReviewOpen, onAccountToggle, onAuthenticated, onLoggedOut, onPremiumOpen, onSettingsToggle, onReviewOpen }: HeaderProps) => {
+const Header = ({ accountUser, isAccountOpen, isPremium, isPremiumOpen, isSettingsOpen, isReviewOpen, isSupportOpen, onAccountToggle, onAuthenticated, onLoggedOut, onPremiumOpen, onSettingsToggle, onReviewOpen, onSupportOpen }: HeaderProps) => {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const telegramUrl = getTelegramContactUrl(import.meta.env.VITE_TELEGRAM_URL);
   return (
   <>
     <header className="app-header">
@@ -38,7 +42,10 @@ const Header = ({ accountUser, isAccountOpen, isPremium, isPremiumOpen, isSettin
           <span aria-hidden="true"  >⚙</span> Settings
         </a>
      
-        {(import.meta.env.VITE_TELEGRAM_URL as string | undefined) && <a href={import.meta.env.VITE_TELEGRAM_URL as string} className="telegram-toggle" target="_blank" rel="noreferrer">✈ Contact</a>}
+        {telegramUrl && <a href={telegramUrl} className="telegram-toggle" target="_blank" rel="noopener noreferrer">✈ Contact</a>}
+        <a href="#support" className={`support-toggle ${isSupportOpen ? 'active' : ''}`} onClick={event => { event.preventDefault(); setIsMobileNavOpen(false); onSupportOpen(); }} aria-current={isSupportOpen ? 'page' : undefined}>
+          <span aria-hidden="true">♡</span> Support
+        </a>
        <a href="#account" className="account-toggle" onClick={event => { event.preventDefault(); onAccountToggle(); }} aria-expanded={isAccountOpen} aria-controls="account-menu">
            {accountUser ? accountUser.email.split('@')[0] : 'Account'}
         </a>  
@@ -47,7 +54,7 @@ const Header = ({ accountUser, isAccountOpen, isPremium, isPremiumOpen, isSettin
     </header>
     {isAccountOpen && (
       <section id="account-menu" className="account-menu" aria-label="Account">
-        <AccountPanel user={accountUser} onAuthenticated={onAuthenticated} onLogout={() => { void logoutAccount(); onLoggedOut(); }} />
+        <AccountPanel user={accountUser} onAuthenticated={onAuthenticated} onLogout={async () => { await logoutAccount(); onLoggedOut(); }} />
       </section>
     )}
   </>

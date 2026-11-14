@@ -11,7 +11,7 @@ import {  type Difficulty } from './utils/sentenceTranslations';
 import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
 import { remainingSeconds, resolvePracticeSentence } from './utils/practiceState';
 import { addReviewWord, clearReviewWords, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, removeReviewWord, replaceReviewWords, saveReviewNoteForAttempt, updateReviewWord, type ReviewWord } from './services/spacedRepetitionService';
-import { addPoints, claimDailyTargetReward, clearPointsState, getDailyTarget, getPoints, getUnlockedAchievements, PERFECT_SENTENCE_POINTS, replaceDailyTarget, replacePoints, subtractPoints, TIMEOUT_PENALTY_POINTS, updateDailyTargetProgress, type DailyTarget } from './services/pointsService';
+import { addPoints, claimDailyTargetReward, clearPointsState, getDailyTarget, getPoints, getUnlockedAchievements, mergeDailyTarget, PERFECT_SENTENCE_POINTS, replaceDailyTarget, replacePoints, subtractPoints, TIMEOUT_PENALTY_POINTS, updateDailyTargetProgress, type DailyTarget } from './services/pointsService';
 import { clearPremiumLearningState, getGoalWpm, getPracticeHistory, getPracticeStreak, saveGoalWpm, savePracticeSession, type PracticeSession } from './services/premiumService';
 const PremiumDashboard = lazy(() => import('./components/PremiumDashboard/PremiumDashboard'));
 const ReviewPage = lazy(() => import('./components/ReviewPage/ReviewPage'));
@@ -26,6 +26,7 @@ import type { YoutubeCaption } from './services/youtubeApi';
 import { buildDailyLesson, clearLearningState, readLearningState, recordLearningAttempt, type LearningFocus } from './services/learningCoach';
 import { getVerifiedSentenceTranslation } from './utils/sentenceTranslations';
 const PaymentPage = lazy(() => import('./components/PaymentPage/PaymentPage'));
+const SupportPage = lazy(() => import('./components/SupportPage/SupportPage'));
 const PaymentResultPage = lazy(async () => {
   const module = await import('./components/PaymentPage/PaymentPage');
   return { default: module.PaymentResultPage };
@@ -193,6 +194,7 @@ function App() {
   const [isPaymentResultOpen, setIsPaymentResultOpen] = useState(() => initialHash === '#payment-result');
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(() => initialHash === '#review');
+  const [isSupportOpen, setIsSupportOpen] = useState(() => initialHash === '#support');
   // const [showTranslation, setShowTranslation] = useState(false);
   const [reviewWord, setReviewWord] = useState<string | undefined>();
   const [focusTimeLeft, setFocusTimeLeft] = useState(20 * 60);
@@ -202,10 +204,30 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('zen-dictation-onboarding-seen') !== 'true');
   const [accountUser, setAccountUser] = useState<AccountUser | null>(null);
   const learningStateHydratedRef = useRef(false);
+  const accountHydrationGenerationRef = useRef(0);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [achievementToast, setAchievementToast] = useState<{ title: string; description: string; icon: string } | null>(null);
   const unlockedAchievementIdsRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const handlePopState = () => {
+      const isSupportRoute = window.location.hash.split('?')[0] === '#support';
+      if (!isSupportRoute && !isSupportOpen) return;
+
+      setIsSupportOpen(isSupportRoute);
+      if (isSupportRoute) {
+        setIsPremiumOpen(false);
+        setIsPaymentOpen(false);
+        setIsPaymentResultOpen(false);
+        setIsReviewOpen(false);
+        setIsSettingsOpen(false);
+        setIsAccountOpen(false);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isSupportOpen]);
   const openPremiumDashboard = () => {
+    setIsSupportOpen(false);
     window.history.pushState({}, '', '#premium');
     setIsPremiumOpen(true);
   };
@@ -214,6 +236,7 @@ function App() {
     setIsPremiumOpen(false);
   };
   const openPaymentPage = () => {
+    setIsSupportOpen(false);
     window.history.pushState({}, '', '#payment');
     setIsPaymentOpen(true);
   };
@@ -251,10 +274,21 @@ function App() {
     window.history.pushState({}, '', window.location.pathname + window.location.search);
   };
   const openReviewPage = (word?: string) => {
+    setIsSupportOpen(false);
     window.history.pushState({}, '', '#review');
     setIsSettingsOpen(false);
     setReviewWord(word);
     setIsReviewOpen(true);
+  };
+  const openSupportPage = () => {
+    setIsPremiumOpen(false);
+    setIsPaymentOpen(false);
+    setIsPaymentResultOpen(false);
+    setIsReviewOpen(false);
+    setIsSettingsOpen(false);
+    setIsAccountOpen(false);
+    window.history.pushState({}, '', '#support');
+    setIsSupportOpen(true);
   };
   const closeReviewPage = () => {
     window.history.pushState({}, '', window.location.pathname + window.location.search);
@@ -435,8 +469,10 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const generation = ++accountHydrationGenerationRef.current;
     learningStateHydratedRef.current = false;
     if (!accountUser) return;
+    const isCurrentHydration = () => accountHydrationGenerationRef.current === generation;
     const localSessions = getPracticeHistory().map(session => ({
       date: session.date,
       difficulty: session.difficulty,
@@ -447,13 +483,12 @@ function App() {
     const localPoints = getPoints();
     const localTarget = getDailyTarget();
     const localGoal = getGoalWpm();
-    Promise.all([syncAccountSessions(localSessions), getAccountLearningState()]).then(([remoteSessions, remoteState]) => {
+    Promise.all([syncAccountSessions(localSessions, isCurrentHydration), getAccountLearningState()]).then(([remoteSessions, remoteState]) => {
+      if (!isCurrentHydration()) return;
       const remoteReviews = Array.isArray(remoteState?.review_words) ? remoteState.review_words as ReviewWord[] : [];
       const mergedReviews = mergeReviewWords(localReviews, remoteReviews);
       const remoteTarget = remoteState?.daily_target && typeof remoteState.daily_target === 'object' ? remoteState.daily_target as DailyTarget : null;
-      const mergedTarget = remoteTarget && remoteTarget.date === localTarget.date
-        ? { ...localTarget, ...remoteTarget, progress: Math.max(localTarget.progress, remoteTarget.progress), rewardClaimed: localTarget.rewardClaimed || remoteTarget.rewardClaimed, completed: localTarget.completed || remoteTarget.completed }
-        : remoteTarget || localTarget;
+      const mergedTarget = mergeDailyTarget(localTarget, remoteTarget);
       const mergedPoints = Math.max(localPoints, remoteState?.points || 0);
       const mergedGoal = remoteState?.goal_wpm || localGoal;
       replaceReviewWords(mergedReviews);
@@ -468,11 +503,17 @@ function App() {
       setGoalWpm(getGoalWpm());
       learningStateHydratedRef.current = true;
     }).catch(() => undefined);
+    return () => {
+      if (isCurrentHydration()) accountHydrationGenerationRef.current += 1;
+      learningStateHydratedRef.current = false;
+    };
   }, [accountUser]);
 
   useEffect(() => {
     if (!accountUser || !learningStateHydratedRef.current) return;
+    const generation = accountHydrationGenerationRef.current;
     const timer = window.setTimeout(() => {
+      if (generation !== accountHydrationGenerationRef.current) return;
       void saveAccountLearningState({ reviewWords, points, dailyTarget, goalWpm });
     }, 250);
     return () => window.clearTimeout(timer);
@@ -936,6 +977,45 @@ function App() {
     </div>
   ) : null;
 
+  const appHeader = <Header
+    accountUser={accountUser}
+    isAccountOpen={isAccountOpen}
+    isPremium={isPremium}
+    isPremiumOpen={isPremiumOpen}
+    isSettingsOpen={isSettingsOpen}
+    isReviewOpen={isReviewOpen}
+    isSupportOpen={isSupportOpen}
+    onAccountToggle={() => setIsAccountOpen(open => !open)}
+    onAuthenticated={user => { setAccountUser(user); setIsAccountOpen(false); }}
+    onLoggedOut={() => {
+      accountHydrationGenerationRef.current += 1;
+      learningStateHydratedRef.current = false;
+      setIsAccountOpen(false);
+      clearReviewWords();
+      clearPointsState();
+      clearPremiumLearningState();
+      clearLearningState();
+      setCoachState(readLearningState());
+      setLesson(null);
+      clearAllPracticeDrafts();
+      setAccountUser(null);
+      setPracticeHistory([]);
+      setReviewWords(getReviewWords());
+      setReviewSummary(getReviewSummary());
+      setPoints(getPoints());
+      setDailyTarget(getDailyTarget());
+      setGoalWpm(getGoalWpm());
+    }}
+    onPremiumOpen={isPremium ? openPremiumDashboard : openPaymentPage}
+    onSettingsToggle={() => {
+      if (isSupportOpen) window.history.pushState({}, '', window.location.pathname + window.location.search);
+      setIsSupportOpen(false);
+      setIsSettingsOpen(open => !open);
+    }}
+    onReviewOpen={() => openReviewPage()}
+    onSupportOpen={openSupportPage}
+  />;
+
   if (isReviewOpen) {
     return <Suspense fallback={<div className="screen-loading" role="status">Loading review…</div>}><>
       {achievementToastNode}
@@ -1000,10 +1080,22 @@ function App() {
         />
       </></Suspense>;
     }
+
     return <Suspense fallback={<div className="screen-loading" role="status">Loading payment…</div>}><>
       {achievementToastNode}
       <PaymentPage onBack={closePaymentPage} onLicenseClick={() => { closePaymentPage(); openPremiumDashboard(); }} />
     </></Suspense>;
+  }
+
+  if (isSupportOpen) {
+    return <Suspense fallback={<div className="screen-loading" role="status">Loading support…</div>}>
+      <div className="app-layout">
+        {achievementToastNode}
+        {appHeader}
+        <main className="app-content support-content"><SupportPage /></main>
+        <footer className="app-footer"><a href={`${import.meta.env.BASE_URL}privacy.html`} target="_blank" rel="noopener noreferrer">Privacy Policy ↗</a></footer>
+      </div>
+    </Suspense>;
   }
 
   const handleTypingChange = (nextValue: string) => {
@@ -1048,36 +1140,7 @@ function App() {
   return (
     <div className={`app-layout ${isFocusMode ? 'focus-mode' : ''}`}>
       {achievementToastNode}
-      {!isFocusMode && <Header
-        accountUser={accountUser}
-        isAccountOpen={isAccountOpen}
-        isPremium={isPremium}
-        isPremiumOpen={isPremiumOpen}
-        isSettingsOpen={isSettingsOpen}
-        isReviewOpen={isReviewOpen}
-        onAccountToggle={() => setIsAccountOpen(open => !open)}
-        onAuthenticated={user => { setAccountUser(user); setIsAccountOpen(false); }}
-        onLoggedOut={() => {
-          learningStateHydratedRef.current = false;
-          clearReviewWords();
-          clearPointsState();
-          clearPremiumLearningState();
-          clearLearningState();
-          setCoachState(readLearningState());
-          setLesson(null);
-          clearAllPracticeDrafts();
-          setAccountUser(null);
-          setPracticeHistory([]);
-          setReviewWords(getReviewWords());
-          setReviewSummary(getReviewSummary());
-          setPoints(getPoints());
-          setDailyTarget(getDailyTarget());
-          setGoalWpm(getGoalWpm());
-        }}
-        onPremiumOpen={isPremium ? openPremiumDashboard : openPaymentPage}
-        onSettingsToggle={() => setIsSettingsOpen(open => !open)}
-        onReviewOpen={() => openReviewPage()}
-      />}
+      {!isFocusMode && appHeader}
       {!isFocusMode && showOnboarding && (
         <section className="onboarding-card" aria-label="How to practice">
           <div><span className="premium-kicker">Welcome to Zen Dictation</span><h2>Four quiet steps to better listening.</h2><p>Listen, type what you hear, then use the feedback to improve your accuracy and speed.</p></div>

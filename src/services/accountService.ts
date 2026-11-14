@@ -67,11 +67,13 @@ export const saveAccountSession = async (session: Omit<AccountPracticeSession, '
 
 const sessionKey = (session: Omit<AccountPracticeSession, 'id'> | AccountPracticeSession) => [session.date, session.difficulty, session.wpm, session.accuracy].join('|');
 
-export const syncAccountSessions = async (localSessions: Array<Omit<AccountPracticeSession, 'id'>>) => {
+export const syncAccountSessions = async (localSessions: Array<Omit<AccountPracticeSession, 'id'>>, isCurrent = () => true) => {
   const remoteSessions = await getAccountSessions();
+  if (!isCurrent()) return remoteSessions;
   const remoteKeys = new Set(remoteSessions.map(sessionKey));
   const missingSessions = localSessions.filter(session => !remoteKeys.has(sessionKey(session))).slice(0, 30);
-  await Promise.all(missingSessions.map(session => saveAccountSession(session)));
+  await Promise.all(missingSessions.map(session => isCurrent() ? saveAccountSession(session) : Promise.resolve()));
+  if (!isCurrent()) return remoteSessions;
   return getAccountSessions();
 };
 

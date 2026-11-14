@@ -6,7 +6,7 @@ import PrivacyNotice from '../PrivacyPage/PrivacyNotice';
 interface AccountPanelProps {
   user: AccountUser | null;
   onAuthenticated: (user: AccountUser) => void;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
   resetToken?: string;
 }
 
@@ -45,8 +45,20 @@ const AccountPanel = ({ user, onAuthenticated, onLogout, resetToken }: AccountPa
     }
   };
 
+  const handleLogout = async () => {
+    setError('');
+    setIsLoading(true);
+    try {
+      await onLogout();
+    } catch (logoutError) {
+      setError(logoutError instanceof Error ? logoutError.message : 'Unable to sign out');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (user) {
-    return <div className="account-panel account-signed-in"><span className="account-avatar">{user.email[0].toUpperCase()}</span><div><strong>{user.email}</strong><small>{user.isPremium ? 'Premium member' : 'Free account'}</small></div><button type="button" onClick={onLogout}>Sign out</button></div>;
+    return <div className="account-panel account-signed-in"><span className="account-avatar">{user.email[0].toUpperCase()}</span><div><strong>{user.email}</strong><small>{user.isPremium ? 'Premium member' : 'Free account'}</small>{error && <p className="account-error" role="alert">{error}</p>}</div><button type="button" onClick={() => void handleLogout()} disabled={isLoading} aria-busy={isLoading}>{isLoading ? 'Signing out…' : 'Sign out'}</button></div>;
   }
 
   return <form className="account-panel account-form" onSubmit={handleSubmit}>

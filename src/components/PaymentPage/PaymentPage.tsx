@@ -105,7 +105,6 @@ export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProp
 
 const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'paypal' | 'qr'>('paypal');
   const [email, setEmail] = useState('');
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [paymentError, setPaymentError] = useState('');
@@ -132,12 +131,11 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
       <main className="checkout-content">
         <div className="checkout-intro"><span className="premium-kicker">Secure checkout</span><h1>Your Premium, one simple payment.</h1><p>After payment is confirmed, we will generate a license key for you. No account is required.</p></div>
         <section className="checkout-card" aria-label="Checkout summary">
-          <div className="payment-methods" role="tablist" aria-label="Payment method"><button type="button" className={`payment-method ${paymentMethod === 'paypal' ? 'selected' : ''}`} onClick={() => setPaymentMethod('paypal')} role="tab" aria-selected={paymentMethod === 'paypal'}>PayPal</button><button type="button" className={`payment-method ${paymentMethod === 'qr' ? 'selected' : ''}`} onClick={() => setPaymentMethod('qr')} role="tab" aria-selected={paymentMethod === 'qr'}>Bank QR</button></div>
-          {paymentMethod === 'paypal' && <div className="checkout-card-header"><span>Zen Dictation Premium</span><strong>$4</strong></div>}
-          {paymentMethod === 'paypal' && <span className="checkout-subtitle">Lifetime access · One-time payment</span>}
-          {paymentMethod === 'paypal' ? <label className="receipt-email">Email for your receipt <span>optional</span><input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" /></label> : <BankQrPayment />}
-          {paymentMethod === 'paypal' && <div className="checkout-security"><span aria-hidden="true">▣</span><span><strong>Secure hosted payment</strong><small>Your card details will be handled by our payment provider, never stored in Zen Dictation.</small></span></div>}
-          {paymentMethod === 'paypal' && <button type="button" className="checkout-button checkout-next" onClick={startPayPalCheckout} disabled={isCreatingOrder}>{isCreatingOrder ? 'Opening PayPal…' : 'Pay securely with PayPal'} {!isCreatingOrder }</button>}
+          <div className="checkout-card-header"><span>Zen Dictation Premium</span><strong>$4</strong></div>
+          <span className="checkout-subtitle">Lifetime access · One-time payment</span>
+          <label className="receipt-email">Email for your receipt <span>optional</span><input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" /></label>
+          <div className="checkout-security"><span aria-hidden="true">▣</span><span><strong>Secure hosted payment</strong><small>Your card details will be handled by our payment provider, never stored in Zen Dictation.</small></span></div>
+          <button type="button" className="checkout-button checkout-next" onClick={startPayPalCheckout} disabled={isCreatingOrder}>{isCreatingOrder ? 'Opening PayPal…' : 'Pay securely with PayPal'}</button>
           {paymentError && <p className="payment-error" role="alert">{paymentError}</p>}
           <button type="button" className="license-button" onClick={onLicenseClick}>Already paid? Enter your license key</button>
         </section>
@@ -180,40 +178,6 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
     </main>
   </div>
   );
-};
-
-const BankQrPayment = () => {
-  const fallbackQrUrl = '/bank-qr.jpg';
-  const configuredQrUrl = import.meta.env.VITE_BANK_QR_URL as string | undefined;
-  const isPlaceholderQrUrl = (url?: string) => {
-    if (!url) return true;
-    const trimmedUrl = url.trim();
-    return !trimmedUrl || trimmedUrl === '/' || trimmedUrl.includes('your-domain.example');
-  };
-  const qrUrl = isPlaceholderQrUrl(configuredQrUrl) ? fallbackQrUrl : (configuredQrUrl || fallbackQrUrl);
-  const [qrSrc, setQrSrc] = useState(qrUrl);
-  useEffect(() => {
-    setQrSrc(qrUrl);
-  }, [qrUrl]);
-  const bankName = (import.meta.env.VITE_BANK_NAME as string | undefined) || 'Ban Viet Bank (Timo Bank)';
-  // const accountName = (import.meta.env.VITE_BANK_ACCOUNT_NAME as string | undefined) || 'Account holder';
-  const accountNumber = (import.meta.env.VITE_BANK_ACCOUNT_NUMBER as string | undefined) || '0908045090';
-  const transferNote = (import.meta.env.VITE_BANK_TRANSFER_NOTE as string | undefined) || 'Buy ZENTATION a coffee';
-  const telegramUrl = import.meta.env.VITE_TELEGRAM_URL as string | undefined;
-  const confirmationMessage = encodeURIComponent(`Xin chào, tôi đã chuyển khoản ủng hộ Zen Dictation. Nội dung: ${transferNote}. Vui lòng kiểm tra và hỗ trợ kích hoạt Premium cho tôi.`);
-  const handleQrError = () => {
-    if (qrSrc !== fallbackQrUrl) {
-      setQrSrc(fallbackQrUrl);
-    }
-  };
-
-  return <div className="bank-qr-payment">
-    {qrSrc ? <img className="bank-qr-image" src={qrSrc} alt="Bank transfer QR" onError={handleQrError} /> : <div className="bank-qr-missing">Add <code>VITE_BANK_QR_URL</code> to show your QR code.</div>}
-    <p className="bank-qr-title">Buy me a coffee via bank transfer</p>
-    <dl className="bank-details"><div><dt>Bank</dt><dd>{bankName}</dd></div><div><dt>Account</dt><dd>{accountNumber}</dd></div><div><dt>Transfer note</dt><dd>{transferNote}</dd></div></dl>
-    {telegramUrl && <a className="bank-confirm-button" href={`${telegramUrl}${telegramUrl.includes('?') ? '&' : '?'}text=${confirmationMessage}`} target="_blank" rel="noreferrer">I&apos;ve completed the transfer — Contact Telegram</a>}
-    <p className="bank-qr-note">Thank you for supporting Zen Dictation! This contribution is separate from the automatic Premium purchase.</p>
-  </div>;
 };
 
 export default PaymentPage;

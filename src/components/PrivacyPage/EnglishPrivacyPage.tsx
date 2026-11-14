@@ -1,5 +1,6 @@
 import PageHeader from '../PageHeader/PageHeader';
 import PrivacyLanguageSelect from './PrivacyLanguageSelect';
+import { getTelegramContactUrl } from '../../services/telegramService';
 
 const sections = [
   ['about', 'Who can you contact?'],
@@ -14,8 +15,7 @@ const sections = [
 ];
 
 export default function EnglishPrivacyPage() {
-  const telegram = (import.meta.env.VITE_TELEGRAM_URL as string | undefined)?.trim();
-  const contactUrl = telegram && /^https:\/\/t\.me\//i.test(telegram) ? telegram : undefined;
+  const contactUrl = getTelegramContactUrl(import.meta.env.VITE_TELEGRAM_URL);
 
   return <div className="privacy-page" lang="en">
     <a className="privacy-skip" href="#privacy-content">Skip to main content</a>
