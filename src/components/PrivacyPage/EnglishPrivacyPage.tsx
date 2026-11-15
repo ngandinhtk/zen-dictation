@@ -21,11 +21,10 @@ export default function EnglishPrivacyPage() {
     <a className="privacy-skip" href="#privacy-content">Skip to main content</a>
     <PageHeader backLabel="Back to practice" />
     <main id="privacy-content" className="privacy-content">
-      <PrivacyLanguageSelect language="en" />
       <div className="privacy-intro">
         <span className="privacy-eyebrow">PRIVACY POLICY</span>
         <h1>Privacy policy</h1>
-        <p>When you practise listening with Zentation, what information does the app store? Who may receive it? This page explains how it works so you can make informed choices.</p>
+        <p>When you practise listening with Zendictation, what information does the app store? Who may receive it? This page explains how it works so you can make informed choices.</p>
         <p className="privacy-date">Last updated <time dateTime="2026-11-03">3 November 2026</time></p>
       </div>
       <aside className="privacy-summary" aria-label="Key information">
@@ -38,9 +37,9 @@ export default function EnglishPrivacyPage() {
       <article className="privacy-article">
         <section id="about">
           <h2>01. Who can you contact?</h2>
-          <p>Zentation is an English listening practice app, also called Zen Dictation on some screens. The operator of Zentation manages the account information and learning progress sent to the app’s systems.</p>
+          <p>Zendictation is an English listening practice app, also called Zen Dictation on some screens. The operator of Zendictation manages the account information and learning progress sent to the app’s systems.</p>
           <p>If you have questions or want to access, correct or delete your information, contact us through Telegram below. This is also the Contact link in the app menu.</p>
-          {contactUrl ? <a className="privacy-contact" href={contactUrl} target="_blank" rel="noopener noreferrer">Contact Zentation on Telegram ↗</a> : <p>Please use the Contact link in the app menu to reach the operator.</p>}
+          {contactUrl ? <a className="privacy-contact" href={contactUrl} target="_blank" rel="noopener noreferrer">Contact Zendictation on Telegram ↗</a> : <p>Please use the Contact link in the app menu to reach the operator.</p>}
         </section>
         <section id="data">
           <h2>02. What information does the app store?</h2>
@@ -61,13 +60,13 @@ export default function EnglishPrivacyPage() {
           <h2>04. Information stored on your device</h2>
           <p>Your browser stores a small amount of information to keep you signed in, preserve your current answer and remember settings such as voice, repetitions, pauses and theme.</p>
           <p>Sign-in information lasts for up to 30 days. Some information is stored only in the open tab; other information stays on your device until you clear site data or the app replaces it.</p>
-          <p>You can clear Zentation’s site data in your browser settings. This may remove your current answer, sign you out or stop the device from recognising Premium. Information saved to your account remains on the system. The app currently has no advertising tools or tools tracking how you use individual pages.</p>
+          <p>You can clear Zendictation’s site data in your browser settings. This may remove your current answer, sign you out or stop the device from recognising Premium. Information saved to your account remains on the system. The app currently has no advertising tools or tools tracking how you use individual pages.</p>
         </section>
         <section id="providers">
           <h2>05. Services involved</h2>
           <ul>
-            <li><strong>App hosting and storage services:</strong> store account information, learning progress and transaction information so Zentation can operate.</li>
-            <li><strong>PayPal:</strong> you pay on PayPal’s website. Zentation receives the transaction result; you do not enter your card number or card security code into a Zentation form. See <a href="https://www.paypal.com/vn/legalhub/paypal/privacy-full" target="_blank" rel="noopener noreferrer">PayPal’s privacy policy</a>.</li>
+            <li><strong>App hosting and storage services:</strong> store account information, learning progress and transaction information so Zendictation can operate.</li>
+            <li><strong>PayPal:</strong> you pay on PayPal’s website. Zendictation receives the transaction result; you do not enter your card number or card security code into a Zendictation form. See <a href="https://www.paypal.com/vn/legalhub/paypal/privacy-full" target="_blank" rel="noopener noreferrer">PayPal’s privacy policy</a>.</li>
             <li><strong>Speech services:</strong> your browser or phone receives sentences to read aloud. Some voices work on the device; others need to send sentences over the Internet. Not all voices are therefore available offline.</li>
             <li><strong>Telegram and banks:</strong> when you request support or make a bank transfer, information you provide is also handled under those services’ policies. If a QR code image is loaded from another service, that service may receive information about the image request.</li>
           </ul>
@@ -95,6 +94,7 @@ export default function EnglishPrivacyPage() {
         </section>
       </article>
     </main>
-    <footer className="privacy-footer"><span>Zentation · Privacy</span><a href="./">Back to practice →</a></footer>
+    <footer className="privacy-footer"><span>Zendictation · Privacy</span><a href="./">Back to practice →</a></footer>
+    <PrivacyLanguageSelect language="en" />
   </div>;
 }

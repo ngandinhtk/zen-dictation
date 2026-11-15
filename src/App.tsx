@@ -5,12 +5,14 @@ import { soundService } from './services/soundService';
 import type { SpeechStatus, VoiceLanguage } from './services/speechService';
 import DictationArea from './components/DictationArea/DictationArea';
 import Controls from './components/Controls/Controls';
+import SiteNotice from './components/SiteNotice/SiteNotice';
+import LanguageSwitcher from './components/LanguageSwitcher/LanguageSwitcher';
 import './styles/globals.css';
 import './App.css';
 import {  type Difficulty } from './utils/sentenceTranslations';
 import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
 import { isNextButtonDisabled, remainingSeconds, resolvePracticeSentence } from './utils/practiceState';
-import { addReviewWord, clearReviewWords, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, removeReviewWord, replaceReviewWords, saveReviewNoteForAttempt, updateReviewWord, type ReviewWord } from './services/spacedRepetitionService';
+import { addReviewWord, clearReviewWords, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, removeReviewWord, replaceReviewWords, saveReviewNoteForAttempt, saveReviewWordNotes, updateReviewWord, type ReviewWord } from './services/spacedRepetitionService';
 import { addPoints, claimDailyTargetReward, clearPointsState, getDailyTarget, getPoints, getUnlockedAchievements, mergeDailyTarget, PERFECT_SENTENCE_POINTS, replaceDailyTarget, replacePoints, subtractPoints, TIMEOUT_PENALTY_POINTS, updateDailyTargetProgress, type DailyTarget } from './services/pointsService';
 import { clearPremiumLearningState, getGoalWpm, getPracticeHistory, getPracticeStreak, saveGoalWpm, savePracticeSession, type PracticeSession } from './services/premiumService';
 const PremiumDashboard = lazy(() => import('./components/PremiumDashboard/PremiumDashboard'));
@@ -27,7 +29,7 @@ import { buildDailyLesson, clearLearningState, readLearningState, recordLearning
 import { getVerifiedSentenceTranslation } from './utils/sentenceTranslations';
 import { findReviewSentence } from './services/reviewSentence';
 import { chooseRandomSentenceIndex, isRecentlyUsedSentence, loadRecentSentenceHistory, rememberRecentSentence, saveRecentSentenceHistory } from './services/sentenceRotation';
-import { getPracticeNotesForSentence, savePracticeNoteForSentence } from './services/practiceNotesService';
+import { useAppLanguage } from './context/useAppLanguage';
 const PaymentPage = lazy(() => import('./components/PaymentPage/PaymentPage'));
 const SupportPage = lazy(() => import('./components/SupportPage/SupportPage'));
 const PaymentResultPage = lazy(async () => {
@@ -49,6 +51,12 @@ const readReplaySetting = (key: string, allowed: number[], fallback: number) => 
 };
 const SHOW_YOUTUBE_IMPORT = false;
 const ACHIEVEMENT_TOAST_DURATION_MS = 8000;
+const ACHIEVEMENT_TRANSLATIONS_VI: Record<string, { title: string; description: string }> = {
+  Starter: { title: 'Người bắt đầu', description: 'Đạt 1.000 điểm' },
+  Committed: { title: 'Kiên trì', description: 'Đạt 5.000 điểm' },
+  'Focused learner': { title: 'Người học tập trung', description: 'Đạt 10.000 điểm' },
+  'Master practice': { title: 'Bậc thầy luyện tập', description: 'Đạt 50.000 điểm' },
+};
 type PracticeFocus = 'mixed' | 'vocabulary' | 'idioms' | 'ielts' | 'business';
 const CAMBRIDGE_LEVELS: Record<Difficulty, { exams: string }> = {
   easy: { exams: 'Starters · A2 Key' },
@@ -126,6 +134,8 @@ const getAdaptiveDifficulty = (difficulty: Difficulty, accuracy: number): Diffic
 };
 
 function App() {
+  const { language } = useAppLanguage();
+  const isVietnamese = language === 'vi';
   const [difficulty, setDifficulty] = useState<Difficulty>(() => savedPractice?.difficulty || DEFAULT_DIFFICULTY);
   const [practiceFocus, setPracticeFocus] = useState<PracticeFocus>(() => savedPractice?.focus || 'mixed');
   const [isAdaptiveMode, setIsAdaptiveMode] = useState(false);
@@ -168,6 +178,8 @@ function App() {
   const [lastAttemptText, setLastAttemptText] = useState('');
   const [lastAttemptTargetText, setLastAttemptTargetText] = useState('');
   const [reviewNote, setReviewNote] = useState('');
+  const [reviewNoteWord, setReviewNoteWord] = useState('');
+  const [reviewNoteError, setReviewNoteError] = useState('');
   const [isReviewNoteSaved, setIsReviewNoteSaved] = useState(false);
   const [isReviewNoteEditorOpen, setIsReviewNoteEditorOpen] = useState(false);
   const [points, setPoints] = useState(getPoints);
@@ -357,7 +369,6 @@ function App() {
   const sentencePool = getSentencePool(practiceFocus, difficulty);
   const sentenceCatalogStatus = sentencePool.length ? 'ready' : sentenceLoadError === `${practiceFocus}:${difficulty}` ? 'error' : 'loading';
   const currentSentence = String(resolvePracticeSentence(sentencePool, currentIndex, lesson));
-  const practiceNotes = getPracticeNotesForSentence(currentSentence);
   useEffect(() => {
     if (!isReviewNoteEditorOpen) return;
     const handleEscape = (event: KeyboardEvent) => {
@@ -609,6 +620,8 @@ function App() {
     setStartedAt(null);
     setHasStartedTyping(false);
     setReviewNote('');
+    setReviewNoteWord('');
+    setReviewNoteError('');
     setIsReviewNoteSaved(false);
     setIsReviewNoteEditorOpen(false);
   }, [timeLimit]);
@@ -896,6 +909,8 @@ function App() {
     setLastAttemptText(completedText);
     setLastAttemptTargetText(currentSentence);
     setReviewNote('');
+    setReviewNoteWord('');
+    setReviewNoteError('');
     setIsReviewNoteSaved(false);
     recordWordAttempt(currentSentence, completedText);
     setReviewSummary(getReviewSummary());
@@ -955,14 +970,28 @@ function App() {
 
   const canSaveReviewNote = Boolean(lastAttempt && (lastAttempt.incorrectCharacters > 0 || lastAttempt.missingCharacters > 0));
   const handleSaveReviewNote = () => {
-    if (!currentSentence || !reviewNote.trim()) return;
-    savePracticeNoteForSentence(currentSentence, reviewNote);
-    if (canSaveReviewNote) {
+    if (!reviewNote.trim()) return;
+    const word = reviewNoteWord.trim();
+    if (word) {
+      if (word.split(',').some(item => !/^[a-zA-Z']+$/.test(item.trim()))) {
+        setReviewNoteError(isVietnamese ? 'Nhập các từ tiếng Anh, cách nhau bằng dấu phẩy; mỗi từ chỉ gồm chữ cái hoặc dấu nháy đơn.' : 'Enter English words separated by commas; use letters or apostrophes only.');
+        return;
+      }
+      setReviewWords(saveReviewWordNotes(word, reviewNote));
+      setReviewSummary(getReviewSummary());
+    } else if (canSaveReviewNote) {
       saveReviewNoteForAttempt(lastAttemptTargetText, lastAttemptText, reviewNote);
       setReviewWords(getReviewWords());
       setReviewSummary(getReviewSummary());
+    } else {
+      setReviewNoteError(isVietnamese ? 'Nhập từ muốn lưu vào Từ cần ôn.' : 'Enter a word to save to Review words.');
+      return;
     }
-    setIsReviewNoteSaved(Boolean(reviewNote.trim()));
+    setReviewNote('');
+    setReviewNoteWord('');
+    setReviewNoteError('');
+    setIsReviewNoteSaved(true);
+    setIsReviewNoteEditorOpen(false);
   };
 
   const handleGoalChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1012,14 +1041,15 @@ function App() {
     <div className="achievement-toast" role="status" aria-live="polite">
       <span className="achievement-toast-badge" aria-hidden="true">{achievementToast.icon}</span>
       <div>
-        <strong>Achievement unlocked!</strong>
-        <span>{achievementToast.title}</span>
-        <small>{achievementToast.description}</small>
+        <strong>{isVietnamese ? 'Đã mở khóa thành tựu!' : 'Achievement unlocked!'}</strong>
+        <span>{isVietnamese ? ACHIEVEMENT_TRANSLATIONS_VI[achievementToast.title]?.title || achievementToast.title : achievementToast.title}</span>
+        <small>{isVietnamese ? ACHIEVEMENT_TRANSLATIONS_VI[achievementToast.title]?.description || achievementToast.description : achievementToast.description}</small>
       </div>
     </div>
   ) : null;
 
   const appHeader = <Header
+    language={language}
     accountUser={accountUser}
     isAccountOpen={isAccountOpen}
     isPremium={isPremium}
@@ -1059,9 +1089,11 @@ function App() {
   />;
 
   if (isReviewOpen) {
-    return <Suspense fallback={<div className="screen-loading" role="status">Loading review…</div>}><>
+    return <Suspense fallback={<div className="screen-loading" role="status">{isVietnamese ? 'Đang tải mục ôn tập…' : 'Loading review…'}</div>}><>
+      <SiteNotice />
       {achievementToastNode}
       <ReviewPage
+        language={language}
         words={reviewWords}
         onAddWord={handleAddReviewWord}
         onUpdateWord={handleUpdateReviewWord}
@@ -1071,11 +1103,13 @@ function App() {
         initialWord={reviewWord}
         onBack={closeReviewPage}
       />
+      <LanguageSwitcher />
     </></Suspense>;
   }
 
   if (isPremiumOpen) {
-    return <Suspense fallback={<div className="screen-loading" role="status">Loading dashboard…</div>}><>
+    return <Suspense fallback={<div className="screen-loading" role="status">{isVietnamese ? 'Đang tải bảng điều khiển…' : 'Loading dashboard…'}</div>}><>
+      <SiteNotice />
       {achievementToastNode}
       <PremiumDashboard
         isPremium={isPremium}
@@ -1092,19 +1126,25 @@ function App() {
         onStartFocus={startFocusSession}
         onBack={closePremiumDashboard}
       />
+      <footer className="app-footer"><span>Zentation</span></footer>
+      <LanguageSwitcher />
     </></Suspense>;
   }
 
   if (isPaymentResultOpen) {
-    return <Suspense fallback={<div className="screen-loading" role="status">Loading payment…</div>}><>
+    return <Suspense fallback={<div className="screen-loading" role="status">{isVietnamese ? 'Đang tải thanh toán…' : 'Loading payment…'}</div>}><>
+      <SiteNotice />
       {achievementToastNode}
       <PaymentResultPage onBack={closePaymentResult} onActivated={() => { setIsPaymentResultOpen(false); openPremiumDashboard(); }} />
+      <footer className="app-footer"><span>Zentation</span></footer>
+      <LanguageSwitcher />
     </></Suspense>;
   }
 
   if (isPaymentOpen) {
     if (isPremium) {
-      return <Suspense fallback={<div className="screen-loading" role="status">Loading dashboard…</div>}><>
+      return <Suspense fallback={<div className="screen-loading" role="status">{isVietnamese ? 'Đang tải bảng điều khiển…' : 'Loading dashboard…'}</div>}><>
+        <SiteNotice />
         {achievementToastNode}
         <PremiumDashboard
           isPremium={isPremium}
@@ -1121,23 +1161,32 @@ function App() {
           onStartFocus={startFocusSession}
           onBack={closePaymentPage}
         />
+        <footer className="app-footer"><span>Zentation</span></footer>
+        <LanguageSwitcher />
       </></Suspense>;
     }
 
-    return <Suspense fallback={<div className="screen-loading" role="status">Loading payment…</div>}><>
+    return <Suspense fallback={<div className="screen-loading" role="status">{isVietnamese ? 'Đang tải thanh toán…' : 'Loading payment…'}</div>}><>
+      <SiteNotice />
       {achievementToastNode}
       <PaymentPage onBack={closePaymentPage} onLicenseClick={() => { closePaymentPage(); openPremiumDashboard(); }} />
+      <footer className="app-footer"><span>Zentation</span></footer>
+      <LanguageSwitcher />
     </></Suspense>;
   }
 
   if (isSupportOpen) {
-    return <Suspense fallback={<div className="screen-loading" role="status">Loading support…</div>}>
+    return <Suspense fallback={<div className="screen-loading" role="status">{isVietnamese ? 'Đang tải trang ủng hộ…' : 'Loading support…'}</div>}>
+      <>
+      <SiteNotice />
       <div className="app-layout">
         {achievementToastNode}
         {appHeader}
         <main className="app-content support-content"><SupportPage /></main>
-        <footer className="app-footer"><a href={`${import.meta.env.BASE_URL}privacy.html`} target="_blank" rel="noopener noreferrer">Privacy Policy ↗</a></footer>
+        <footer className="app-footer"><span>Zentation · {isVietnamese ? 'Luyện nghe tiếng Anh' : 'English listening practice'}</span></footer>
       </div>
+      <LanguageSwitcher />
+      </>
     </Suspense>;
   }
 
@@ -1181,107 +1230,109 @@ function App() {
   };
 
   return (
+    <>
+    {!isFocusMode && <SiteNotice />}
     <div className={`app-layout ${isFocusMode ? 'focus-mode' : ''}`}>
       {achievementToastNode}
       {!isFocusMode && appHeader}
       {!isFocusMode && showOnboarding && (
-        <section className="onboarding-card" aria-label="How to practice">
-          <div><span className="premium-kicker">Welcome to Zen Dictation</span><h2>Four quiet steps to better listening.</h2><p>Listen, type what you hear, then use the feedback to improve your accuracy and speed.</p></div>
-          <div className="onboarding-steps"><span><b>1</b> Listen</span><span><b>2</b> Type</span><span><b>3</b> Repeat</span><span><b>4</b> Improve</span></div>
-          <button type="button" onClick={() => { localStorage.setItem('zen-dictation-onboarding-seen', 'true'); setShowOnboarding(false); }}>Start practicing</button>
+        <section className="onboarding-card" aria-label={isVietnamese ? 'Hướng dẫn luyện tập' : 'How to practice'}>
+          <div><span className="premium-kicker">{isVietnamese ? 'Chào mừng đến với Zen Dictation' : 'Welcome to Zen Dictation'}</span><h2>{isVietnamese ? 'Bốn bước nhẹ nhàng để nghe tốt hơn.' : 'Four quiet steps to better listening.'}</h2><p>{isVietnamese ? 'Nghe, gõ lại nội dung bạn nghe được, rồi dùng phản hồi để cải thiện độ chính xác và tốc độ.' : 'Listen, type what you hear, then use the feedback to improve your accuracy and speed.'}</p></div>
+          <div className="onboarding-steps"><span><b>1</b> {isVietnamese ? 'Nghe' : 'Listen'}</span><span><b>2</b> {isVietnamese ? 'Gõ' : 'Type'}</span><span><b>3</b> {isVietnamese ? 'Lặp lại' : 'Repeat'}</span><span><b>4</b> {isVietnamese ? 'Cải thiện' : 'Improve'}</span></div>
+          <button type="button" onClick={() => { localStorage.setItem('zen-dictation-onboarding-seen', 'true'); setShowOnboarding(false); }}>{isVietnamese ? 'Bắt đầu luyện tập' : 'Start practicing'}</button>
         </section>
       )}
       {!isFocusMode && isPremiumOpen && (
-        <section className="premium-panel" aria-label="Premium features">
+        <section className="premium-panel" aria-label={isVietnamese ? 'Tính năng Premium' : 'Premium features'}>
           {isPremium ? (
             <>
-              <div className="premium-heading"><span className="premium-kicker">Zen Dictation Premium</span><strong>Your learning dashboard</strong></div>
+              <div className="premium-heading"><span className="premium-kicker">Zen Dictation Premium</span><strong>{isVietnamese ? 'Tổng quan học tập' : 'Your learning dashboard'}</strong></div>
               <div className="premium-metrics">
-                <div><span>Best speed</span><strong>{bestWpm || '—'} <small>WPM</small></strong></div>
-                <div><span>Accuracy</span><strong>{averageAccuracy || '—'}<small>%</small></strong></div>
-                <div><span>Sessions</span><strong>{practiceHistory.length}</strong></div>
+                <div><span>{isVietnamese ? 'Tốc độ tốt nhất' : 'Best speed'}</span><strong>{bestWpm || '—'} <small>WPM</small></strong></div>
+                <div><span>{isVietnamese ? 'Độ chính xác' : 'Accuracy'}</span><strong>{averageAccuracy || '—'}<small>%</small></strong></div>
+                <div><span>{isVietnamese ? 'Lượt luyện tập' : 'Sessions'}</span><strong>{practiceHistory.length}</strong></div>
               </div>
-              <label className="goal-control">Daily speed goal <input type="number" min="10" max="200" value={goalWpm} onChange={handleGoalChange} /> WPM</label>
-              <div className="history-heading"><span>Recent sessions</span><small>Saved on this device</small></div>
-              {practiceHistory.length === 0 ? <p className="premium-empty">Complete a practice sentence to start your personal history.</p> : <div className="history-list">{practiceHistory.slice(0, 5).map(session => <div className="history-row" key={session.id}><span>{new Date(session.date).toLocaleDateString()} · {session.difficulty}</span><strong>{session.wpm} WPM · {session.accuracy}%</strong></div>)}</div>}
+              <label className="goal-control">{isVietnamese ? 'Mục tiêu tốc độ mỗi ngày' : 'Daily speed goal'} <input type="number" min="10" max="200" value={goalWpm} onChange={handleGoalChange} /> WPM</label>
+              <div className="history-heading"><span>{isVietnamese ? 'Lượt gần đây' : 'Recent sessions'}</span><small>{isVietnamese ? 'Đã lưu trên thiết bị này' : 'Saved on this device'}</small></div>
+              {practiceHistory.length === 0 ? <p className="premium-empty">{isVietnamese ? 'Hoàn thành một câu để bắt đầu lưu lịch sử luyện tập.' : 'Complete a practice sentence to start your personal history.'}</p> : <div className="history-list">{practiceHistory.slice(0, 5).map(session => <div className="history-row" key={session.id}><span>{new Date(session.date).toLocaleDateString(isVietnamese ? 'vi-VN' : 'en-US')} · {isVietnamese ? ({ easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' } as const)[session.difficulty] : session.difficulty}</span><strong>{session.wpm} WPM · {session.accuracy}%</strong></div>)}</div>}
             </>
           ) : (
             <div className="premium-upsell">
               <span className="premium-kicker">Zen Dictation Premium</span>
-              <strong>See your progress. Improve with purpose.</strong>
-              <p>Turn every practice session into a clear, measurable learning habit.</p>
+              <strong>{isVietnamese ? 'Theo dõi tiến độ. Học tập có mục tiêu.' : 'See your progress. Improve with purpose.'}</strong>
+              <p>{isVietnamese ? 'Biến mỗi buổi luyện tập thành thói quen học tập rõ ràng và có thể đo lường.' : 'Turn every practice session into a clear, measurable learning habit.'}</p>
               <div className="premium-benefits">
-                <div><span className="benefit-icon" aria-hidden="true">↗</span><span><strong>Know your real progress</strong><small>Track your best speed and average accuracy over time.</small></span></div>
-                <div><span className="benefit-icon" aria-hidden="true">▤</span><span><strong>Never lose a practice session</strong><small>Keep a personal history of your latest 30 results.</small></span></div>
-                <div><span className="benefit-icon" aria-hidden="true">◎</span><span><strong>Set a goal that keeps you moving</strong><small>Choose a WPM target and make each session count.</small></span></div>
-                <div><span className="benefit-icon" aria-hidden="true">✦</span><span><strong>Make practice feel rewarding</strong><small>See your milestones in one calm, focused dashboard.</small></span></div>
+                <div><span className="benefit-icon" aria-hidden="true">↗</span><span><strong>{isVietnamese ? 'Nắm rõ tiến độ của bạn' : 'Know your real progress'}</strong><small>{isVietnamese ? 'Theo dõi tốc độ tốt nhất và độ chính xác trung bình.' : 'Track your best speed and average accuracy over time.'}</small></span></div>
+                <div><span className="benefit-icon" aria-hidden="true">▤</span><span><strong>{isVietnamese ? 'Không bỏ lỡ buổi luyện tập nào' : 'Never lose a practice session'}</strong><small>{isVietnamese ? 'Lưu lịch sử 30 kết quả gần nhất của bạn.' : 'Keep a personal history of your latest 30 results.'}</small></span></div>
+                <div><span className="benefit-icon" aria-hidden="true">◎</span><span><strong>{isVietnamese ? 'Đặt mục tiêu giúp bạn tiến bộ' : 'Set a goal that keeps you moving'}</strong><small>{isVietnamese ? 'Chọn mục tiêu WPM và tận dụng từng buổi luyện tập.' : 'Choose a WPM target and make each session count.'}</small></span></div>
+                <div><span className="benefit-icon" aria-hidden="true">✦</span><span><strong>{isVietnamese ? 'Tạo động lực khi luyện tập' : 'Make practice feel rewarding'}</strong><small>{isVietnamese ? 'Theo dõi các cột mốc trong bảng điều khiển tập trung.' : 'See your milestones in one calm, focused dashboard.'}</small></span></div>
               </div>
             </div>
           )}
         </section>
       )}
       {!isFocusMode && isSettingsOpen && (
-        <section id="settings-menu" className="settings-panel" aria-label="Settings">
+        <section id="settings-menu" className="settings-panel" aria-label={isVietnamese ? 'Cài đặt' : 'Settings'}>
           <label className="settings-field">
-            <span>Level</span>
+            <span>{isVietnamese ? 'Trình độ' : 'Level'}</span>
             <select value={difficulty} onChange={handleDifficultyChange}>
-              <option value="easy">Easy · A1–A2</option>
-              <option value="medium">Medium · B1–B2</option>
-              <option value="hard" disabled={!isPremium}>Hard · C1–C2 {isPremium ? '' : '(Premium)'}</option>
+              <option value="easy">{isVietnamese ? 'Dễ' : 'Easy'} · A1–A2</option>
+              <option value="medium">{isVietnamese ? 'Trung bình' : 'Medium'} · B1–B2</option>
+              <option value="hard" disabled={!isPremium}>{isVietnamese ? 'Khó' : 'Hard'} · C1–C2 {isPremium ? '' : '(Premium)'}</option>
             </select>
-            <small className="level-guide" role="note">{CAMBRIDGE_LEVELS[difficulty].exams}</small>
+            <small className="level-guide" role="note">{isVietnamese ? 'Cambridge: ' : ''}{CAMBRIDGE_LEVELS[difficulty].exams}</small>
           </label>
           <label className="settings-field">
-            <span>Focus</span>
+            <span>{isVietnamese ? 'Nội dung' : 'Focus'}</span>
             <select value={practiceFocus} onChange={handleFocusChange}>
-              <option value="mixed">Mixed practice</option>
-              <option value="vocabulary">Vocabulary</option>
-              <option value="idioms">Idioms</option>
-              <option value="ielts" disabled={!isPremium}>IELTS pack · Premium</option>
-              <option value="business" disabled={!isPremium}>Business pack · Premium</option>
+              <option value="mixed">{isVietnamese ? 'Luyện tập tổng hợp' : 'Mixed practice'}</option>
+              <option value="vocabulary">{isVietnamese ? 'Từ vựng' : 'Vocabulary'}</option>
+              <option value="idioms">{isVietnamese ? 'Thành ngữ' : 'Idioms'}</option>
+              <option value="ielts" disabled={!isPremium}>IELTS · Premium</option>
+              <option value="business" disabled={!isPremium}>{isVietnamese ? 'Giao tiếp công việc' : 'Business pack'} · Premium</option>
             </select>
             <small className="review-status" role="status">
-              {reviewSummary.due > 0 ? `${reviewSummary.due} word${reviewSummary.due === 1 ? '' : 's'} ready to review` : `${reviewSummary.total} words tracked`}
+              {reviewSummary.due > 0 ? (isVietnamese ? `${reviewSummary.due} từ đến hạn ôn tập` : `${reviewSummary.due} word${reviewSummary.due === 1 ? '' : 's'} ready to review`) : (isVietnamese ? `Đang theo dõi ${reviewSummary.total} từ` : `${reviewSummary.total} words tracked`)}
             </small>
           </label>
           <label className="settings-field">
-            <span>Practice</span>
+            <span>{isVietnamese ? 'Chế độ luyện' : 'Practice'}</span>
             <select value={isAdaptiveMode ? 'adaptive' : 'guided'} onChange={handlePracticeModeChange}>
-              <option value="guided">Guided</option>
-              <option value="adaptive" disabled={!isPremium}>Adaptive · Premium</option>
+              <option value="guided">{isVietnamese ? 'Có hướng dẫn' : 'Guided'}</option>
+              <option value="adaptive" disabled={!isPremium}>{isVietnamese ? 'Thích ứng' : 'Adaptive'} · Premium</option>
             </select>
             <small className="level-guide" role="note">
-              {isAdaptiveMode ? 'Level adjusts to your accuracy' : 'Choose level yourself.'}
+              {isAdaptiveMode ? (isVietnamese ? 'Trình độ tự điều chỉnh theo độ chính xác' : 'Level adjusts to your accuracy') : (isVietnamese ? 'Tự chọn trình độ.' : 'Choose level yourself.')}
             </small>
           </label>
           {reviewWords.length > 0 && (
-            <section className="review-words" aria-label="Words to review">
-              <div className="review-words-heading"><strong>Review words</strong><small>{reviewSummary.due} due now</small></div>
+            <section className="review-words" aria-label={isVietnamese ? 'Từ cần ôn tập' : 'Words to review'}>
+              <div className="review-words-heading"><strong>{isVietnamese ? 'Từ cần ôn' : 'Review words'}</strong><small>{isVietnamese ? `${reviewSummary.due} từ đến hạn` : `${reviewSummary.due} due now`}</small></div>
               <div className="review-words-list">
                 {reviewWords.slice(0, 8).map(review => {
                   const isDue = new Date(review.nextReviewAt).getTime() <= reviewNow;
-                  return <div className="review-word" key={review.word}><strong>{review.word}</strong>{isDue ? <button type="button" className="review-due-button" onClick={() => startDueWordPractice(review.word)}>{review.mistakes} mistake{review.mistakes === 1 ? '' : 's'} · Due now</button> : <span>{review.mistakes} mistake{review.mistakes === 1 ? '' : 's'} · Streak {review.correctStreak}</span>}</div>;
+                  return <div className="review-word" key={review.word}><strong>{review.word}</strong>{isDue ? <button type="button" className="review-due-button" onClick={() => startDueWordPractice(review.word)}>{isVietnamese ? `${review.mistakes} lỗi · Đến hạn` : `${review.mistakes} mistake${review.mistakes === 1 ? '' : 's'} · Due now`}</button> : <span>{isVietnamese ? `${review.mistakes} lỗi · Chuỗi ${review.correctStreak}` : `${review.mistakes} mistake${review.mistakes === 1 ? '' : 's'} · Streak ${review.correctStreak}`}</span>}</div>;
                 })}
               </div>
               {reviewPracticeError && <small className="review-practice-error" role="alert">{reviewPracticeError}</small>}
-              {reviewWords.length > 8 && <small className="review-words-more">Showing 8 of {reviewWords.length} words</small>}
-              <button type="button" className="review-words-button" onClick={() => openReviewPage()}>Open review page</button>
+              {reviewWords.length > 8 && <small className="review-words-more">{isVietnamese ? `Đang hiển thị 8/${reviewWords.length} từ` : `Showing 8 of ${reviewWords.length} words`}</small>}
+              <button type="button" className="review-words-button" onClick={() => openReviewPage()}>{isVietnamese ? 'Mở trang ôn tập' : 'Open review page'}</button>
             </section>
           )}
                   <label className="settings-field">
-            <span>count</span>
+            <span>{isVietnamese ? 'Số lần đọc' : 'Count'}</span>
             <select value={repeatCount} onChange={event => setRepeatCount(Number(event.target.value))}>
-              {REPEAT_COUNTS.map(count => <option key={count} value={count}>{count} {count === 1 ? 'time' : 'times'}</option>)}
+              {REPEAT_COUNTS.map(count => <option key={count} value={count}>{count} {isVietnamese ? 'lần' : count === 1 ? 'time' : 'times'}</option>)}
             </select>
           </label>
           <label className="settings-field">
-            <span>Pause</span>
+            <span>{isVietnamese ? 'Thời gian nghỉ' : 'Pause'}</span>
             <select value={repeatGap} onChange={event => setRepeatGap(Number(event.target.value))}>
-              {REPEAT_GAPS.map(gap => <option key={gap} value={gap}>{gap} {gap === 1 ? 'second' : 'seconds'}</option>)}
+              {REPEAT_GAPS.map(gap => <option key={gap} value={gap}>{gap} {isVietnamese ? 'giây' : gap === 1 ? 'second' : 'seconds'}</option>)}
             </select>
           </label>
           <div className="settings-field settings-speed-field">
-            <span>speed</span>
+            <span>{isVietnamese ? 'Tốc độ' : 'Speed'}</span>
             <div className="settings-speed-options">
               {SPEECH_SPEEDS.map(option => (
                 <button
@@ -1296,22 +1347,22 @@ function App() {
             </div>
           </div>
           <label className="settings-field">
-            <span>Voice</span>
+            <span>{isVietnamese ? 'Giọng đọc' : 'Voice'}</span>
             <select value={selectedVoice} onChange={event => setSelectedVoice(event.target.value)} disabled={voiceStatus === 'unsupported'}>
               <option value={DEFAULT_VOICE_NAME}>Google US English (default)</option>
-              <option value="">Browser default voice</option>
+              <option value="">{isVietnamese ? 'Giọng mặc định của trình duyệt' : 'Browser default voice'}</option>
               {voices.filter(voice => voice.name !== DEFAULT_VOICE_NAME).map(voice => <option key={`${voice.name}-${voice.voiceURI}`} value={voice.name}>{voice.name}</option>)}
             </select>
             <small className={`voice-status voice-status-${voiceStatus}`} role="status">
-              {voiceStatus === 'loading' ? 'Loading voices…' : voiceStatus === 'unsupported' ? 'Speech unavailable' : voiceStatus === 'speaking' ? 'Speaking' : voiceStatus === 'error' ? 'Try Again' : 'Ready'}
+              {voiceStatus === 'loading' ? (isVietnamese ? 'Đang tải giọng đọc…' : 'Loading voices…') : voiceStatus === 'unsupported' ? (isVietnamese ? 'Không hỗ trợ đọc văn bản' : 'Speech unavailable') : voiceStatus === 'speaking' ? (isVietnamese ? 'Đang đọc' : 'Speaking') : voiceStatus === 'error' ? (isVietnamese ? 'Thử lại' : 'Try Again') : (isVietnamese ? 'Sẵn sàng' : 'Ready')}
             </small>
-            <small>Google US English is preferred when available; otherwise another English voice is used. Browser default uses your device’s voice.</small>
+            <small>{isVietnamese ? 'Ưu tiên Google US English nếu có; nếu không sẽ dùng giọng tiếng Anh khác. Tùy chọn mặc định dùng giọng đọc trên thiết bị của bạn.' : 'Google US English is preferred when available; otherwise another English voice is used. Browser default uses your device’s voice.'}</small>
           </label>
           
         </section>
       )}
-      {isFocusMode && <div className="focus-toolbar"><span><b>Focus mode</b><small>Distraction-free practice</small></span><strong>{Math.floor(focusTimeLeft / 60)}:{String(focusTimeLeft % 60).padStart(2, '0')}</strong><button type="button" onClick={exitFocusMode}>Exit focus</button></div>}
-      {isFocusMode && focusSessionComplete && <section className="focus-summary" role="status"><span className="premium-kicker">Session complete</span><h2>Well done. You stayed focused.</h2><p>You practiced for this session with {typingSpeed.toFixed(1)} WPM on the last attempt.</p><button type="button" className="action-btn next" onClick={exitFocusMode}>Back to practice</button></section>}
+      {isFocusMode && <div className="focus-toolbar"><span><b>{isVietnamese ? 'Chế độ tập trung' : 'Focus mode'}</b><small>{isVietnamese ? 'Luyện tập không bị làm phiền' : 'Distraction-free practice'}</small></span><strong>{Math.floor(focusTimeLeft / 60)}:{String(focusTimeLeft % 60).padStart(2, '0')}</strong><button type="button" onClick={exitFocusMode}>{isVietnamese ? 'Thoát' : 'Exit focus'}</button></div>}
+      {isFocusMode && focusSessionComplete && <section className="focus-summary" role="status"><span className="premium-kicker">{isVietnamese ? 'Hoàn thành buổi luyện tập' : 'Session complete'}</span><h2>{isVietnamese ? 'Tuyệt vời! Bạn đã tập trung luyện tập.' : 'Well done. You stayed focused.'}</h2><p>{isVietnamese ? 'Tốc độ ở lần luyện cuối là' : 'You practiced for this session with'} {typingSpeed.toFixed(1)} WPM.</p><button type="button" className="action-btn next" onClick={exitFocusMode}>{isVietnamese ? 'Quay lại luyện tập' : 'Back to practice'}</button></section>}
       <main className="app-content">
         {SHOW_YOUTUBE_IMPORT && !isFocusMode && <YoutubeImport busy={hasStartedTyping && !lastAttempt} lesson={lesson?.videoId ? lesson : null}
           onExit={exitCoachLesson} onImport={(texts, videoId, captions) => {
@@ -1332,37 +1383,37 @@ function App() {
         {!isFocusMode && (
           <>
             <div className="stats-row">
-              <div className="time-limit-control" ><span className="stat-label">Typing speed</span><strong>{typingSpeed.toFixed(1)} WPM</strong></div>
+              <div className="time-limit-control" ><span className="stat-label">{isVietnamese ? 'Tốc độ gõ' : 'Typing speed'}</span><strong>{typingSpeed.toFixed(1)} WPM</strong></div>
               <div>
-                <div className="time-limit-control"> <span className="stat-label">Time limit</span>
-                  <input type="number" min={10} max={1800} step={5} value={timeLimit} onChange={handleTimeLimitChange} aria-label="Custom time limit in seconds" />
+                <div className="time-limit-control"> <span className="stat-label">{isVietnamese ? 'Giới hạn thời gian' : 'Time limit'}</span>
+                  <input type="number" min={10} max={1800} step={5} value={timeLimit} onChange={handleTimeLimitChange} aria-label={isVietnamese ? 'Giới hạn thời gian tùy chỉnh tính bằng giây' : 'Custom time limit in seconds'} />
                   <span>s</span>
                 </div>
-                <strong>{hasStartedTyping ? `${timeLeft}s left` : 'Waiting...'}</strong>
+                <strong>{hasStartedTyping ? (isVietnamese ? `Còn ${timeLeft}s` : `${timeLeft}s left`) : (isVietnamese ? 'Đang chờ...' : 'Waiting...')}</strong>
               </div>
               <div className="daily-target-card">
-                <span className="stat-label">Daily target</span>
+                <span className="stat-label">{isVietnamese ? 'Mục tiêu hôm nay' : 'Daily target'}</span>
                 <strong>{Math.min(dailyTarget.progress, dailyTarget.target)}/{dailyTarget.target}</strong>
-                <div className="stat-label" aria-label="Daily target progress">
+                <div className="stat-label" aria-label={isVietnamese ? 'Tiến độ mục tiêu hôm nay' : 'Daily target progress'}>
                   <span style={{ width: `${Math.min((dailyTarget.progress / dailyTarget.target) * 100, 100)}%` }} />
                 </div>
-                <small > {dailyTarget.completed ? `Reward claimead +${dailyTarget.rewardPoints}` : `Reward +${dailyTarget.rewardPoints}`}</small>
+                <small > {dailyTarget.completed ? `${isVietnamese ? 'Đã nhận thưởng' : 'Reward claimed'} +${dailyTarget.rewardPoints}` : `${isVietnamese ? 'Thưởng' : 'Reward'} +${dailyTarget.rewardPoints}`}</small>
               </div>
-              <div className="points-stat"><span className="stat-label">Points</span><strong>{points}</strong><small></small></div>
+              <div className="points-stat"><span className="stat-label">{isVietnamese ? 'Điểm' : 'Points'}</span><strong>{points}</strong><small></small></div>
             </div>
 
             <div className={'status-badge ' + (isTimeUp ? 'status-error' : isCompleted ? 'status-success' : 'status-ready')} role="status" aria-live="polite">
               {isTimeUp && !isCompleted ? (
                 <>
-                  <span aria-hidden="true">⏰</span> <strong>Time’s up</strong> — Hit Reset Timer to try again.
+                  <span aria-hidden="true">⏰</span> <strong>{isVietnamese ? 'Hết giờ' : 'Time’s up'}</strong> — {isVietnamese ? 'Nhấn Đặt lại giờ để thử lại.' : 'Hit Reset Timer to try again.'}
                 </>
-              ) : isCompleted ? '🎉 Done! +10 points perfect sentence' : '🎧 Listen and type...'}
+              ) : isCompleted ? (isVietnamese ? '🎉 Hoàn thành! +10 điểm cho câu chính xác' : '🎉 Done! +10 points perfect sentence') : (isVietnamese ? '🎧 Nghe và gõ lại...' : '🎧 Listen and type...')}
             </div>
 
             <div className="timer-action-group">
-              <button type="button" className="reset-timer-btn" onClick={handleResetTimer}>Reset Timer</button>
-              <button type="button" className="add-note-btn" onClick={() => setIsReviewNoteEditorOpen(open => !open)} aria-expanded={isReviewNoteEditorOpen}>
-                {isReviewNoteEditorOpen ? 'Close Note' : 'Add Note'}
+              <button type="button" className="reset-timer-btn" onClick={handleResetTimer}>{isVietnamese ? 'Đặt lại giờ' : 'Reset Timer'}</button>
+              <button type="button" className="add-note-btn" onClick={() => { setIsReviewNoteSaved(false); setIsReviewNoteEditorOpen(open => !open); }} aria-expanded={isReviewNoteEditorOpen}>
+                {isReviewNoteEditorOpen ? (isVietnamese ? 'Đóng ghi chú' : 'Close Note') : (isVietnamese ? 'Thêm ghi chú' : 'Add Note')}
               </button>
             </div>
             {isReviewNoteEditorOpen && (
@@ -1371,17 +1422,17 @@ function App() {
               }}>
                 <section className="practice-note-modal" role="dialog" aria-modal="true" aria-labelledby="practice-note-title">
                   <header className="practice-note-modal-header">
-                    <div><h2 id="practice-note-title">Add a note</h2><p>Saved with this sentence for future reference.</p></div>
-                    <button type="button" className="practice-note-modal-close" onClick={() => setIsReviewNoteEditorOpen(false)} aria-label="Close note popup">×</button>
+                    <div><h2 id="practice-note-title">{isVietnamese ? 'Thêm ghi chú' : 'Add a note'}</h2><p>{isVietnamese ? 'Lưu ghi chú cho từ sai trong câu hoặc thêm nhiều từ tiếng Anh, cách nhau bằng dấu phẩy. Ghi chú sẽ áp dụng cho tất cả từ.' : 'Save a note for a missed word or add multiple comma-separated English words. The note will apply to each word.'}</p></div>
+                    <button type="button" className="practice-note-modal-close" onClick={() => setIsReviewNoteEditorOpen(false)} aria-label={isVietnamese ? 'Đóng ghi chú' : 'Close note popup'}>×</button>
                   </header>
                   <div className="review-note-editor">
-                    <label htmlFor="practice-review-note">Your note</label>
-                    <textarea id="practice-review-note" value={reviewNote} onChange={event => { setReviewNote(event.target.value); setIsReviewNoteSaved(false); }} placeholder="Add a thought or reminder..." maxLength={240} autoFocus />
-                    <button type="button" onClick={handleSaveReviewNote} disabled={!currentSentence || !reviewNote.trim()}>Save note</button>
-                    {isReviewNoteSaved && <span role="status">Note saved.</span>}
-                    {practiceNotes.length > 0 && <ul className="saved-practice-notes" aria-label="Saved notes for this sentence">
-                      {practiceNotes.map((note, index) => <li key={`${note.createdAt}-${index}`}>{note.note}</li>)}
-                    </ul>}
+                    <label htmlFor="practice-review-word">{isVietnamese ? 'Từ cần thêm (cách nhau bằng dấu phẩy; có thể bỏ trống nếu vừa làm sai)' : 'Words to add (comma-separated; optional if you just made a mistake)'}</label>
+                    <input id="practice-review-word" value={reviewNoteWord} onChange={event => { setReviewNoteWord(event.target.value); setReviewNoteError(''); setIsReviewNoteSaved(false); }} placeholder={isVietnamese ? 'Ví dụ: apple, learning, practice' : 'Example: apple, learning, practice'} maxLength={1000} autoComplete="off" />
+                    <label htmlFor="practice-review-note">{isVietnamese ? 'Ghi chú của bạn' : 'Your note'}</label>
+                    <textarea id="practice-review-note" value={reviewNote} onChange={event => { setReviewNote(event.target.value); setReviewNoteError(''); setIsReviewNoteSaved(false); }} placeholder={isVietnamese ? 'Thêm suy nghĩ hoặc lời nhắc...' : 'Add a thought or reminder...'} maxLength={240} autoFocus />
+                    {reviewNoteError && <small className="review-edit-error" role="alert">{reviewNoteError}</small>}
+                    <button type="button" onClick={handleSaveReviewNote} disabled={!reviewNote.trim() || (!reviewNoteWord.trim() && !canSaveReviewNote)}>{isVietnamese ? 'Lưu vào Từ cần ôn' : 'Save to Review words'}</button>
+                    {isReviewNoteSaved && <span role="status">{isVietnamese ? 'Đã lưu ghi chú.' : 'Note saved.'}</span>}
                   </div>
                 </section>
               </div>
@@ -1391,11 +1442,11 @@ function App() {
 
         {!currentSentence ? (
           <section className="sentence-catalog-state" role="status">
-            <strong>{sentenceCatalogStatus === 'error' ? 'Sentence bank unavailable' : 'Loading sentence bank…'}</strong>
-            <small>{sentenceCatalogStatus === 'error' ? 'Check the API server and try refreshing the page.' : 'Connecting...'}</small>
+            <strong>{sentenceCatalogStatus === 'error' ? (isVietnamese ? 'Không thể tải ngân hàng câu' : 'Sentence bank unavailable') : (isVietnamese ? 'Đang tải ngân hàng câu…' : 'Loading sentence bank…')}</strong>
+            <small>{sentenceCatalogStatus === 'error' ? (isVietnamese ? 'Kiểm tra máy chủ API rồi tải lại trang.' : 'Check the API server and try refreshing the page.') : (isVietnamese ? 'Đang kết nối...' : 'Connecting...')}</small>
           </section>
         ) : <>
-        <DictationArea key={`${key}:${practiceFocus}:${difficulty}:${lesson?.index ?? ''}:${currentSentence}`} targetText={currentSentence} onComplete={handlePerfectComplete} onFinish={handleAttemptFinish} onNext={handleNext} onTypingChange={handleTypingChange} isHidden={isSentenceHidden && !isTimeUp && !focusSessionComplete && !(lesson?.videoId && lastAttempt)} disabled={Boolean(lesson?.completed) || focusSessionComplete} readOnly={isTimeUp} />
+        <DictationArea language={language} key={`${key}:${practiceFocus}:${difficulty}:${lesson?.index ?? ''}:${currentSentence}`} targetText={currentSentence} onComplete={handlePerfectComplete} onFinish={handleAttemptFinish} onNext={handleNext} onTypingChange={handleTypingChange} isHidden={isSentenceHidden && !isTimeUp && !focusSessionComplete && !(lesson?.videoId && lastAttempt)} disabled={Boolean(lesson?.completed) || focusSessionComplete} readOnly={isTimeUp} />
 
         {/* {!isFocusMode && (
           <div className="translation-panel">
@@ -1408,46 +1459,48 @@ function App() {
         )} */}
 
         <button type="button" className="visibility-toggle" onClick={() => setIsSentenceHidden(prev => !prev)} aria-pressed={isSentenceHidden && !isTimeUp && !focusSessionComplete} disabled={isTimeUp || focusSessionComplete}>
-          {isSentenceHidden && !isTimeUp && !focusSessionComplete ? 'Show sentence' : 'Hide sentence'}
+          {isSentenceHidden && !isTimeUp && !focusSessionComplete ? (isVietnamese ? 'Hiện câu' : 'Show sentence') : (isVietnamese ? 'Ẩn câu' : 'Hide sentence')}
         </button>
 
         {!isFocusMode && lastAttempt && (
           <div className="attempt-summary" role="status" aria-live="polite">
-            <strong>{lastAttempt.accuracy}% accuracy</strong>
+            <strong>{isVietnamese ? `Độ chính xác ${lastAttempt.accuracy}%` : `${lastAttempt.accuracy}% accuracy`}</strong>
             {lastAttempt.incorrectWords.length > 0 && <div className="incorrect-details" aria-label="Incorrect words">
               {/* <span>Words */}
               <div className="incorrect-details-list">
                 {lastAttempt.incorrectWords.map((detail, index) => <span className="incorrect-word" key={`${detail.actual}-${detail.expected}-${index}`}><b>{detail.actual}</b><i>→</i><strong>{detail.expected}</strong></span>)}
               </div>
             </div>}
-            {lastAttempt.missingWords.length > 0 && <div className="word-difference missing-words"><span>Missing</span><strong>{lastAttempt.missingWords.join(', ')}</strong></div>}
-            {lastAttempt.extraWords.length > 0 && <div className="word-difference extra-words"><span>Extra</span><strong>{lastAttempt.extraWords.join(', ')}</strong></div>}
+            {lastAttempt.missingWords.length > 0 && <div className="word-difference missing-words"><span>{isVietnamese ? 'Thiếu' : 'Missing'}</span><strong>{lastAttempt.missingWords.join(', ')}</strong></div>}
+            {lastAttempt.extraWords.length > 0 && <div className="word-difference extra-words"><span>{isVietnamese ? 'Thừa' : 'Extra'}</span><strong>{lastAttempt.extraWords.join(', ')}</strong></div>}
             <div className="error-coaching">
-              <strong className="error-coaching-title">{lastAttempt.accuracy === 100 ? 'Well done' : 'Listen & improve'}</strong>
-              {[...new Set([...lastAttempt.incorrectWords.map(item => item.expected), ...lastAttempt.missingWords])].slice(0, 6).map(word => <button type="button" key={word} aria-label={`Listen to the correct word: ${word}`} disabled={voiceStatus === 'unsupported'} onClick={() => replayMistake(word)}><span aria-hidden="true">▷</span> {word}</button>)}
-              <details><summary>Explanation & meaning</summary>
+              <strong className="error-coaching-title">{lastAttempt.accuracy === 100 ? (isVietnamese ? 'Làm tốt lắm' : 'Well done') : (isVietnamese ? 'Nghe và cải thiện' : 'Listen & improve')}</strong>
+              {[...new Set([...lastAttempt.incorrectWords.map(item => item.expected), ...lastAttempt.missingWords])].slice(0, 6).map(word => <button type="button" key={word} aria-label={isVietnamese ? `Nghe từ đúng: ${word}` : `Listen to the correct word: ${word}`} disabled={voiceStatus === 'unsupported'} onClick={() => replayMistake(word)}><span aria-hidden="true">▷</span> {word}</button>)}
+              <details><summary>{isVietnamese ? 'Giải thích và ý nghĩa' : 'Explanation & meaning'}</summary>
             {getVerifiedSentenceTranslation(lastAttemptTargetText) && <p lang="vi">   <i> <strong> {getVerifiedSentenceTranslation(lastAttemptTargetText)}</strong> </i> </p>}
-              {lastAttempt.incorrectWords.length > 0 && <p>A different word or spelling was entered. Listen to the correct word slowly, then compare the letters.</p>}
-              {lastAttempt.missingWords.length > 0 && <p>Words are missing. Listen for short connecting words and word endings.</p>}
-              {lastAttempt.extraWords.length > 0 && <p>Extra words were entered. Replay the sentence and check exactly which words you hear.</p>}
-              {!lastAttempt.incorrectWords.length && !lastAttempt.missingWords.length && !lastAttempt.extraWords.length && <p>{lastAttempt.accuracy === 100 ? 'All correct. Keep practising to make this feel natural.' : 'The words match. Check punctuation and spacing for a perfect answer.'}</p>}
+              {lastAttempt.incorrectWords.length > 0 && <p>{isVietnamese ? 'Bạn đã nhập từ khác hoặc sai chính tả. Nghe lại từ đúng thật chậm rồi đối chiếu các chữ cái.' : 'A different word or spelling was entered. Listen to the correct word slowly, then compare the letters.'}</p>}
+              {lastAttempt.missingWords.length > 0 && <p>{isVietnamese ? 'Bạn còn thiếu từ. Hãy chú ý các từ nối ngắn và đuôi từ.' : 'Words are missing. Listen for short connecting words and word endings.'}</p>}
+              {lastAttempt.extraWords.length > 0 && <p>{isVietnamese ? 'Bạn đã nhập thừa từ. Nghe lại câu và xác định chính xác những từ được đọc.' : 'Extra words were entered. Replay the sentence and check exactly which words you hear.'}</p>}
+              {!lastAttempt.incorrectWords.length && !lastAttempt.missingWords.length && !lastAttempt.extraWords.length && <p>{lastAttempt.accuracy === 100 ? (isVietnamese ? 'Chính xác! Hãy tiếp tục luyện tập để thành thạo hơn.' : 'All correct. Keep practising to make this feel natural.') : (isVietnamese ? 'Các từ đã khớp. Kiểm tra dấu câu và khoảng trắng để hoàn thành chính xác.' : 'The words match. Check punctuation and spacing for a perfect answer.')}</p>}
               {/* <p><small>Grammar focus: {lastAttempt.grammarTip}</small></p> */}
               </details>
               {/* {lastAttempt.accuracy < 100 && <small>This sentence is saved for review tomorrow.</small>} */}
             </div>
-            <button type="button" className="retry-attempt-button" onClick={handleRetry}>Try again</button>
+            <button type="button" className="retry-attempt-button" onClick={handleRetry}>{isVietnamese ? 'Thử lại' : 'Try again'}</button>
           </div>
         )}
 
-        <Controls onReplay={handleSpeak} onNext={handleNext} nextDisabled={nextButtonDisabled || Boolean(lesson && ((!lastAttempt && !isCompleted) || lesson.completed))} />
+        <Controls language={language} onReplay={handleSpeak} onNext={handleNext} nextDisabled={nextButtonDisabled || Boolean(lesson && ((!lastAttempt && !isCompleted) || lesson.completed))} />
         {!lesson?.videoId && (voiceStatus === 'error' || voiceStatus === 'unsupported') && <p className="speech-playback-error" role="alert">
-          {voiceStatus === 'unsupported' ? 'Speech playback is unavailable in this browser.' : voiceError}
+          {voiceStatus === 'unsupported' ? (isVietnamese ? 'Trình duyệt này không hỗ trợ phát giọng nói.' : 'Speech playback is unavailable in this browser.') : voiceError}
         </p>}
         </>}
         
       </main>
-      {!isFocusMode && <footer className="app-footer"><p> <i> Tip: Focus on the sounds, then the letters. Repeat three times for best results. </i> </p><a href={`${import.meta.env.BASE_URL}privacy.html`} target="_blank" rel="noopener noreferrer">Privacy Policy ↗</a></footer>}
+      {!isFocusMode && <footer className="app-footer"><p> <i> {isVietnamese ? 'Mẹo: Tập trung nghe âm thanh, rồi đến chữ cái. Lặp lại ba lần để đạt kết quả tốt nhất.' : 'Tip: Focus on the sounds, then the letters. Repeat three times for best results.'} </i> </p></footer>}
     </div>
+    {!isFocusMode && <LanguageSwitcher />}
+    </>
   );
 }
 

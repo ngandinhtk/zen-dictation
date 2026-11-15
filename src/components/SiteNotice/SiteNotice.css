@@ -1,0 +1,4 @@
+.site-notice { box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: 100%; padding: .65rem 1rem; border-bottom: 1px solid var(--border-color); background: color-mix(in srgb, var(--accent-color, #4479a7) 9%, var(--bg-color)); color: var(--text-color); font-size: .82rem; text-align: center; }
+.site-notice p { max-width: 100%; margin: 0; }
+.site-notice a { color: var(--text-color); font-weight: 700; text-underline-offset: 2px; }
+@media (max-width: 640px) { .site-notice { font-size: .75rem; line-height: 1.5; } }

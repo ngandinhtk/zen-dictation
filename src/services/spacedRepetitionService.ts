@@ -62,14 +62,38 @@ export const saveReviewNoteForAttempt = (target: string, input: string, note: st
   if (!cleanNote) return;
   const targetWords = normalizeWords(target);
   const inputWords = normalizeWords(input);
-  const { correctTargetIndices } = getWordAlignment(targetWords, inputWords);
-  const reviews = readReviews();
-  targetWords.forEach((word, index) => {
-    if (correctTargetIndices.includes(index)) return;
-    const existing = reviews.find(item => item.word === word);
-    if (existing && existing.mistakes > 0) existing.note = cleanNote;
+  const { errorTargetIndices } = getWordAlignment(targetWords, inputWords);
+  const reviews = new Map(readReviews().map(item => [item.word, item]));
+  const now = new Date().toISOString();
+  [...new Set(errorTargetIndices.map(index => targetWords[index]))].forEach(word => {
+    if (!word) return;
+    const existing = reviews.get(word);
+    if (existing) {
+      existing.note = cleanNote;
+      return;
+    }
+    reviews.set(word, { word, mistakes: 1, correctStreak: 0, nextReviewAt: now, lastMistakeAt: now, note: cleanNote });
   });
-  saveReviews(reviews.sort((a, b) => b.mistakes - a.mistakes));
+  saveReviews([...reviews.values()].sort((a, b) => b.mistakes - a.mistakes));
+};
+
+export const saveReviewWordNotes = (value: string, note: string) => {
+  const words = value.split(',').map(word => word.trim().toLowerCase());
+  const cleanNote = note.trim();
+  if (!words.length || words.some(word => !/^[a-z']+$/.test(word)) || !cleanNote) return getReviewWords();
+
+  const reviews = new Map(readReviews().map(item => [item.word, item]));
+  const now = new Date().toISOString();
+  [...new Set(words)].forEach(word => {
+    const existing = reviews.get(word);
+    if (existing) {
+      existing.note = cleanNote;
+    } else {
+      reviews.set(word, { word, mistakes: 1, correctStreak: 0, nextReviewAt: now, lastMistakeAt: now, note: cleanNote });
+    }
+  });
+  saveReviews([...reviews.values()].sort((a, b) => b.mistakes - a.mistakes));
+  return getReviewWords();
 };
 
 export const addReviewWord = (value: string) => {

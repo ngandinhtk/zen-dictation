@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { getTelegramMessageUrl } from '../../services/telegramService';
 import './BankQrPayment.css';
+import { useAppLanguage } from '../../context/useAppLanguage';
 
 const BankQrPayment = () => {
+  const isVietnamese = useAppLanguage().language === 'vi';
   const fallbackQrUrl = '/bank-qr.jpg';
   const configuredQrUrl = import.meta.env.VITE_BANK_QR_URL as string | undefined;
   const trimmedQrUrl = configuredQrUrl?.trim();
@@ -20,11 +22,11 @@ const BankQrPayment = () => {
   };
 
   return <div className="bank-qr-payment">
-    <img className="bank-qr-image" src={qrSrc} alt="Bank transfer QR" onError={handleQrError} />
-    <p className="bank-qr-title">Buy me a coffee via bank transfer</p>
-    <dl className="bank-details"><div><dt>Bank</dt><dd>{bankName}</dd></div><div><dt>Account</dt><dd>{accountNumber}</dd></div><div><dt>Transfer note</dt><dd>{transferNote}</dd></div></dl>
-    {telegramUrl && <a className="bank-confirm-button" href={telegramUrl} target="_blank" rel="noopener noreferrer">I&apos;ve completed the transfer — Contact Telegram</a>}
-    <p className="bank-qr-note">Thank you for supporting Zen Dictation! This contribution is separate from the automatic Premium purchase.</p>
+    <img className="bank-qr-image" src={qrSrc} alt={isVietnamese ? 'Mã QR chuyển khoản ngân hàng' : 'Bank transfer QR'} onError={handleQrError} />
+    <p className="bank-qr-title">{isVietnamese ? 'Mời cà phê qua chuyển khoản ngân hàng' : 'Buy me a coffee via bank transfer'}</p>
+    <dl className="bank-details"><div><dt>{isVietnamese ? 'Ngân hàng' : 'Bank'}</dt><dd>{bankName}</dd></div><div><dt>{isVietnamese ? 'Tài khoản' : 'Account'}</dt><dd>{accountNumber}</dd></div><div><dt>{isVietnamese ? 'Nội dung chuyển khoản' : 'Transfer note'}</dt><dd>{transferNote}</dd></div></dl>
+    {telegramUrl && <a className="bank-confirm-button" href={telegramUrl} target="_blank" rel="noopener noreferrer">{isVietnamese ? 'Tôi đã chuyển khoản — Liên hệ Telegram' : 'I’ve completed the transfer — Contact Telegram'}</a>}
+    <p className="bank-qr-note">{isVietnamese ? 'Cảm ơn bạn đã ủng hộ Zen Dictation! Khoản đóng góp này độc lập với giao dịch mua Premium tự động.' : 'Thank you for supporting Zen Dictation! This contribution is separate from the automatic Premium purchase.'}</p>
   </div>;
 };
 

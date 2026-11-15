@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getFeedback, type CharFeedback } from '../../utils/textUtils';
 import { soundService } from '../../services/soundService';
+import type { AppLanguage } from '../../utils/appLanguage';
 import './DictationArea.css';
 
 interface DictationAreaProps {
+  language: AppLanguage;
   targetText: string;
   onComplete: (value?: string, correctCharacters?: number) => void;
   onFinish?: (value: string, correctCharacters: number, isComplete: boolean) => void;
@@ -14,7 +16,8 @@ interface DictationAreaProps {
   readOnly?: boolean;
 }
 
-const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, onFinish, onNext, onTypingChange, isHidden = false, disabled = false, readOnly = false }) => {
+const DictationArea: React.FC<DictationAreaProps> = ({ language, targetText, onComplete, onFinish, onNext, onTypingChange, isHidden = false, disabled = false, readOnly = false }) => {
+  const isVietnamese = language === 'vi';
   const draftKey = `zen-dictation-draft:${encodeURIComponent(targetText)}`;
   const [userInput, setUserInput] = useState(() => {
     try {
@@ -121,7 +124,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
 
   return (
     <>
-    <div className="dictation-container" onClick={handleAreaClick} role="group" aria-label="Dictation practice area">
+    <div className="dictation-container" onClick={handleAreaClick} role="group" aria-label={isVietnamese ? 'Khu vực luyện nghe chính tả' : 'Dictation practice area'}>
       <div className={`feedback-display ${shouldHidePrompt ? 'hidden' : ''}`}>
         {wordGroups.map((group, groupIndex) => {
           const groupStartIndex = wordGroups.slice(0, groupIndex).reduce((total, currentGroup) => total + currentGroup.length, 0);
@@ -144,7 +147,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
       {shouldHidePrompt && (
         <div className="typing-signal" aria-live="polite">
           <span className="typing-signal-dot" aria-hidden="true" />
-          {userInput.length > 0 ? `Typing… ${userInput.length} characters` : 'Start typing…'}
+          {userInput.length > 0 ? (isVietnamese ? `Đang gõ… ${userInput.length} ký tự` : `Typing… ${userInput.length} characters`) : (isVietnamese ? 'Bắt đầu gõ…' : 'Start typing…')}
         </div>
       )}
       <input
@@ -157,7 +160,7 @@ const DictationArea: React.FC<DictationAreaProps> = ({ targetText, onComplete, o
         autoFocus
         spellCheck={false}
         autoComplete="off"
-        aria-label="Type the sentence you hear"
+        aria-label={isVietnamese ? 'Gõ lại câu bạn nghe được' : 'Type the sentence you hear'}
         disabled={disabled}
         readOnly={readOnly || hasSubmitted}
       />

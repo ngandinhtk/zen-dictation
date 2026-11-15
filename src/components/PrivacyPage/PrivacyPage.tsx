@@ -24,9 +24,8 @@ export default function PrivacyPage() {
     <a className="privacy-skip" href="#privacy-content">Đến nội dung chính</a>
     <PageHeader backLabel="Về luyện tập" />
     <main id="privacy-content" className="privacy-content">
-      <PrivacyLanguageSelect language="vi" />
       <div className="privacy-intro">
-        <span className="privacy-eyebrow">PRIVACY POLICY</span>
+        <span className="privacy-eyebrow">CHÍNH SÁCH QUYỀN RIÊNG TƯ</span>
         <h1>Chính sách<br />quyền riêng tư</h1>
         <p>Khi bạn luyện nghe cùng Zentation, ứng dụng lưu những gì? Ai có thể nhận thông tin đó? Trang này giải thích để bạn dễ theo dõi và lựa chọn.</p>
         <p className="privacy-date">Cập nhật ngày <time dateTime="2026-11-03">03/11/2026</time></p>
@@ -42,8 +41,8 @@ export default function PrivacyPage() {
         <section id="about">
           <h2>01. Bạn có thể liên hệ với ai?</h2>
           <p>Zentation là ứng dụng luyện nghe tiếng Anh, còn có tên Zen Dictation trên một số màn hình. Người vận hành Zentation quản lý thông tin tài khoản và tiến độ học được gửi đến hệ thống của ứng dụng.</p>
-          <p>Nếu có câu hỏi hoặc muốn xem, sửa, xóa thông tin của mình, hãy nhắn qua Telegram bên dưới. Đây cũng là liên kết Contact trong menu ứng dụng.</p>
-          {contactUrl ? <a className="privacy-contact" href={contactUrl} target="_blank" rel="noopener noreferrer">Liên hệ Zentation qua Telegram ↗</a> : <p>Vui lòng sử dụng liên kết Contact trong menu ứng dụng để liên hệ người vận hành.</p>}
+          <p>Nếu có câu hỏi hoặc muốn xem, sửa, xóa thông tin của mình, hãy nhắn qua Telegram bên dưới. Đây cũng là liên kết Liên hệ trong menu ứng dụng.</p>
+          {contactUrl ? <a className="privacy-contact" href={contactUrl} target="_blank" rel="noopener noreferrer">Liên hệ Zentation qua Telegram ↗</a> : <p>Vui lòng sử dụng liên kết Liên hệ trong menu ứng dụng để liên hệ người vận hành.</p>}
         </section>
         <section id="data">
           <h2>02. Ứng dụng lưu những gì?</h2>
@@ -100,5 +99,6 @@ export default function PrivacyPage() {
       </article>
     </main>
     <footer className="privacy-footer"><span>Zentation · Quyền riêng tư</span><a href="./">Trở về luyện tập →</a></footer>
+    <PrivacyLanguageSelect language="vi" />
   </div>;
 }

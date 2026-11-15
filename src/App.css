@@ -713,8 +713,8 @@
 .review-note-editor label small { display: inline; margin-left: .35rem; color: var(--text-muted); font-size: .58rem; }
 .review-note-editor textarea { width: 100%; min-height: 3.2rem; padding: .5rem .6rem; resize: vertical; border: 1px solid var(--border-color); border-radius: 8px; outline: none; background: var(--bg-color); color: var(--text-color); font: inherit; font-size: .65rem; }
 .review-note-editor textarea:focus { border-color: var(--accent-color); }
-.review-note-editor button { align-self: flex-start; padding: .35rem .6rem; border: 1px solid var(--border-color); border-radius: 999px; background: transparent; color: var(--text-muted); cursor: pointer; font-size: .6rem; }
-.review-note-editor button:hover:not(:disabled) { border-color: var(--accent-color); color: var(--text-color); }
+.review-note-editor button { align-self: flex-start; padding: .35rem .6rem; border: 1px solid var(--border-color); border-radius: 999px; background: var(--hover-bg); color: var(--text-muted); cursor: pointer; font-size: .6rem; box-shadow: 0 2px 10px rgba(109, 89, 122, .18); transition: background .2s ease, box-shadow .2s ease, transform .2s ease; }
+.review-note-editor button:hover:not(:disabled) { border-color: transparent; background: linear-gradient(135deg, #7b6b9d 0%, #4d7ea8 38%, #6ca98f 100%); color: #fff; box-shadow: 0 10px 22px rgba(31, 41, 55, .2); transform: translateY(-1px); }
 .review-note-editor button:disabled { cursor: not-allowed; opacity: .45; }
 .review-note-editor > span { color: var(--correct-color); font-size: .6rem; }
 .saved-practice-notes { display: grid; gap: .3rem; margin: .25rem 0 0; padding: 0; list-style: none; }

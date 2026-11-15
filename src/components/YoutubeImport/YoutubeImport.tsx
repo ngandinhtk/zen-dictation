@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { fetchYoutubeTranscript, type YoutubeCaption } from '../../services/youtubeApi';
 import './YoutubeImport.css';
+import { useAppLanguage } from '../../context/useAppLanguage';
 
 interface Props {
   busy: boolean;
@@ -10,13 +11,14 @@ interface Props {
 }
 
 export default function YoutubeImport({ busy, lesson, onImport, onExit }: Props) {
+  const isVietnamese = useAppLanguage().language === 'vi';
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const pending = useRef(false);
-  return <section className="youtube-import" aria-label="YouTube dictation">
-    <strong>Practice from YouTube</strong>
-    <p>Paste a video link to listen to the original audio, one sentence at a time. The video pauses while you type.</p>
+  return <section className="youtube-import" aria-label={isVietnamese ? 'Luyện nghe từ YouTube' : 'YouTube dictation'}>
+    <strong>{isVietnamese ? 'Luyện tập từ YouTube' : 'Practice from YouTube'}</strong>
+    <p>{isVietnamese ? 'Dán liên kết video để nghe âm thanh gốc theo từng câu. Video sẽ tạm dừng khi bạn gõ.' : 'Paste a video link to listen to the original audio, one sentence at a time. The video pauses while you type.'}</p>
     <form onSubmit={async event => {
       event.preventDefault();
       if (pending.current || busy) return;
@@ -35,16 +37,16 @@ export default function YoutubeImport({ busy, lesson, onImport, onExit }: Props)
     }}>
       <input type="url" required maxLength={500} value={url} disabled={loading || busy}
         onChange={event => { setUrl(event.target.value); setError(''); }}
-        placeholder="https://www.youtube.com/watch?v=…" aria-label="YouTube video link" />
-      <button type="submit" disabled={loading || busy || !url.trim()}>{loading ? 'Loading captions…' : 'Load captions'}</button>
+        placeholder="https://www.youtube.com/watch?v=…" aria-label={isVietnamese ? 'Liên kết video YouTube' : 'YouTube video link'} />
+      <button type="submit" disabled={loading || busy || !url.trim()}>{loading ? (isVietnamese ? 'Đang tải phụ đề…' : 'Loading captions…') : (isVietnamese ? 'Tải phụ đề' : 'Load captions')}</button>
     </form>
-    {busy && <small>Finish the current sentence before importing a video.</small>}
-    {loading && <p role="status">Đang lấy phụ đề tiếng Anh… YouTube có thể phản hồi chậm, vui lòng chờ tối đa khoảng một phút.</p>}
+    {busy && <small>{isVietnamese ? 'Hoàn thành câu hiện tại trước khi nhập video.' : 'Finish the current sentence before importing a video.'}</small>}
+    {loading && <p role="status">{isVietnamese ? 'Đang lấy phụ đề tiếng Anh… YouTube có thể phản hồi chậm, vui lòng chờ tối đa khoảng một phút.' : 'Fetching English captions… YouTube may respond slowly, please wait up to about a minute.'}</p>}
     {error && <p role="alert">{error}</p>}
     {lesson && <div className="youtube-progress" role="status">
-      <span>{lesson.completed ? 'Video practice complete!' : `YouTube · Caption ${lesson.index + 1} of ${lesson.texts.length}`}</span>
-      <a href={`https://www.youtube.com/watch?v=${lesson.videoId}`} target="_blank" rel="noreferrer">Open video</a>
-      <button type="button" disabled={loading} onClick={onExit}>Back to regular practice</button>
+      <span>{lesson.completed ? (isVietnamese ? 'Đã hoàn thành bài luyện video!' : 'Video practice complete!') : `YouTube · ${isVietnamese ? 'Phụ đề' : 'Caption'} ${lesson.index + 1}/${lesson.texts.length}`}</span>
+      <a href={`https://www.youtube.com/watch?v=${lesson.videoId}`} target="_blank" rel="noreferrer">{isVietnamese ? 'Mở video' : 'Open video'}</a>
+      <button type="button" disabled={loading} onClick={onExit}>{isVietnamese ? 'Quay lại luyện tập thường' : 'Back to regular practice'}</button>
     </div>}
   </section>;
 }

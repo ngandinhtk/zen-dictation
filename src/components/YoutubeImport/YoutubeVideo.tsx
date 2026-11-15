@@ -1,6 +1,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { loadYoutubePlayer, type YoutubePlayer } from '../../services/youtubePlayer';
 import type { YoutubeCaption } from '../../services/youtubeApi';
+import { useAppLanguage } from '../../context/useAppLanguage';
 
 export interface YoutubeVideoHandle { replay: () => void }
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function YoutubeVideo({ ref, videoId, caption, speed, completed }: Props) {
+  const isVietnamese = useAppLanguage().language === 'vi';
   const container = useRef<HTMLDivElement>(null);
   const player = useRef<YoutubePlayer | null>(null);
   const current = useRef({ caption, speed, completed });
@@ -55,12 +57,12 @@ export default function YoutubeVideo({ ref, videoId, caption, speed, completed }
           },
           onError(event) {
             if (disposed) return;
-            setError([101, 150].includes(event.data) ? 'This video does not allow embedded playback. Choose another video.' : 'Unable to play this video. It may be restricted or unavailable. Try another video.');
+            setError([101, 150].includes(event.data) ? (isVietnamese ? 'Video này không cho phép phát nhúng. Hãy chọn video khác.' : 'This video does not allow embedded playback. Choose another video.') : (isVietnamese ? 'Không thể phát video. Video có thể bị giới hạn hoặc không khả dụng. Hãy thử video khác.' : 'Unable to play this video. It may be restricted or unavailable. Try another video.'));
           },
-          onAutoplayBlocked() { if (!disposed) setNotice('Press Play sentence or the video play button to begin.'); },
+          onAutoplayBlocked() { if (!disposed) setNotice(isVietnamese ? 'Nhấn Phát câu hoặc nút phát video để bắt đầu.' : 'Press Play sentence or the video play button to begin.'); },
         },
       });
-    }).catch(cause => { if (!disposed) setError(cause instanceof Error ? cause.message : 'Unable to load video.'); });
+    }).catch(cause => { if (!disposed) setError(cause instanceof Error ? cause.message : (isVietnamese ? 'Không thể tải video.' : 'Unable to load video.')); });
     return () => {
       disposed = true;
       window.clearInterval(interval);
@@ -68,7 +70,7 @@ export default function YoutubeVideo({ ref, videoId, caption, speed, completed }
       instance?.destroy();
       host.remove();
     };
-  }, [videoId]);
+  }, [videoId, isVietnamese]);
 
   useEffect(() => {
     if (!ready || !player.current) return;
@@ -82,7 +84,7 @@ export default function YoutubeVideo({ ref, videoId, caption, speed, completed }
 
   return <div className="youtube-video">
     <div ref={container} className="youtube-player" />
-    {!ready && !error && <p role="status">Loading video player…</p>}
+    {!ready && !error && <p role="status">{isVietnamese ? 'Đang tải trình phát video…' : 'Loading video player…'}</p>}
     {error && <p role="alert">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     <button type="button" disabled={!ready || Boolean(error) || completed} onClick={() => {
@@ -91,7 +93,7 @@ export default function YoutubeVideo({ ref, videoId, caption, speed, completed }
       setNotice('');
       active.loadVideoById({ videoId, startSeconds: caption.start, endSeconds: caption.end });
       active.setPlaybackRate(speed);
-    }}>Play sentence / Replay</button>
-    <small> {caption.start.toFixed(1)}–{caption.end.toFixed(1)}s · Pauses at the end of this sentence</small>
+    }}>{isVietnamese ? 'Phát câu / Nghe lại' : 'Play sentence / Replay'}</button>
+    <small> {caption.start.toFixed(1)}–{caption.end.toFixed(1)}s · {isVietnamese ? 'Tạm dừng ở cuối câu' : 'Pauses at the end of this sentence'}</small>
   </div>;
 }

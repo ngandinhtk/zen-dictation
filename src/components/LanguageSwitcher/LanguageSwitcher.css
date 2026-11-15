@@ -1,0 +1,4 @@
+.site-footer-controls { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .6rem 1.25rem; width: min(calc(100% - 2rem), 800px); margin: .5rem auto 1.5rem; color: var(--text-muted); font-size: .75rem; }
+.site-footer-controls > a { color: var(--accent-color); text-underline-offset: .2em; }
+.language-switcher { display: inline-flex; align-items: center; gap: .45rem; color: var(--text-muted); font-size: inherit; }
+.language-switcher select { padding: .35rem .55rem; border: 1px solid var(--border-color); border-radius: 7px; background: var(--bg-color); color: var(--text-color); font: inherit; }
