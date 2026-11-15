@@ -46,7 +46,7 @@ const LicenseActivation = ({ onActivated }: { onActivated: () => void }) => {
       setIsLoading(false);
     }
   };
-  return <form className="license-form" onSubmit={handleSubmit}><label>{isVietnamese ? 'Mã giấy phép Premium' : 'Premium license key'}<input value={licenseKey} onChange={event => setLicenseKey(event.target.value)} placeholder="ZEN-XXXX-XXXX" autoComplete="off" required /></label>{error && <p className="license-error" role="alert">{error}</p>}<button type="submit" className="dashboard-cta" disabled={isLoading}>{isLoading ? (isVietnamese ? 'Đang kiểm tra mã…' : 'Checking key…') : (isVietnamese ? 'Mở khóa Premium' : 'Unlock Premium')}</button></form>;
+  return <form className="license-form" onSubmit={handleSubmit}><label>{isVietnamese ? 'Mã code  Premium' : 'Premium license key'}<input value={licenseKey} onChange={event => setLicenseKey(event.target.value)} placeholder="ZEN-XXXX-XXXX" autoComplete="off" required /></label>{error && <p className="license-error" role="alert">{error}</p>}<button type="submit" className="dashboard-cta" disabled={isLoading}>{isLoading ? (isVietnamese ? 'Đang kiểm tra mã…' : 'Checking key…') : (isVietnamese ? 'Mở khóa Premium' : 'Unlock Premium')}</button></form>;
 };
 
 const FocusLauncher = ({ isPremium, onStartFocus }: { isPremium: boolean; onStartFocus: (durationMinutes: number) => void }) => {
@@ -109,13 +109,14 @@ const ProgressAnalytics = ({ practiceHistory }: { practiceHistory: PracticeSessi
     return <section className="dashboard-card analytics-card"><div className="section-title"><h2>{isVietnamese ? 'Phân tích tiến độ' : 'Progress analytics'}</h2><span>{isVietnamese ? 'Thông tin Premium' : 'Premium insight'}</span></div><p className="dashboard-empty">{isVietnamese ? 'Hoàn thành ít nhất hai phiên để xem xu hướng WPM và độ chính xác.' : 'Complete at least two sessions to see your WPM and accuracy trends.'}</p></section>;
   }
 
-  const wpmValues = sessions.map(session => session.wpm);
+  const wpmValues = sessions.filter(session => session.wpm > 0).map(session => session.wpm);
   const accuracyValues = sessions.map(session => session.accuracy);
   const maxWpm = Math.max(...wpmValues, 1);
   const chartPoints = (values: number[], maxValue: number) => values.map((value, index) => `${(index / Math.max(values.length - 1, 1)) * 100},${100 - (value / maxValue) * 82 - 9}`).join(' ');
   const midpoint = Math.max(Math.floor(sessions.length / 2), 1);
+  const wpmMidpoint = Math.max(Math.floor(wpmValues.length / 2), 1);
   const average = (values: number[]) => values.reduce((total, value) => total + value, 0) / values.length;
-  const wpmTrend = Math.round(average(wpmValues.slice(midpoint)) - average(wpmValues.slice(0, midpoint)));
+  const wpmTrend = wpmValues.length >= 2 ? Math.round(average(wpmValues.slice(wpmMidpoint)) - average(wpmValues.slice(0, wpmMidpoint))) : null;
   const accuracyTrend = Math.round(average(accuracyValues.slice(midpoint)) - average(accuracyValues.slice(0, midpoint)));
   const trendLabel = (value: number, unit: string) => `${value > 0 ? '+' : ''}${value}${unit} ${isVietnamese ? 'so với các phiên trước' : 'vs earlier sessions'}`;
 
@@ -123,7 +124,7 @@ const ProgressAnalytics = ({ practiceHistory }: { practiceHistory: PracticeSessi
     <div className="section-title"><h2>{isVietnamese ? 'Phân tích tiến độ' : 'Progress analytics'}</h2><span>{isVietnamese ? `${sessions.length} phiên gần nhất` : `Last ${sessions.length} sessions`}</span></div>
     <div className="analytics-grid">
       <div className="analytics-chart-block">
-        <div className="analytics-chart-heading"><span>{isVietnamese ? 'Tốc độ gõ' : 'Typing speed'}</span><strong>{trendLabel(wpmTrend, ' WPM')}</strong></div>
+        <div className="analytics-chart-heading"><span>{isVietnamese ? 'Tốc độ gõ' : 'Typing speed'}</span><strong>{wpmTrend === null ? '—' : trendLabel(wpmTrend, ' WPM')}</strong></div>
         <svg className="analytics-chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={isVietnamese ? 'Biểu đồ xu hướng tốc độ gõ' : 'Typing speed trend chart'}>
           <polyline points={chartPoints(wpmValues, maxWpm)} fill="none" stroke="currentColor" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
         </svg>
@@ -145,15 +146,16 @@ const WeeklyLearningReport = ({ practiceHistory }: { practiceHistory: PracticeSe
   const [reportNow] = useState(() => Date.now());
   const weekStart = reportNow - 7 * 24 * 60 * 60 * 1000;
   const weeklySessions = practiceHistory.filter(session => new Date(session.date).getTime() >= weekStart);
+  const speedSessions = weeklySessions.filter(session => session.wpm > 0);
   const activeDays = new Set(weeklySessions.map(session => new Date(session.date).toLocaleDateString())).size;
   const averageAccuracy = weeklySessions.length ? Math.round(weeklySessions.reduce((total, session) => total + session.accuracy, 0) / weeklySessions.length) : 0;
-  const bestWpm = weeklySessions.length ? Math.max(...weeklySessions.map(session => session.wpm)) : 0;
+  const bestWpm = speedSessions.length ? Math.max(...speedSessions.map(session => session.wpm)) : 0;
   const weakestSession = weeklySessions.length ? [...weeklySessions].sort((a, b) => a.accuracy - b.accuracy)[0] : undefined;
   const recommendation = !weeklySessions.length
     ? (isVietnamese ? 'Hoàn thành một phiên trong tuần này để xem báo cáo đầu tiên.' : 'Complete a session this week to unlock your first report.')
     : averageAccuracy < 85
       ? (isVietnamese ? 'Ưu tiên độ chính xác. Nghe lại mỗi câu một lần trước khi gõ.' : 'Focus on accuracy first. Replay each sentence once before typing.')
-      : bestWpm < 35
+      : bestWpm > 0 && bestWpm < 35
         ? (isVietnamese ? 'Độ chính xác của bạn khá tốt. Thử tăng nhẹ tốc độ đọc để luyện phản xạ.' : 'Your accuracy is solid. Try a slightly faster speech speed to build fluency.')
         : (isVietnamese ? 'Bạn đang duy trì nhịp luyện tập tốt. Hãy thử chế độ luyện thích ứng để tăng thử thách.' : 'You are building a strong rhythm. Try Adaptive Practice for a new challenge.');
 
@@ -206,7 +208,7 @@ const PremiumDashboard = ({ isPremium, goalWpm, bestWpm, averageAccuracy, practi
         </section>
         <FocusLauncher isPremium={isPremium} onStartFocus={onStartFocus} />
         <LicenseActivation onActivated={onLicenseActivated} />
-        <small className="dashboard-note">{isVietnamese ? 'Mở khóa một lần · Không cần tài khoản' : 'One-time unlock · No account required'}</small>
+        <small className="dashboard-note">{isVietnamese ? '' : 'One-time unlock · No account required'}</small>
       </main>
     )}
   </div>;
@@ -217,7 +219,7 @@ const RecentSessions = ({ practiceHistory }: { practiceHistory: PracticeSession[
   const [visibleCount, setVisibleCount] = useState(10);
   const visibleSessions = practiceHistory.slice(0, visibleCount);
 
-  return <section className="dashboard-card"><div className="section-title"><h2>{isVietnamese ? 'Phiên gần đây' : 'Recent sessions'}</h2><span>{isVietnamese ? '30 kết quả gần nhất' : 'Last 30 results'}</span></div>{practiceHistory.length === 0 ? <p className="dashboard-empty">{isVietnamese ? 'Hoàn thành một câu để xem tiến độ tại đây.' : 'Complete a practice sentence to see your progress here.'}</p> : <><div className="dashboard-history">{visibleSessions.map(session => <div className="dashboard-history-row" key={session.id}><span>{new Date(session.date).toLocaleDateString(isVietnamese ? 'vi-VN' : 'en-US')} · {isVietnamese ? ({ easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' } as const)[session.difficulty] : session.difficulty}</span><strong>{session.wpm} WPM</strong><span>{session.accuracy}% {isVietnamese ? 'độ chính xác' : 'accuracy'}</span></div>)}</div>{visibleCount < practiceHistory.length && <button type="button" className="load-more-sessions" onClick={() => setVisibleCount(count => count + 10)}>{isVietnamese ? 'Tải thêm phiên' : 'Load more sessions'}</button>}</>}</section>;
+  return <section className="dashboard-card"><div className="section-title"><h2>{isVietnamese ? 'Phiên gần đây' : 'Recent sessions'}</h2><span>{isVietnamese ? '30 kết quả gần nhất' : 'Last 30 results'}</span></div>{practiceHistory.length === 0 ? <p className="dashboard-empty">{isVietnamese ? 'Hoàn thành một câu để xem tiến độ tại đây.' : 'Complete a practice sentence to see your progress here.'}</p> : <><div className="dashboard-history">{visibleSessions.map(session => <div className="dashboard-history-row" key={session.id}><span>{new Date(session.date).toLocaleDateString(isVietnamese ? 'vi-VN' : 'en-US')} · {isVietnamese ? ({ easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' } as const)[session.difficulty] : session.difficulty}</span><strong>{session.wpm > 0 ? `${session.wpm} WPM` : '— WPM'}</strong><span>{session.accuracy}% {isVietnamese ? 'độ chính xác' : 'accuracy'}</span></div>)}</div>{visibleCount < practiceHistory.length && <button type="button" className="load-more-sessions" onClick={() => setVisibleCount(count => count + 10)}>{isVietnamese ? 'Tải thêm phiên' : 'Load more sessions'}</button>}</>}</section>;
 };
 
 export default PremiumDashboard;

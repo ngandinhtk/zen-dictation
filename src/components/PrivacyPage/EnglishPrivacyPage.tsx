@@ -25,11 +25,11 @@ export default function EnglishPrivacyPage() {
         <span className="privacy-eyebrow">PRIVACY POLICY</span>
         <h1>Privacy policy</h1>
         <p>When you practise listening with Zendictation, what information does the app store? Who may receive it? This page explains how it works so you can make informed choices.</p>
-        <p className="privacy-date">Last updated <time dateTime="2026-11-03">3 November 2026</time></p>
+        <p className="privacy-date">Last updated <time dateTime="2026-11-15">15 November 2026</time></p>
       </div>
       <aside className="privacy-summary" aria-label="Key information">
         <strong>What you need to know</strong>
-        <p>Your current answer and settings are stored on your device. When you sign in, learning progress is also saved to your account for use on other devices. To access, correct or delete your information, contact us on Telegram.</p>
+        <p>The email you enter to open the app is stored on our server. We send one welcome email only if you actively choose to receive a Premium code; we will not send other marketing emails. Your current answer and settings are stored on your device. When you sign in, learning progress is also saved to your account for use on other devices. To access, correct or delete your information, contact us on Telegram.</p>
       </aside>
       <nav className="privacy-toc" aria-label="Policy contents">
         {sections.map(([id, title], index) => <a key={id} href={`#${id}`}><span>{String(index + 1).padStart(2, '0')}</span>{title}</a>)}
@@ -45,6 +45,7 @@ export default function EnglishPrivacyPage() {
           <h2>02. What information does the app store?</h2>
           <ul>
             <li><strong>Account:</strong> your email address, account ID, registration date and Premium status. Your password is used to verify sign-in. The stored password is a special verification string, rather than the original password you enter.</li>
+            <li><strong>Access email:</strong> your email address and submission time when you first open the app; stored on our server to record access. If you opt in to receive a Premium code, we also store your choice and consent time to send one welcome email with an activation code; we will not send other marketing emails.</li>
             <li><strong>Learning:</strong> practice dates, level, typing speed, accuracy, words to review, notes, scores and learning goals. Some information is stored on your device; when you sign in, history and progress are also saved to your account.</li>
             <li><strong>Premium purchases:</strong> order ID, amount, payment time and result, activation code and email address if you provide one. The app also generates a random identifier to recognise a browser with Premium activated; this is not your phone’s hardware identifier.</li>
             <li><strong>Support:</strong> information you send through Telegram. The systems running the app may also log Internet Protocol (IP) addresses, visits and errors to keep the service working and prevent abuse.</li>
@@ -54,7 +55,7 @@ export default function EnglishPrivacyPage() {
         <section id="purpose">
           <h2>03. How is your information used?</h2>
           <p>To let you sign in, reset your password, continue learning on another device, review words you often get wrong and use Premium you have purchased. Information also helps us support you, investigate errors and prevent misuse.</p>
-          <p>You do not need to provide an email address to use practice features that do not require an account.</p>
+          <p>An email address is required to open the app and record access. The Premium-code email is optional; if you opt in, we use your email to send one welcome message with a free activation code. We will not send other marketing emails.</p>
         </section>
         <section id="storage">
           <h2>04. Information stored on your device</h2>
@@ -65,8 +66,9 @@ export default function EnglishPrivacyPage() {
         <section id="providers">
           <h2>05. Services involved</h2>
           <ul>
-            <li><strong>App hosting and storage services:</strong> store account information, learning progress and transaction information so Zendictation can operate.</li>
+            <li><strong>App hosting and storage services:</strong> store access emails, account information, learning progress and transaction information so Zendictation can operate.</li>
             <li><strong>PayPal:</strong> you pay on PayPal’s website. Zendictation receives the transaction result; you do not enter your card number or card security code into a Zendictation form. See <a href="https://www.paypal.com/vn/legalhub/paypal/privacy-full" target="_blank" rel="noopener noreferrer">PayPal’s privacy policy</a>.</li>
+            <li><strong>Brevo:</strong> delivers the welcome email with a Premium code when you actively opt in. See <a href="https://www.brevo.com/legal/privacypolicy/" target="_blank" rel="noopener noreferrer">Brevo’s privacy policy</a>.</li>
             <li><strong>Speech services:</strong> your browser or phone receives sentences to read aloud. Some voices work on the device; others need to send sentences over the Internet. Not all voices are therefore available offline.</li>
             <li><strong>Telegram and banks:</strong> when you request support or make a bank transfer, information you provide is also handled under those services’ policies. If a QR code image is loaded from another service, that service may receive information about the image request.</li>
           </ul>
@@ -74,14 +76,14 @@ export default function EnglishPrivacyPage() {
         </section>
         <section id="retention">
           <h2>06. How long is information kept?</h2>
-          <p>Account, learning and Premium information is kept so you can continue using the app. The system currently does not automatically delete entire accounts after a fixed period. To request deletion, contact us on Telegram as described in section 01.</p>
+          <p>Access emails and email-consent records are kept until you request deletion. Account, learning and Premium information is kept so you can continue using the app. The system currently does not automatically delete entire accounts after a fixed period. To request deletion, contact us on Telegram as described in section 01.</p>
           <p>Sign-in sessions last for up to 30 days. Password reset links can be used once and expire after 30 minutes. Some payment information may need to be retained to verify transactions, resolve disputes or meet legal requirements, even when you request account deletion.</p>
           <p>We protect passwords and restrict access to the system. Do not share your password, sign-in codes or card information with anyone else.</p>
         </section>
         <section id="rights">
           <h2>07. Access, correct or delete your information</h2>
           <p>Under applicable law, you may request details of information the app stores about you, receive a copy, correct inaccurate information or request deletion. You may also request restrictions on, or an end to, its use.</p>
-          <p>Contact us on Telegram as described in section 01, providing your account email and explaining your request. We may need to verify that the account belongs to you. There is currently no self-service account deletion button; requests are reviewed under applicable law, including cases where some information must be retained.</p>
+          <p>Contact us on Telegram as described in section 01, providing the email you submitted or your account email and explaining your request. We may need to verify that the information belongs to you. There is currently no self-service data deletion button; requests are reviewed under applicable law, including cases where some information must be retained.</p>
           <p>Signing out, clearing browser data or stopping use of the app does not automatically delete information saved to your account. If you no longer allow a particular type of information to be used, features that depend on it may stop working.</p>
         </section>
         <section id="children">

@@ -85,7 +85,7 @@ export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProp
   const handleActivate = async () => {
     if (!licenseKey || isActivating) return;
     setIsActivating(true);
-    setMessage(isVietnamese ? 'Đang kích hoạt giấy phép Premium…' : 'Activating your Premium license…');
+    setMessage(isVietnamese ? 'Đang kích hoạt code Premium…' : 'Activating your Premium license…');
     try {
       await activatePremiumLicense(licenseKey);
       sessionStorage.removeItem('zen-paypal-order-id');
@@ -109,8 +109,8 @@ export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProp
         {status === 'paid' && <p><strong>{isVietnamese ? 'Cảm ơn bạn đã mua hàng. Chúng tôi rất trân trọng sự ủng hộ của bạn.' : 'Thank you for your purchase. We truly appreciate your support.'}</strong></p>}
         {status === 'checking' && <div className="payment-loader" aria-label={isVietnamese ? 'Đang kiểm tra trạng thái thanh toán' : 'Checking payment status'} />}
         {status === 'paid' && <>
-          <label className="license-reveal">{isVietnamese ? 'Mã giấy phép của bạn' : 'Your license key'}<input value={licenseKey} readOnly aria-label={isVietnamese ? 'Mã giấy phép Premium' : 'Premium license key'} /></label>
-          <button type="button" className="checkout-button checkout-next" onClick={() => void handleActivate()} disabled={!licenseKey || isActivating} aria-busy={isActivating}>{isActivating ? (isVietnamese ? 'Đang kích hoạt Premium…' : 'Activating Premium…') : (isVietnamese ? 'Kích hoạt giấy phép' : 'Activate this license')}</button>
+          <label className="license-reveal">{isVietnamese ? 'Mã code của bạn' : 'Your license key'}<input value={licenseKey} readOnly aria-label={isVietnamese ? 'Mã code Premium' : 'Premium license key'} /></label>
+          <button type="button" className="checkout-button checkout-next" onClick={() => void handleActivate()} disabled={!licenseKey || isActivating} aria-busy={isActivating}>{isActivating ? (isVietnamese ? 'Đang kích hoạt Premium…' : 'Activating Premium…') : (isVietnamese ? 'Kích hoạt code' : 'Activate this license')}</button>
         </>}
         <button type="button" className="license-button" onClick={onBack}>{status === 'paid' ? (isVietnamese ? 'Tôi sẽ kích hoạt sau' : 'I will activate later') : (isVietnamese ? 'Quay lại luyện tập' : 'Return to practice')}</button>
       </section>
@@ -146,7 +146,7 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
         <a className="logo payment-logo logo-link" href="#" onClick={event => { event.preventDefault(); onBack(); }}>Zen Dictation</a>
       </header>
       <main className="checkout-content">
-        <div className="checkout-intro"><span className="premium-kicker">{isVietnamese ? 'Thanh toán an toàn' : 'Secure checkout'}</span><h1>{isVietnamese ? 'Premium của bạn, thanh toán một lần.' : 'Your Premium, one simple payment.'}</h1><p>{isVietnamese ? 'Sau khi xác nhận thanh toán, chúng tôi sẽ tạo mã giấy phép cho bạn. Không cần tài khoản.' : 'After payment is confirmed, we will generate a license key for you. No account is required.'}</p></div>
+        <div className="checkout-intro"><span className="premium-kicker">{isVietnamese ? 'Thanh toán an toàn' : 'Secure checkout'}</span><h1>{isVietnamese ? 'Premium của bạn, thanh toán một lần.' : 'Your Premium, one simple payment.'}</h1><p>{isVietnamese ? 'Sau khi xác nhận thanh toán, chúng tôi sẽ tạo mã code cho bạn. Không cần tài khoản.' : 'After payment is confirmed, we will generate a license key for you. No account is required.'}</p></div>
         <section className="checkout-card" aria-label={isVietnamese ? 'Thông tin thanh toán' : 'Checkout summary'}>
           <div className="checkout-card-header"><span>Zen Dictation Premium</span><strong>$4</strong></div>
           <span className="checkout-subtitle">{isVietnamese ? 'Truy cập trọn đời · Thanh toán một lần' : 'Lifetime access · One-time payment'}</span>
@@ -154,7 +154,7 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
           <div className="checkout-security"><span aria-hidden="true">▣</span><span><strong>{isVietnamese ? 'Thanh toán qua cổng bảo mật' : 'Secure hosted payment'}</strong><small>{isVietnamese ? 'Nhà cung cấp dịch vụ thanh toán xử lý thông tin thẻ; Zen Dictation không lưu thông tin này.' : 'Your card details will be handled by our payment provider, never stored in Zen Dictation.'}</small></span></div>
           <button type="button" className="checkout-button checkout-next" onClick={startPayPalCheckout} disabled={isCreatingOrder}>{isCreatingOrder ? (isVietnamese ? 'Đang mở PayPal…' : 'Opening PayPal…') : (isVietnamese ? 'Thanh toán an toàn qua PayPal' : 'Pay securely with PayPal')}</button>
           {paymentError && <p className="payment-error" role="alert">{paymentError}</p>}
-          <button type="button" className="license-button" onClick={onLicenseClick}>{isVietnamese ? 'Đã thanh toán? Nhập mã giấy phép' : 'Already paid? Enter your license key'}</button>
+          <button type="button" className="license-button" onClick={onLicenseClick}>{isVietnamese ? 'Đã thanh toán? Nhập CODE premium' : 'Already paid? Enter your license key'}</button>
         </section>
         <p className="payment-note">{isVietnamese ? 'Bạn sẽ được chuyển đến PayPal để hoàn tất thanh toán. Email không bắt buộc và chỉ dùng để gửi biên lai.' : 'You will be redirected to PayPal to complete the payment. Your email is optional and is only used for the receipt.'}</p>
         <PrivacyNotice />
@@ -188,7 +188,7 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
           <li>{isVietnamese ? 'Có chế độ tập trung' : 'Focus mode included'}</li>
         </ul>
         <button type="button" className="checkout-button" onClick={() => setIsCheckoutOpen(true)}>{isVietnamese ? 'Tiếp tục thanh toán' : 'Continue to checkout'}</button>
-        <button type="button" className="license-button" onClick={onLicenseClick}>{isVietnamese ? 'Bạn đã có mã giấy phép?' : 'Already have a license key?'}</button>
+        <button type="button" className="license-button" onClick={onLicenseClick}>{isVietnamese ? 'Bạn đã có CODE premium?' : 'Already have a license key?'}</button>
       </section>
       {/* <p className="payment-note">Your Premium license will work without creating an account. An account is optional for syncing your progress across devices.</p> */}
       <PrivacyNotice />

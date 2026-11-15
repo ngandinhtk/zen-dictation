@@ -26,7 +26,7 @@ const BankQrPayment = () => {
     <p className="bank-qr-title">{isVietnamese ? 'Mời cà phê qua chuyển khoản ngân hàng' : 'Buy me a coffee via bank transfer'}</p>
     <dl className="bank-details"><div><dt>{isVietnamese ? 'Ngân hàng' : 'Bank'}</dt><dd>{bankName}</dd></div><div><dt>{isVietnamese ? 'Tài khoản' : 'Account'}</dt><dd>{accountNumber}</dd></div><div><dt>{isVietnamese ? 'Nội dung chuyển khoản' : 'Transfer note'}</dt><dd>{transferNote}</dd></div></dl>
     {telegramUrl && <a className="bank-confirm-button" href={telegramUrl} target="_blank" rel="noopener noreferrer">{isVietnamese ? 'Tôi đã chuyển khoản — Liên hệ Telegram' : 'I’ve completed the transfer — Contact Telegram'}</a>}
-    <p className="bank-qr-note">{isVietnamese ? 'Cảm ơn bạn đã ủng hộ Zen Dictation! Khoản đóng góp này độc lập với giao dịch mua Premium tự động.' : 'Thank you for supporting Zen Dictation! This contribution is separate from the automatic Premium purchase.'}</p>
+    <p className="bank-qr-note">{isVietnamese ? 'Cảm ơn bạn đã ủng hộ Zen Dictation! Khoản đóng góp của bạn là động lực lớn cho đội ngũ phát triển.' : 'Thank you for supporting Zen Dictation! Your contribution is a big motivation for our development team.'}</p>
   </div>;
 };
 

@@ -5,7 +5,7 @@ import ts from 'typescript';
 
 const source = await readFile(new URL('../src/utils/practiceState.ts', import.meta.url), 'utf8');
 const javascript = ts.transpile(source, { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 });
-const { remainingSeconds, resolvePracticeSentence } = await import(`data:text/javascript;base64,${Buffer.from(javascript).toString('base64')}`);
+const { getTypingSpeed, remainingSeconds, resolvePracticeSentence } = await import(`data:text/javascript;base64,${Buffer.from(javascript).toString('base64')}`);
 
 test('countdown reaches zero at the deadline and stays at zero', () => {
   assert.equal(remainingSeconds(31_000, 1_000), 30);
@@ -18,6 +18,15 @@ test('countdown catches up after a delayed background-tab callback', () => {
   const deadline = 1_000 + 20 * 60_000;
   assert.equal(remainingSeconds(deadline, 1_000 + 5 * 60_000), 15 * 60);
   assert.equal(remainingSeconds(deadline, deadline + 60_000), 0);
+});
+
+test('typing speed is not calculated when hidden mode disables it', () => {
+  assert.equal(getTypingSpeed(100, 1_000, 61_000, true), null);
+});
+
+test('typing speed is calculated only while enabled', () => {
+  assert.equal(getTypingSpeed(100, 1_000, 61_000, false), 20);
+  assert.equal(getTypingSpeed(0, 1_000, 61_000, false), 0);
 });
 
 test('lesson text takes precedence over the random sentence pool', () => {
@@ -34,7 +43,7 @@ test('missing lesson or pool entries never fall back to an unrelated sentence', 
 // Exercise the actual input handler as well as the clock calculation.
 const appSource = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const handlerStart = appSource.indexOf('  const handleTypingChange =');
-const handlerEnd = appSource.indexOf('\n\n  return (', handlerStart);
+const handlerEnd = appSource.indexOf('  return (', handlerStart);
 assert.ok(handlerStart >= 0 && handlerEnd > handlerStart);
 const handlerCode = ts.transpile(appSource.slice(handlerStart, handlerEnd), { target: ts.ScriptTarget.ES2022 });
 const makeHandler = (overrides = {}) => {

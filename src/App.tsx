@@ -11,7 +11,7 @@ import './styles/globals.css';
 import './App.css';
 import {  type Difficulty } from './utils/sentenceTranslations';
 import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
-import { isNextButtonDisabled, remainingSeconds, resolvePracticeSentence } from './utils/practiceState';
+import { getTypingSpeed, isNextButtonDisabled, remainingSeconds, resolvePracticeSentence } from './utils/practiceState';
 import { addReviewWord, clearReviewWords, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, removeReviewWord, replaceReviewWords, saveReviewNoteForAttempt, saveReviewWordNotes, updateReviewWord, type ReviewWord } from './services/spacedRepetitionService';
 import { addPoints, claimDailyTargetReward, clearPointsState, getDailyTarget, getPoints, getUnlockedAchievements, mergeDailyTarget, PERFECT_SENTENCE_POINTS, replaceDailyTarget, replacePoints, subtractPoints, TIMEOUT_PENALTY_POINTS, updateDailyTargetProgress, type DailyTarget } from './services/pointsService';
 import { clearPremiumLearningState, getGoalWpm, getPracticeHistory, getPracticeStreak, saveGoalWpm, savePracticeSession, type PracticeSession } from './services/premiumService';
@@ -189,6 +189,7 @@ function App() {
   const [timeLimit, setTimeLimit] = useState(DEFAULT_TIME_LIMIT);
   const [timeLeft, setTimeLeft] = useState(DEFAULT_TIME_LIMIT);
   const [typingSpeed, setTypingSpeed] = useState(0);
+  const [isSpeedTrackingDisabled, setIsSpeedTrackingDisabled] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const attemptStartedAtRef = useRef<number | null>(null);
   const [hasStartedTyping, setHasStartedTyping] = useState(false);
@@ -610,8 +611,9 @@ function App() {
     };
   }, [isAccountOpen]);
 
-  const resetStats = useCallback((nextTimeLimit = timeLimit) => {
+  const resetStats = useCallback((nextTimeLimit = timeLimit, disableSpeedTracking = isSentenceHidden) => {
     attemptStartedAtRef.current = null;
+    setIsSpeedTrackingDisabled(disableSpeedTracking);
     recordedAttemptRef.current = false;
     setLastAttempt(null);
     setCorrectChars(0);
@@ -624,7 +626,7 @@ function App() {
     setReviewNoteError('');
     setIsReviewNoteSaved(false);
     setIsReviewNoteEditorOpen(false);
-  }, [timeLimit]);
+  }, [isSentenceHidden, timeLimit]);
 
   const handleSpeak = useCallback(() => {
     speechPlaybackRequestedRef.current = true;
@@ -690,11 +692,10 @@ function App() {
   useEffect(() => {
     if (isFocusMode || !hasStartedTyping || startedAt === null) return;
     const tick = () => {
-      const elapsedSeconds = Math.max(0, (Date.now() - startedAt) / 1000);
       const remaining = remainingSeconds(startedAt + timeLimit * 1000);
-      const minutes = Math.max(elapsedSeconds / 60, 1 / 60);
       setTimeLeft(remaining);
-      setTypingSpeed(correctChars > 0 ? (correctChars / 5) / minutes : 0);
+      const nextTypingSpeed = getTypingSpeed(correctChars, startedAt, Date.now(), isSentenceHidden || isSpeedTrackingDisabled);
+      if (nextTypingSpeed !== null) setTypingSpeed(nextTypingSpeed);
       if (remaining === 0) {
         setIsTimeUp(true);
         setHasStartedTyping(false);
@@ -704,7 +705,7 @@ function App() {
     tick();
     const intervalId = window.setInterval(tick, 250);
     return () => window.clearInterval(intervalId);
-  }, [correctChars, hasStartedTyping, isFocusMode, startedAt, timeLimit]);
+  }, [correctChars, hasStartedTyping, isFocusMode, isSentenceHidden, isSpeedTrackingDisabled, startedAt, timeLimit]);
 
   useEffect(() => {
     if (isTimeUp && !timeUpSoundPlayedRef.current) {
@@ -769,7 +770,7 @@ function App() {
       setCurrentIndex(nextIndex);
       setIsCompleted(false);
       setIsTimeUp(false);
-      resetStats(timeLimit);
+      resetStats(timeLimit, isSentenceHidden || Boolean(nextLesson?.videoId));
       setKey(prev => prev + 1);
     };
     if (isMobileViewport && !lesson?.videoId) {
@@ -860,11 +861,15 @@ function App() {
   };
 
   const recordPremiumSession = (completedText: string, correctCharacters: number) => {
-    const elapsedMinutes = startedAt ? Math.max((Date.now() - startedAt) / 60000, 1 / 60) : 1 / 60;
+    let wpm = 0;
+    if (!isSentenceHidden && !isSpeedTrackingDisabled) {
+      const elapsedMinutes = startedAt ? Math.max((Date.now() - startedAt) / 60000, 1 / 60) : 1 / 60;
+      wpm = Math.round((completedText.length / 5) / elapsedMinutes);
+    }
     const session = {
       date: new Date().toISOString(),
       difficulty,
-      wpm: Math.round((completedText.length / 5) / elapsedMinutes),
+      wpm,
       accuracy: Math.round((correctCharacters / Math.max(currentSentence.length, 1)) * 100),
     };
     setPracticeHistory(savePracticeSession(session));
@@ -1254,7 +1259,7 @@ function App() {
               </div>
               <label className="goal-control">{isVietnamese ? 'Mục tiêu tốc độ mỗi ngày' : 'Daily speed goal'} <input type="number" min="10" max="200" value={goalWpm} onChange={handleGoalChange} /> WPM</label>
               <div className="history-heading"><span>{isVietnamese ? 'Lượt gần đây' : 'Recent sessions'}</span><small>{isVietnamese ? 'Đã lưu trên thiết bị này' : 'Saved on this device'}</small></div>
-              {practiceHistory.length === 0 ? <p className="premium-empty">{isVietnamese ? 'Hoàn thành một câu để bắt đầu lưu lịch sử luyện tập.' : 'Complete a practice sentence to start your personal history.'}</p> : <div className="history-list">{practiceHistory.slice(0, 5).map(session => <div className="history-row" key={session.id}><span>{new Date(session.date).toLocaleDateString(isVietnamese ? 'vi-VN' : 'en-US')} · {isVietnamese ? ({ easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' } as const)[session.difficulty] : session.difficulty}</span><strong>{session.wpm} WPM · {session.accuracy}%</strong></div>)}</div>}
+              {practiceHistory.length === 0 ? <p className="premium-empty">{isVietnamese ? 'Hoàn thành một câu để bắt đầu lưu lịch sử luyện tập.' : 'Complete a practice sentence to start your personal history.'}</p> : <div className="history-list">{practiceHistory.slice(0, 5).map(session => <div className="history-row" key={session.id}><span>{new Date(session.date).toLocaleDateString(isVietnamese ? 'vi-VN' : 'en-US')} · {isVietnamese ? ({ easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' } as const)[session.difficulty] : session.difficulty}</span><strong>{session.wpm > 0 ? `${session.wpm} WPM` : '— WPM'} · {session.accuracy}%</strong></div>)}</div>}
             </>
           ) : (
             <div className="premium-upsell">
@@ -1362,7 +1367,7 @@ function App() {
         </section>
       )}
       {isFocusMode && <div className="focus-toolbar"><span><b>{isVietnamese ? 'Chế độ tập trung' : 'Focus mode'}</b><small>{isVietnamese ? 'Luyện tập không bị làm phiền' : 'Distraction-free practice'}</small></span><strong>{Math.floor(focusTimeLeft / 60)}:{String(focusTimeLeft % 60).padStart(2, '0')}</strong><button type="button" onClick={exitFocusMode}>{isVietnamese ? 'Thoát' : 'Exit focus'}</button></div>}
-      {isFocusMode && focusSessionComplete && <section className="focus-summary" role="status"><span className="premium-kicker">{isVietnamese ? 'Hoàn thành buổi luyện tập' : 'Session complete'}</span><h2>{isVietnamese ? 'Tuyệt vời! Bạn đã tập trung luyện tập.' : 'Well done. You stayed focused.'}</h2><p>{isVietnamese ? 'Tốc độ ở lần luyện cuối là' : 'You practiced for this session with'} {typingSpeed.toFixed(1)} WPM.</p><button type="button" className="action-btn next" onClick={exitFocusMode}>{isVietnamese ? 'Quay lại luyện tập' : 'Back to practice'}</button></section>}
+      {isFocusMode && focusSessionComplete && <section className="focus-summary" role="status"><span className="premium-kicker">{isVietnamese ? 'Hoàn thành buổi luyện tập' : 'Session complete'}</span><h2>{isVietnamese ? 'Tuyệt vời! Bạn đã tập trung luyện tập.' : 'Well done. You stayed focused.'}</h2><p>{isSentenceHidden || isSpeedTrackingDisabled ? (isVietnamese ? 'Không đo tốc độ gõ khi ẩn câu.' : 'Typing speed is not tracked while the sentence is hidden.') : (isVietnamese ? `Tốc độ ở lần luyện cuối là ${typingSpeed.toFixed(1)} WPM.` : `Your typing speed for this session was ${typingSpeed.toFixed(1)} WPM.`)}</p><button type="button" className="action-btn next" onClick={exitFocusMode}>{isVietnamese ? 'Quay lại luyện tập' : 'Back to practice'}</button></section>}
       <main className="app-content">
         {SHOW_YOUTUBE_IMPORT && !isFocusMode && <YoutubeImport busy={hasStartedTyping && !lastAttempt} lesson={lesson?.videoId ? lesson : null}
           onExit={exitCoachLesson} onImport={(texts, videoId, captions) => {
@@ -1372,7 +1377,7 @@ function App() {
             setIsSentenceHidden(true);
             setIsCompleted(false);
             setIsTimeUp(false);
-            resetStats(timeLimit);
+            resetStats(timeLimit, true);
             setKey(value => value + 1);
           }} />}
         {lesson?.videoId && lesson.captions?.[lesson.index] && <YoutubeVideo key={lesson.videoId} ref={youtubeVideoRef}
@@ -1383,7 +1388,7 @@ function App() {
         {!isFocusMode && (
           <>
             <div className="stats-row">
-              <div className="time-limit-control" ><span className="stat-label">{isVietnamese ? 'Tốc độ gõ' : 'Typing speed'}</span><strong>{typingSpeed.toFixed(1)} WPM</strong></div>
+              <div className="time-limit-control" ><span className="stat-label">{isVietnamese ? 'Tốc độ gõ' : 'Typing speed'}</span><strong>{isSentenceHidden || isSpeedTrackingDisabled ? '—' : `${typingSpeed.toFixed(1)} WPM`}</strong></div>
               <div>
                 <div className="time-limit-control"> <span className="stat-label">{isVietnamese ? 'Giới hạn thời gian' : 'Time limit'}</span>
                   <input type="number" min={10} max={1800} step={5} value={timeLimit} onChange={handleTimeLimitChange} aria-label={isVietnamese ? 'Giới hạn thời gian tùy chỉnh tính bằng giây' : 'Custom time limit in seconds'} />
@@ -1458,7 +1463,16 @@ function App() {
           </div>
         )} */}
 
-        <button type="button" className="visibility-toggle" onClick={() => setIsSentenceHidden(prev => !prev)} aria-pressed={isSentenceHidden && !isTimeUp && !focusSessionComplete} disabled={isTimeUp || focusSessionComplete}>
+        <button type="button" className="visibility-toggle" onClick={() => {
+          const shouldHide = !isSentenceHidden;
+          setIsSentenceHidden(shouldHide);
+          if (shouldHide) {
+            setIsSpeedTrackingDisabled(true);
+            setTypingSpeed(0);
+          } else if (attemptStartedAtRef.current === null) {
+            setIsSpeedTrackingDisabled(false);
+          }
+        }} aria-pressed={isSentenceHidden && !isTimeUp && !focusSessionComplete} disabled={isTimeUp || focusSessionComplete}>
           {isSentenceHidden && !isTimeUp && !focusSessionComplete ? (isVietnamese ? 'Hiện câu' : 'Show sentence') : (isVietnamese ? 'Ẩn câu' : 'Hide sentence')}
         </button>
 

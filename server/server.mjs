@@ -26,6 +26,7 @@ CREATE INDEX IF NOT EXISTS auth_sessions_expiry ON auth_sessions(expires_at);
 CREATE TABLE IF NOT EXISTS password_reset_tokens (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at TIMESTAMPTZ NOT NULL);
 CREATE INDEX IF NOT EXISTS password_reset_tokens_expiry ON password_reset_tokens(expires_at);
 ALTER TABLE password_reset_tokens ENABLE ROW LEVEL SECURITY;
+CREATE TABLE IF NOT EXISTS access_email_submissions (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), promo_consent BOOLEAN NOT NULL DEFAULT FALSE, promo_consent_at TIMESTAMPTZ, promo_license_key TEXT, promo_email_sent_at TIMESTAMPTZ, promo_email_delivery_token TEXT, promo_email_delivery_started_at TIMESTAMPTZ);
 CREATE TABLE IF NOT EXISTS practice_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, date TIMESTAMPTZ NOT NULL, difficulty TEXT NOT NULL, wpm INTEGER NOT NULL DEFAULT 0, accuracy INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS practice_sessions_user_date ON practice_sessions(user_id, date DESC);
 CREATE TABLE IF NOT EXISTS licenses (id TEXT PRIMARY KEY, key_hash TEXT NOT NULL UNIQUE, key_last4 TEXT NOT NULL, activated_by TEXT, activated_user_id TEXT REFERENCES users(id) ON DELETE SET NULL, activated_at TIMESTAMPTZ);
@@ -37,6 +38,12 @@ CREATE TABLE IF NOT EXISTS learning_state (user_id TEXT PRIMARY KEY REFERENCES u
 CREATE INDEX IF NOT EXISTS learning_state_updated_at_idx ON learning_state(updated_at DESC);`);
 await query('ALTER TABLE licenses ADD COLUMN IF NOT EXISTS activated_user_id TEXT REFERENCES users(id) ON DELETE SET NULL');
 await query('CREATE INDEX IF NOT EXISTS licenses_activated_user_idx ON licenses(activated_user_id) WHERE activated_user_id IS NOT NULL');
+await query('ALTER TABLE access_email_submissions ADD COLUMN IF NOT EXISTS promo_consent BOOLEAN NOT NULL DEFAULT FALSE');
+await query('ALTER TABLE access_email_submissions ADD COLUMN IF NOT EXISTS promo_consent_at TIMESTAMPTZ');
+await query('ALTER TABLE access_email_submissions ADD COLUMN IF NOT EXISTS promo_license_key TEXT');
+await query('ALTER TABLE access_email_submissions ADD COLUMN IF NOT EXISTS promo_email_sent_at TIMESTAMPTZ');
+await query('ALTER TABLE access_email_submissions ADD COLUMN IF NOT EXISTS promo_email_delivery_token TEXT');
+await query('ALTER TABLE access_email_submissions ADD COLUMN IF NOT EXISTS promo_email_delivery_started_at TIMESTAMPTZ');
 
 const migrateLegacyData = async () => {
   try {
@@ -213,6 +220,17 @@ const sendLicenseEmail = async (email, licenseKey) => {
   }
   await sendEmail(email, 'Your Zen Dictation Premium license', `Thank you for your purchase!\n\nYour Zen Dictation Premium license key is:\n${licenseKey}\n\nOpen Zen Dictation Premium and enter this key to activate your access.`);
 };
+const sendWelcomeLicenseEmail = async (email, licenseKey, language) => {
+  if (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM) throw new Error('Welcome email is not configured');
+  const isVietnamese = language === 'vi';
+  const subject = isVietnamese
+    ? 'Chào mừng bạn đến với Zentation — mã Premium miễn phí'
+    : 'Welcome to Zentation — your free Premium code';
+  const textContent = isVietnamese
+    ? `Chào mừng bạn đến với Zentation!\n\nCảm ơn bạn đã tham gia. Đây là mã kích hoạt Zen Dictation Premium miễn phí, không hết hạn của bạn:\n\n${licenseKey}\n\nĐể kích hoạt, mở ứng dụng, vào mục Premium và nhập mã trên. Mỗi mã chỉ kích hoạt được một lần cho một thiết bị hoặc tài khoản.\n\nĐây là email chào mừng một lần mà bạn đã đồng ý nhận. Chúng tôi sẽ không gửi email quảng cáo nào khác.`
+    : `Welcome to Zentation!\n\nThanks for joining. Here is your free, non-expiring Zen Dictation Premium activation code:\n\n${licenseKey}\n\nTo activate it, open the app, go to Premium, and enter the code. Each code can be activated once for one device or account.\n\nThis is the one-time welcome email you agreed to receive. We will not send other marketing emails.`;
+  await sendEmail(email, subject, textContent);
+};
 const rawBody = async req => {
   let raw = '';
   for await (const chunk of req) { raw += chunk; if (raw.length > 100_000) throw new Error('Payload too large'); }
@@ -283,7 +301,7 @@ const getClientIp = req => {
 };
 const isRateLimited = (req, pathname) => {
   if (pathname === '/api/health' || pathname === '/api/payments/paypal/webhook') return false;
-  const isSensitive = pathname.includes('/auth/') || pathname.includes('/premium/activate') || pathname.includes('/payments/paypal/create-order');
+  const isSensitive = pathname.includes('/auth/') || pathname === '/api/access-email' || pathname.includes('/premium/activate') || pathname.includes('/payments/paypal/create-order');
   const limit = isSensitive ? 12 : 120;
   const key = `${getClientIp(req)}:${pathname}`;
   const now = Date.now();
@@ -310,6 +328,78 @@ const server = createServer(async (req, res) => {
   try {
     if (isRateLimited(req, url.pathname)) return send(res, 429, { error: 'Too many requests. Please try again shortly.' });
     if (url.pathname === '/api/health' && req.method === 'GET') return send(res, 200, { ok: true });
+
+    if (url.pathname === '/api/access-email' && req.method === 'POST') {
+      let input;
+      try {
+        input = await body(req);
+      } catch (error) {
+        if (error instanceof SyntaxError) return send(res, 400, { error: 'Invalid request body' });
+        throw error;
+      }
+      const email = typeof input.email === 'string' ? input.email.trim().toLowerCase() : '';
+      if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return send(res, 400, { error: 'Enter a valid email address' });
+      const promoConsent = input.promoConsent === true;
+      const language = input.language === 'vi' ? 'vi' : 'en';
+      const client = await pool.connect();
+      let promoLicenseKey;
+      let welcomeEmailSent = false;
+      try {
+        await client.query('BEGIN');
+        await client.query(`INSERT INTO access_email_submissions (id, email, promo_consent, promo_consent_at)
+          VALUES ($1, $2, $3, CASE WHEN $3 THEN NOW() END)
+          ON CONFLICT (email) DO UPDATE SET
+            promo_consent = access_email_submissions.promo_consent OR EXCLUDED.promo_consent,
+            promo_consent_at = CASE
+              WHEN EXCLUDED.promo_consent AND NOT access_email_submissions.promo_consent THEN NOW()
+              ELSE access_email_submissions.promo_consent_at
+            END`, [randomUUID(), email, promoConsent]);
+        if (promoConsent) {
+          const submission = (await client.query('SELECT promo_license_key, promo_email_sent_at FROM access_email_submissions WHERE email = $1 FOR UPDATE', [email])).rows[0];
+          promoLicenseKey = submission.promo_license_key ? decryptLicenseKey(submission.promo_license_key) : null;
+          if (!promoLicenseKey) {
+            promoLicenseKey = createLicenseKey();
+            await client.query('INSERT INTO licenses (id, key_hash, key_last4) VALUES ($1, $2, $3)', [randomUUID(), hashLicense(promoLicenseKey), promoLicenseKey.slice(-4)]);
+            await client.query('UPDATE access_email_submissions SET promo_license_key = $1 WHERE email = $2', [encryptLicenseKey(promoLicenseKey), email]);
+          }
+          welcomeEmailSent = Boolean(submission.promo_email_sent_at);
+        }
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+      if (promoConsent && !welcomeEmailSent) {
+        const deliveryToken = randomUUID();
+        const delivery = (await query(`UPDATE access_email_submissions
+          SET promo_email_delivery_token = $2, promo_email_delivery_started_at = NOW()
+          WHERE email = $1 AND promo_email_sent_at IS NULL
+            AND (promo_email_delivery_token IS NULL OR promo_email_delivery_started_at < NOW() - INTERVAL '2 minutes')
+          RETURNING promo_license_key`, [email, deliveryToken])).rows[0];
+        if (delivery) {
+          try {
+            await sendWelcomeLicenseEmail(email, decryptLicenseKey(delivery.promo_license_key), language);
+            await query(`UPDATE access_email_submissions
+              SET promo_email_sent_at = NOW(), promo_email_delivery_token = NULL, promo_email_delivery_started_at = NULL
+              WHERE email = $1 AND promo_email_delivery_token = $2`, [email, deliveryToken]);
+            welcomeEmailSent = true;
+          } catch (error) {
+            console.error('Welcome Premium email delivery failed:', error.message);
+            try {
+              await query(`UPDATE access_email_submissions
+                SET promo_email_delivery_token = NULL, promo_email_delivery_started_at = NULL
+                WHERE email = $1 AND promo_email_delivery_token = $2`, [email, deliveryToken]);
+            } catch (releaseError) {
+              console.error('Welcome Premium email retry release failed:', releaseError.message);
+            }
+            return send(res, 503, { error: 'WELCOME_EMAIL_FAILED' });
+          }
+        }
+      }
+      return send(res, 201, { accepted: true, welcomeEmailSent });
+    }
 
     if (url.pathname === '/api/sentences' && req.method === 'GET') {
       const pack = url.searchParams.get('pack') || 'core';
