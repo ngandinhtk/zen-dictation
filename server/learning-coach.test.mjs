@@ -9,7 +9,8 @@ const load = async path => {
   return import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
 };
 const { analyzeAttempt, getWordAlignment } = await load('../src/utils/textUtils.ts');
-const { applyLearningAttempt, buildDailyLesson, getWeeklyReport } = await load('../src/services/learningCoach.ts');
+const { applyLearningAttempt, buildDailyLesson, getWeeklyReport, mergeLearningStates } = await load('../src/services/learningCoach.ts');
+const { mergePracticeNotes } = await load('../src/services/practiceNotesService.ts');
 const now = Date.parse('2026-10-11T08:00:00Z');
 const attempt = { text: 'The train is late.', focus: 'mixed', difficulty: 'easy', accuracy: 70, errors: 1, date: new Date(now).toISOString() };
 
@@ -79,4 +80,27 @@ test('weekly comparisons use the same goal and difficulty and count unique maste
   assert.deepEqual(getWeeklyReport(history, 'mixed', 'easy', now), { count: 2, accuracy: 95, change: 35, errorChange: 2, mastered: 1 });
   assert.equal(getWeeklyReport([], 'mixed', 'easy', now).accuracy, null);
   assert.equal(getWeeklyReport([attempt], 'mixed', 'easy', now).change, null);
+});
+
+test('account hydration merges coach attempts and lets the newer review state win', () => {
+  const localAttempt = { ...attempt, date: new Date(now - 86400000).toISOString() };
+  const remoteAttempt = { ...attempt, accuracy: 100, errors: 0 };
+  const merged = mergeLearningStates({
+    attempts: [localAttempt],
+    reviews: [{ text: attempt.text, focus: 'mixed', difficulty: 'easy', streak: 0, nextReviewAt: new Date(now).toISOString() }],
+  }, {
+    attempts: [remoteAttempt],
+    reviews: [{ text: attempt.text, focus: 'mixed', difficulty: 'easy', streak: 1, nextReviewAt: new Date(now + 3 * 86400000).toISOString() }],
+  });
+
+  assert.equal(merged.attempts.length, 2);
+  assert.equal(merged.reviews[0].streak, 1);
+});
+
+test('account hydration merges practice notes without duplicating matching entries', () => {
+  const note = { sentence: 'The train is late.', note: 'Review the verb.', createdAt: new Date(now).toISOString() };
+  const merged = mergePracticeNotes([note], [{ ...note, sentence: 'the TRAIN is late.' }]);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].note, note.note);
+  assert.equal(merged[0].createdAt, note.createdAt);
 });

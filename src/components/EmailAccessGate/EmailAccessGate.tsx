@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useAppLanguage } from '../../context/useAppLanguage';
 import { submitAccessEmail } from '../../services/accessEmailService';
 import LanguageSwitcher from '../LanguageSwitcher/LanguageSwitcher';
-import PrivacyNotice from '../PrivacyPage/PrivacyNotice';
+// import PrivacyNotice from '../PrivacyPage/PrivacyNotice';
 import SiteNotice from '../SiteNotice/SiteNotice';
 import './EmailAccessGate.css';
 
@@ -72,8 +72,8 @@ export default function EmailAccessGate({ onAccessGranted }: EmailAccessGateProp
               disabled={isSubmitting}
             />
             <span>{isVietnamese
-              ? 'Gửi cho tôi một email chào mừng kèm mã Premium miễn phí. Tôi đồng ý nhận email này; sẽ không có email quảng cáo nào khác.'
-              : 'Email me a welcome message with my free Premium code. I agree to receive this one email; no other marketing emails will be sent.'}</span>
+              ? 'Gửi cho tôi Email chào mừng kèm mã Premium miễn phí. Tôi đồng ý nhận email này. Sẽ không có email quảng cáo nào khác.'
+              : 'Email me a Welcome message with my free Premium code. I agree to receive this one email. No other marketing emails will be sent.'}</span>
           </label>
           {error && <p className="email-access-error" role="alert">{error}</p>}
           <button type="submit" disabled={isSubmitting} aria-busy={isSubmitting}>
@@ -82,13 +82,13 @@ export default function EmailAccessGate({ onAccessGranted }: EmailAccessGateProp
               : (isVietnamese ? 'Tiếp tục' : 'Continue')}
           </button>
         </form>
-        <p className="email-access-data-notice">
+        {/* <p className="email-access-data-notice">
           {isVietnamese
             ? 'Email được lưu để ghi nhận quyền truy cập. Chỉ khi bạn chọn ô trên, chúng tôi mới dùng email để gửi một thư chào mừng có mã Premium.'
             : 'Your email is stored to record access. We will use it to send one welcome email with a Premium code only if you select the option above.'}
-        </p>
-        <PrivacyNotice />
-        <footer className="app-footer"><span>Zentation · {isVietnamese ? 'Luyện nghe tiếng Anh' : 'English listening practice'}</span></footer>
+        </p> */}
+        {/* <PrivacyNotice /> */}
+        {/* <footer className="app-footer"><span>Zentation · {isVietnamese ? 'Luyện nghe tiếng Anh' : 'English listening practice'}</span></footer> */}
       </section>
     </main>
     <LanguageSwitcher />

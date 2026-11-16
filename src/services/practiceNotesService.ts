@@ -11,7 +11,7 @@ const isPracticeNote = (value: unknown): value is PracticeNote => {
   return typeof note.sentence === 'string' && typeof note.note === 'string' && typeof note.createdAt === 'string';
 };
 
-const readPracticeNotes = () => {
+export const readPracticeNotes = () => {
   try {
     const value = JSON.parse(localStorage.getItem(NOTES_KEY) || '[]');
     return Array.isArray(value) ? value.filter(isPracticeNote) : [];
@@ -35,4 +35,31 @@ export const savePracticeNoteForSentence = (sentence: string, value: string) => 
   }].slice(-200);
   localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
   return notes.filter(note => note.sentence === cleanSentence);
+};
+
+export const mergePracticeNotes = (local: unknown, remote: unknown): PracticeNote[] => {
+  const toNotes = (value: unknown) => Array.isArray(value) ? value.filter(isPracticeNote) : [];
+  const notesByKey = new Map<string, PracticeNote>();
+  for (const note of [...toNotes(local), ...toNotes(remote)]) {
+    notesByKey.set(JSON.stringify([note.sentence.trim().toLowerCase(), note.createdAt]), note);
+  }
+  return [...notesByKey.values()].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)).slice(-200);
+};
+
+export const replacePracticeNotes = (notes: unknown): boolean => {
+  try {
+    localStorage.setItem(NOTES_KEY, JSON.stringify(mergePracticeNotes([], notes)));
+    return true;
+  } catch (error) {
+    console.error('Unable to save practice notes:', error);
+    return false;
+  }
+};
+
+export const clearPracticeNotes = () => {
+  try {
+    localStorage.removeItem(NOTES_KEY);
+  } catch (error) {
+    console.error('Unable to clear practice notes:', error);
+  }
 };

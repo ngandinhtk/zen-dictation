@@ -50,7 +50,7 @@ const Header = ({ language, accountUser, isAccountOpen, isPremium, isPremiumOpen
           <span aria-hidden="true">♡</span> {isVietnamese ? 'Ủng hộ' : 'Support'}
         </a>
        <a href="#account" className="account-toggle" onClick={event => { event.preventDefault(); onAccountToggle(); }} aria-expanded={isAccountOpen} aria-controls="account-menu">
-           {accountUser ? accountUser.email.split('@')[0] : isVietnamese ? 'Tài khoản' : 'Account'}
+           {accountUser ? <b>{accountUser.email.split('@')[0]}</b> : isVietnamese ? 'Tài khoản' : 'Account'}
         </a>  
     
       </nav>

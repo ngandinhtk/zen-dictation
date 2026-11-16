@@ -10,6 +10,7 @@ import LanguageSwitcher from './components/LanguageSwitcher/LanguageSwitcher';
 import './styles/globals.css';
 import './App.css';
 import {  type Difficulty } from './utils/sentenceTranslations';
+import { clearLearnerLevel, getLearnerLevel, isLearnerLevel, LEARNER_LEVEL_DIFFICULTY, saveLearnerLevel, type LearnerLevel } from './services/learnerLevelService';
 import { analyzeAttempt, type AttemptAnalysis } from './utils/textUtils';
 import { getTypingSpeed, isNextButtonDisabled, remainingSeconds, resolvePracticeSentence } from './utils/practiceState';
 import { addReviewWord, clearReviewWords, getDueReviewWords, getReviewSummary, getReviewWords, recordWordAttempt, removeReviewWord, replaceReviewWords, saveReviewNoteForAttempt, saveReviewWordNotes, updateReviewWord, type ReviewWord } from './services/spacedRepetitionService';
@@ -25,7 +26,8 @@ import LearningCoach from './components/LearningCoach/LearningCoach';
 import YoutubeImport from './components/YoutubeImport/YoutubeImport';
 import YoutubeVideo, { type YoutubeVideoHandle } from './components/YoutubeImport/YoutubeVideo';
 import type { YoutubeCaption } from './services/youtubeApi';
-import { buildDailyLesson, clearLearningState, readLearningState, recordLearningAttempt, type LearningFocus } from './services/learningCoach';
+import { buildDailyLesson, clearLearningState, mergeLearningStates, readLearningState, recordLearningAttempt, replaceLearningState, type LearningFocus, type LearningState } from './services/learningCoach';
+import { clearPracticeNotes, mergePracticeNotes, readPracticeNotes, replacePracticeNotes, type PracticeNote } from './services/practiceNotesService';
 import { getVerifiedSentenceTranslation } from './utils/sentenceTranslations';
 import { findReviewSentence } from './services/reviewSentence';
 import { chooseRandomSentenceIndex, isRecentlyUsedSentence, loadRecentSentenceHistory, rememberRecentSentence, saveRecentSentenceHistory } from './services/sentenceRotation';
@@ -91,6 +93,7 @@ const readActivePractice = (): ActivePractice | null => {
 const savedPractice = readActivePractice();
 const initialFocus = savedPractice?.focus || 'mixed';
 const initialDifficulty = savedPractice?.difficulty || DEFAULT_DIFFICULTY;
+const initialLearnerLevel = getLearnerLevel(initialDifficulty);
 const initialPack = initialFocus === 'mixed' ? 'core' : initialFocus;
 const initialSentences = getCachedSentencePack(initialPack, initialDifficulty);
 if (initialSentences?.length) updateDatabaseSentencePool(initialFocus, initialSentences);
@@ -136,10 +139,14 @@ const getAdaptiveDifficulty = (difficulty: Difficulty, accuracy: number): Diffic
 function App() {
   const { language } = useAppLanguage();
   const isVietnamese = language === 'vi';
-  const [difficulty, setDifficulty] = useState<Difficulty>(() => savedPractice?.difficulty || DEFAULT_DIFFICULTY);
+  const [learnerLevel, setLearnerLevel] = useState<LearnerLevel>(() => initialLearnerLevel);
+  const [learnerLevelSaveError, setLearnerLevelSaveError] = useState('');
+  const [accountSyncError, setAccountSyncError] = useState('');
+  const [difficulty, setDifficulty] = useState<Difficulty>(() => initialDifficulty);
   const [practiceFocus, setPracticeFocus] = useState<PracticeFocus>(() => savedPractice?.focus || 'mixed');
   const [isAdaptiveMode, setIsAdaptiveMode] = useState(false);
-  const [coachState, setCoachState] = useState(readLearningState);
+  const [coachState, setCoachState] = useState<LearningState>(readLearningState);
+  const [practiceNotes, setPracticeNotes] = useState<PracticeNote[]>(readPracticeNotes);
   const [lesson, setLesson] = useState<{ texts: string[]; index: number; completed: boolean; videoId?: string; captions?: YoutubeCaption[] } | null>(null);
   const youtubeVideoRef = useRef<YoutubeVideoHandle>(null);
   const recordedAttemptRef = useRef(false);
@@ -214,9 +221,13 @@ function App() {
   const [accountUser, setAccountUser] = useState<AccountUser | null>(null);
   const learningStateHydratedRef = useRef(false);
   const accountHydrationGenerationRef = useRef(0);
+  const accountLearningSnapshotRef = useRef({ learnerLevel, coachState, practiceNotes, isVietnamese });
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [achievementToast, setAchievementToast] = useState<{ title: string; description: string; icon: string } | null>(null);
   const unlockedAchievementIdsRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    accountLearningSnapshotRef.current = { learnerLevel, coachState, practiceNotes, isVietnamese };
+  }, [coachState, isVietnamese, learnerLevel, practiceNotes]);
   useEffect(() => {
     const handlePopState = () => {
       const isSupportRoute = window.location.hash.split('?')[0] === '#support';
@@ -324,7 +335,7 @@ function App() {
     const candidateFocuses: PracticeFocus[] = [practiceFocus, 'mixed', 'vocabulary', 'idioms'];
     if (isPremium) candidateFocuses.push('ielts', 'business');
     const focusOrder = [...new Set(candidateFocuses)];
-    const availableDifficulties: Difficulty[] = isPremium ? ['easy', 'medium', 'hard'] : ['easy', 'medium'];
+    const availableDifficulties: Difficulty[] = [LEARNER_LEVEL_DIFFICULTY[learnerLevel]];
     const findMatch = () => findReviewSentence(word, focusOrder.flatMap(focus => availableDifficulties.map(level => ({
       focus,
       difficulty: level,
@@ -529,6 +540,7 @@ function App() {
     const localPoints = getPoints();
     const localTarget = getDailyTarget();
     const localGoal = getGoalWpm();
+    const { learnerLevel: localLevel, coachState: localCoachState, practiceNotes: localPracticeNotes, isVietnamese: currentLanguageIsVietnamese } = accountLearningSnapshotRef.current;
     Promise.all([syncAccountSessions(localSessions, isCurrentHydration), getAccountLearningState()]).then(([remoteSessions, remoteState]) => {
       if (!isCurrentHydration()) return;
       const remoteReviews = Array.isArray(remoteState?.review_words) ? remoteState.review_words as ReviewWord[] : [];
@@ -537,18 +549,35 @@ function App() {
       const mergedTarget = mergeDailyTarget(localTarget, remoteTarget);
       const mergedPoints = Math.max(localPoints, remoteState?.points || 0);
       const mergedGoal = remoteState?.goal_wpm || localGoal;
+      const mergedLearnerLevel = isLearnerLevel(remoteState?.learner_level) ? remoteState.learner_level : localLevel;
+      const mergedCoachState = mergeLearningStates(localCoachState, remoteState?.coach_state);
+      const mergedPracticeNotes = mergePracticeNotes(localPracticeNotes, remoteState?.practice_notes);
       replaceReviewWords(mergedReviews);
       replacePoints(mergedPoints);
       replaceDailyTarget(mergedTarget);
       saveGoalWpm(mergedGoal);
+      replaceLearningState(mergedCoachState);
+      replacePracticeNotes(mergedPracticeNotes);
+      if (!saveLearnerLevel(mergedLearnerLevel)) {
+        setLearnerLevelSaveError(currentLanguageIsVietnamese ? 'Không thể lưu trình độ trên thiết bị này.' : 'Unable to save your level on this device.');
+      } else {
+        setLearnerLevelSaveError('');
+      }
       setPracticeHistory(remoteSessions);
+      setLearnerLevel(mergedLearnerLevel);
+      setCoachState(mergedCoachState);
+      setPracticeNotes(mergedPracticeNotes);
       setReviewWords(getReviewWords());
       setReviewSummary(getReviewSummary());
       setPoints(getPoints());
       setDailyTarget(getDailyTarget());
       setGoalWpm(getGoalWpm());
+      setAccountSyncError('');
       learningStateHydratedRef.current = true;
-    }).catch(() => undefined);
+    }).catch(error => {
+      console.error('Unable to sync account learning data:', error);
+      if (isCurrentHydration()) setAccountSyncError(currentLanguageIsVietnamese ? 'Chưa thể đồng bộ dữ liệu học tập. Hãy kiểm tra mạng rồi tải lại.' : 'Learning data could not sync. Check your connection and reload.');
+    });
     return () => {
       if (isCurrentHydration()) accountHydrationGenerationRef.current += 1;
       learningStateHydratedRef.current = false;
@@ -560,10 +589,24 @@ function App() {
     const generation = accountHydrationGenerationRef.current;
     const timer = window.setTimeout(() => {
       if (generation !== accountHydrationGenerationRef.current) return;
-      void saveAccountLearningState({ reviewWords, points, dailyTarget, goalWpm });
+      void saveAccountLearningState({
+        reviewWords,
+        points,
+        dailyTarget,
+        goalWpm,
+        learnerLevel,
+        coachState,
+        practiceNotes,
+      }).then(() => {
+        if (generation === accountHydrationGenerationRef.current) setAccountSyncError('');
+      }).catch(error => {
+        console.error('Unable to save account learning data:', error);
+        const currentLanguageIsVietnamese = accountLearningSnapshotRef.current.isVietnamese;
+        if (generation === accountHydrationGenerationRef.current) setAccountSyncError(currentLanguageIsVietnamese ? 'Chưa thể đồng bộ dữ liệu học tập. Hãy kiểm tra kết nối.' : 'Learning data could not sync. Check your connection.');
+      });
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [accountUser, dailyTarget, goalWpm, points, reviewWords]);
+  }, [accountUser, coachState, dailyTarget, goalWpm, learnerLevel, points, practiceNotes, reviewWords]);
 
   useEffect(() => {
     getPremiumStatus().then(entitlement => {
@@ -785,12 +828,23 @@ function App() {
   };
 
 
-  const handleDifficultyChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextDifficulty = event.target.value as Difficulty;
+  const handleLearnerLevelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextLevel = event.currentTarget.value;
+    if (!isLearnerLevel(nextLevel)) {
+      console.error('Unexpected learner level selection:', nextLevel);
+      return;
+    }
+    const nextDifficulty = LEARNER_LEVEL_DIFFICULTY[nextLevel];
     if (nextDifficulty === 'hard' && !isPremium) {
       openPremiumDashboard();
       return;
     }
+    if (!saveLearnerLevel(nextLevel)) {
+      setLearnerLevelSaveError(isVietnamese ? 'Không thể lưu trình độ trên thiết bị này.' : 'Unable to save your level on this device.');
+      return;
+    }
+    setLearnerLevelSaveError('');
+    setLearnerLevel(nextLevel);
     setLesson(null);
     clearActivePractice();
     setDifficulty(nextDifficulty);
@@ -938,12 +992,15 @@ function App() {
 
   const startCoachLesson = (reviewOnly = false) => {
     const now = new Date().getTime();
+    const levelDifficulty = LEARNER_LEVEL_DIFFICULTY[learnerLevel];
+    const levelSentencePool = getSentencePool(practiceFocus, levelDifficulty);
     const texts = reviewOnly
-      ? coachState.reviews.filter(item => item.focus === practiceFocus && item.difficulty === difficulty && Date.parse(item.nextReviewAt) <= now && sentencePool.includes(item.text)).sort((a, b) => Date.parse(a.nextReviewAt) - Date.parse(b.nextReviewAt)).slice(0, 5).map(item => item.text)
-      : buildDailyLesson(sentencePool, coachState.reviews, practiceFocus, difficulty, now, coachState.attempts, getDueReviewWords());
+      ? coachState.reviews.filter(item => item.focus === practiceFocus && item.difficulty === levelDifficulty && Date.parse(item.nextReviewAt) <= now && levelSentencePool.includes(item.text)).sort((a, b) => Date.parse(a.nextReviewAt) - Date.parse(b.nextReviewAt)).slice(0, 5).map(item => item.text)
+      : buildDailyLesson(levelSentencePool, coachState.reviews, practiceFocus, levelDifficulty, now, coachState.attempts, getDueReviewWords());
     if (!texts.length) return;
     try { texts.forEach(text => localStorage.removeItem(`zen-dictation-draft:${encodeURIComponent(text)}`)); } catch { /* Best effort. */ }
     clearActivePractice();
+    setDifficulty(levelDifficulty);
     setLesson({ texts, index: 0, completed: false });
     setIsCompleted(false);
     setIsTimeUp(false);
@@ -1073,6 +1130,13 @@ function App() {
       clearPremiumLearningState();
       clearLearningState();
       setCoachState(readLearningState());
+      clearPracticeNotes();
+      setPracticeNotes(readPracticeNotes());
+      clearLearnerLevel();
+      setLearnerLevel('beginner');
+      setDifficulty('easy');
+      setLearnerLevelSaveError('');
+      setAccountSyncError('');
       setLesson(null);
       clearAllPracticeDrafts();
       setAccountUser(null);
@@ -1280,12 +1344,14 @@ function App() {
         <section id="settings-menu" className="settings-panel" aria-label={isVietnamese ? 'Cài đặt' : 'Settings'}>
           <label className="settings-field">
             <span>{isVietnamese ? 'Trình độ' : 'Level'}</span>
-            <select value={difficulty} onChange={handleDifficultyChange}>
-              <option value="easy">{isVietnamese ? 'Dễ' : 'Easy'} · A1–A2</option>
-              <option value="medium">{isVietnamese ? 'Trung bình' : 'Medium'} · B1–B2</option>
-              <option value="hard" disabled={!isPremium}>{isVietnamese ? 'Khó' : 'Hard'} · C1–C2 {isPremium ? '' : '(Premium)'}</option>
+            <select value={learnerLevel} onChange={handleLearnerLevelChange}>
+              <option value="beginner">{isVietnamese ? 'Sơ cấp' : 'Beginner'} · A1–A2</option>
+              <option value="intermediate">{isVietnamese ? 'Trung cấp' : 'Intermediate'} · B1–B2</option>
+              <option value="advanced" disabled={!isPremium}>{isVietnamese ? 'Nâng cao' : 'Advanced'} · C1–C2 {isPremium ? '' : '(Premium)'}</option>
             </select>
-            <small className="level-guide" role="note">{isVietnamese ? 'Cambridge: ' : ''}{CAMBRIDGE_LEVELS[difficulty].exams}</small>
+            <small className="level-guide" role="note">{isVietnamese ? 'Cambridge: ' : 'Cambridge: '}{CAMBRIDGE_LEVELS[LEARNER_LEVEL_DIFFICULTY[learnerLevel]].exams}</small>
+            {learnerLevelSaveError && <small className="level-guide" role="alert">{learnerLevelSaveError}</small>}
+            {accountUser && accountSyncError && <small className="level-guide" role="alert">{accountSyncError}</small>}
           </label>
           <label className="settings-field">
             <span>{isVietnamese ? 'Nội dung' : 'Focus'}</span>

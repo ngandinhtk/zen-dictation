@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { loginAccount, registerAccount, resetAccountPassword, type AccountUser } from '../../services/accountService';
 import './AccountPanel.css';
-import PrivacyNotice from '../PrivacyPage/PrivacyNotice';
+// import PrivacyNotice from '../PrivacyPage/PrivacyNotice';
 import { useAppLanguage } from '../../context/useAppLanguage';
 
 interface AccountPanelProps {
@@ -70,7 +70,7 @@ const AccountPanel = ({ user, onAuthenticated, onLogout, resetToken }: AccountPa
     {!resetComplete && <label>{resetToken ? (isVietnamese ? 'Mật khẩu mới' : 'New password') : (isVietnamese ? 'Mật khẩu' : 'Password')}<input type="password" value={password} onChange={event => setPassword(event.target.value)} minLength={8} maxLength={1024} autoComplete={isRegistering || resetToken ? 'new-password' : 'current-password'} required /><small>{isVietnamese ? 'Ít nhất 8 ký tự' : 'At least 8 characters'}</small></label>}
     {resetToken && !resetComplete && <label>{isVietnamese ? 'Xác nhận mật khẩu mới' : 'Confirm new password'}<input type="password" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} minLength={8} maxLength={1024} autoComplete="new-password" required /></label>}
     </fieldset>
-    <PrivacyNotice />
+    {/* <PrivacyNotice /> */}
     {error && <p className="account-error" role="alert">{error}</p>}
     {message && <p role="status">{message}</p>}
     {!resetComplete && <button type="submit" className="account-submit" disabled={isLoading}>{isLoading ? (isVietnamese ? 'Vui lòng đợi…' : 'Please wait…') : resetToken ? (isVietnamese ? 'Lưu mật khẩu mới' : 'Save new password') : isRegistering ? (isVietnamese ? 'Tạo tài khoản' : 'Create account') : (isVietnamese ? 'Đăng nhập' : 'Sign in')}</button>}

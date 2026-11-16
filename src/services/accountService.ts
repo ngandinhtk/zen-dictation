@@ -20,6 +20,9 @@ export interface AccountLearningState {
   points: number;
   daily_target: unknown | null;
   goal_wpm: number;
+  learner_level?: 'beginner' | 'intermediate' | 'advanced' | null;
+  coach_state?: unknown;
+  practice_notes?: unknown[];
   updated_at?: string;
 }
 
@@ -78,4 +81,12 @@ export const syncAccountSessions = async (localSessions: Array<Omit<AccountPract
 };
 
 export const getAccountLearningState = async () => (await request<{ state: AccountLearningState | null }>('/api/learning-state')).state;
-export const saveAccountLearningState = async (state: { reviewWords: unknown[]; points: number; dailyTarget: unknown | null; goalWpm: number }) => request<{ state: AccountLearningState }>('/api/learning-state', { method: 'PUT', body: JSON.stringify(state) });
+export const saveAccountLearningState = async (state: {
+  reviewWords: unknown[];
+  points: number;
+  dailyTarget: unknown | null;
+  goalWpm: number;
+  learnerLevel: 'beginner' | 'intermediate' | 'advanced';
+  coachState: unknown;
+  practiceNotes: unknown[];
+}) => request<{ state: AccountLearningState }>('/api/learning-state', { method: 'PUT', body: JSON.stringify(state) });

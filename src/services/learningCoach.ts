@@ -42,6 +42,88 @@ export const recordLearningAttempt = (attempt: LearningAttempt) => {
   try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* Practice works without persistence. */ }
   return next;
 };
+
+const isLearningFocus = (value: unknown): value is LearningFocus =>
+  value === 'mixed' || value === 'vocabulary' || value === 'idioms' || value === 'ielts' || value === 'business';
+
+const isDifficulty = (value: unknown): value is Difficulty =>
+  value === 'easy' || value === 'medium' || value === 'hard';
+
+const asLearningState = (value: unknown): LearningState => {
+  if (!value || typeof value !== 'object') return { attempts: [], reviews: [] };
+  const state = value as { attempts?: unknown; reviews?: unknown };
+  const attempts = Array.isArray(state.attempts) ? state.attempts.filter((item): item is LearningAttempt =>
+    Boolean(item && typeof item === 'object'
+      && typeof item.text === 'string'
+      && isLearningFocus(item.focus)
+      && isDifficulty(item.difficulty)
+      && typeof item.accuracy === 'number'
+      && typeof item.date === 'string'
+      && typeof item.errors === 'number')) : [];
+  const reviews = Array.isArray(state.reviews) ? state.reviews.filter((item): item is SentenceReview =>
+    Boolean(item && typeof item === 'object'
+      && typeof item.text === 'string'
+      && isLearningFocus(item.focus)
+      && isDifficulty(item.difficulty)
+      && typeof item.nextReviewAt === 'string'
+      && typeof item.streak === 'number')) : [];
+  return { attempts, reviews };
+};
+
+const getSentenceKey = ({ text, focus, difficulty }: Pick<LearningAttempt, 'text' | 'focus' | 'difficulty'>) =>
+  JSON.stringify([text, focus, difficulty]);
+
+const getAttemptDate = (state: LearningState, key: string) => state.attempts.reduce((latest, attempt) =>
+  getSentenceKey(attempt) === key ? Math.max(latest, Date.parse(attempt.date) || 0) : latest, 0);
+
+export const mergeLearningStates = (localValue: unknown, remoteValue: unknown): LearningState => {
+  const local = asLearningState(localValue);
+  const remote = asLearningState(remoteValue);
+  const attemptsByKey = new Map<string, LearningAttempt>();
+  for (const attempt of [...local.attempts, ...remote.attempts]) {
+    const key = JSON.stringify([attempt.text, attempt.focus, attempt.difficulty, attempt.date]);
+    if (!attemptsByKey.has(key)) attemptsByKey.set(key, attempt);
+  }
+  const attempts = [...attemptsByKey.values()]
+    .sort((a, b) => Date.parse(a.date) - Date.parse(b.date))
+    .slice(-2000);
+
+  const reviewsByKey = new Map<string, { review: SentenceReview; source: LearningState }>();
+  for (const [source, reviews] of [[local, local.reviews], [remote, remote.reviews]] as const) {
+    for (const review of reviews) {
+      const key = getSentenceKey(review);
+      const existing = reviewsByKey.get(key);
+      if (!existing) {
+        reviewsByKey.set(key, { review, source });
+        continue;
+      }
+      const incomingAttemptDate = getAttemptDate(source, key);
+      const existingAttemptDate = getAttemptDate(existing.source, key);
+      const shouldReplace = incomingAttemptDate > existingAttemptDate
+        || (incomingAttemptDate === existingAttemptDate
+          && (review.streak > existing.review.streak
+            || (review.streak === existing.review.streak
+              && Date.parse(review.nextReviewAt) > Date.parse(existing.review.nextReviewAt))));
+      if (shouldReplace) reviewsByKey.set(key, { review, source });
+    }
+  }
+
+  const reviews = [...reviewsByKey.values()]
+    .map(({ review }) => review)
+    .sort((a, b) => Date.parse(a.nextReviewAt) - Date.parse(b.nextReviewAt))
+    .slice(-300);
+  return { attempts, reviews };
+};
+
+export const replaceLearningState = (state: LearningState): boolean => {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(asLearningState(state)));
+    return true;
+  } catch (error) {
+    console.error('Unable to save learning coach state:', error);
+    return false;
+  }
+};
 export const buildDailyLesson = (pool: string[], reviews: SentenceReview[], focus: LearningFocus, difficulty: Difficulty, now = Date.now(), attempts: LearningAttempt[] = [], weakWords: string[] = []) => {
   const dueReviews = reviews.filter(item => item.focus === focus && item.difficulty === difficulty && Date.parse(item.nextReviewAt) <= now && pool.includes(item.text))
     .sort((a, b) => Date.parse(a.nextReviewAt) - Date.parse(b.nextReviewAt)).map(item => item.text);

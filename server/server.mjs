@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import pg from 'pg';
 import { fetchYoutubeTranscript, YoutubeTranscriptError } from './youtubeTranscript.mjs';
+import { mergeAccountLearningState } from './learningStateMerge.mjs';
 
 const scrypt = promisify(scryptCallback);
 const PORT = Number(process.env.PORT || 3002);
@@ -34,10 +35,13 @@ CREATE TABLE IF NOT EXISTS payment_orders (app_trans_id TEXT PRIMARY KEY, device
 CREATE TABLE IF NOT EXISTS sentence_packs (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', is_premium BOOLEAN NOT NULL DEFAULT FALSE, is_active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS sentences (id TEXT PRIMARY KEY, pack_id TEXT NOT NULL REFERENCES sentence_packs(id) ON DELETE CASCADE, text TEXT NOT NULL, difficulty TEXT NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard')), topic TEXT NOT NULL DEFAULT 'general', source TEXT NOT NULL DEFAULT 'custom', license TEXT, sort_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE INDEX IF NOT EXISTS sentences_pack_difficulty_idx ON sentences(pack_id, difficulty, sort_order);
-CREATE TABLE IF NOT EXISTS learning_state (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, review_words JSONB NOT NULL DEFAULT '[]'::jsonb, points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0), daily_target JSONB, goal_wpm INTEGER NOT NULL DEFAULT 40 CHECK (goal_wpm BETWEEN 10 AND 200), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS learning_state (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, review_words JSONB NOT NULL DEFAULT '[]'::jsonb, points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0), daily_target JSONB, goal_wpm INTEGER NOT NULL DEFAULT 40 CHECK (goal_wpm BETWEEN 10 AND 200), learner_level TEXT CHECK (learner_level IN ('beginner', 'intermediate', 'advanced')), coach_state JSONB NOT NULL DEFAULT '{"attempts":[],"reviews":[]}'::jsonb, practice_notes JSONB NOT NULL DEFAULT '[]'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE INDEX IF NOT EXISTS learning_state_updated_at_idx ON learning_state(updated_at DESC);`);
 await query('ALTER TABLE licenses ADD COLUMN IF NOT EXISTS activated_user_id TEXT REFERENCES users(id) ON DELETE SET NULL');
 await query('CREATE INDEX IF NOT EXISTS licenses_activated_user_idx ON licenses(activated_user_id) WHERE activated_user_id IS NOT NULL');
+await query("ALTER TABLE learning_state ADD COLUMN IF NOT EXISTS learner_level TEXT CHECK (learner_level IN ('beginner', 'intermediate', 'advanced'))");
+await query(`ALTER TABLE learning_state ADD COLUMN IF NOT EXISTS coach_state JSONB NOT NULL DEFAULT '{"attempts":[],"reviews":[]}'::jsonb`);
+await query("ALTER TABLE learning_state ADD COLUMN IF NOT EXISTS practice_notes JSONB NOT NULL DEFAULT '[]'::jsonb");
 await query('ALTER TABLE access_email_submissions ADD COLUMN IF NOT EXISTS promo_consent BOOLEAN NOT NULL DEFAULT FALSE');
 await query('ALTER TABLE access_email_submissions ADD COLUMN IF NOT EXISTS promo_consent_at TIMESTAMPTZ');
 await query('ALTER TABLE access_email_submissions ADD COLUMN IF NOT EXISTS promo_license_key TEXT');
@@ -113,11 +117,11 @@ const send = (res, status, payload, extraHeaders = {}) => {
   res.end(extraHeaders['Content-Encoding'] === 'gzip' ? gzipSync(responseBody) : responseBody);
 };
 
-const body = async req => {
+const body = async (req, maxChars = 100_000) => {
   let raw = '';
   for await (const chunk of req) {
     raw += chunk;
-    if (raw.length > 100_000) throw new Error('Payload too large');
+    if (raw.length > maxChars) throw new Error('Payload too large');
   }
   return raw ? JSON.parse(raw) : {};
 };
@@ -301,7 +305,7 @@ const getClientIp = req => {
 };
 const isRateLimited = (req, pathname) => {
   if (pathname === '/api/health' || pathname === '/api/payments/paypal/webhook') return false;
-  const isSensitive = pathname.includes('/auth/') || pathname === '/api/access-email' || pathname.includes('/premium/activate') || pathname.includes('/payments/paypal/create-order');
+  const isSensitive = pathname.includes('/auth/') || pathname === '/api/access-email' || pathname === '/api/learning-state' || pathname.includes('/premium/activate') || pathname.includes('/payments/paypal/create-order');
   const limit = isSensitive ? 12 : 120;
   const key = `${getClientIp(req)}:${pathname}`;
   const now = Date.now();
@@ -627,17 +631,42 @@ const server = createServer(async (req, res) => {
     }
 
     if (url.pathname === '/api/learning-state' && req.method === 'GET') {
-      const state = (await query('SELECT review_words, points, daily_target, goal_wpm, updated_at FROM learning_state WHERE user_id = $1', [user.id])).rows[0];
+      const state = (await query('SELECT review_words, points, daily_target, goal_wpm, learner_level, coach_state, practice_notes, updated_at FROM learning_state WHERE user_id = $1', [user.id])).rows[0];
       return send(res, 200, { state: state || null });
     }
 
     if (url.pathname === '/api/learning-state' && req.method === 'PUT') {
-      const input = await body(req);
-      const reviewWords = Array.isArray(input.reviewWords) ? input.reviewWords.slice(0, 100) : [];
-      const points = Math.max(0, Math.round(Number(input.points) || 0));
-      const goalWpm = Math.min(Math.max(Math.round(Number(input.goalWpm) || 40), 10), 200);
-      const dailyTarget = input.dailyTarget && typeof input.dailyTarget === 'object' ? input.dailyTarget : null;
-      const state = (await query(`INSERT INTO learning_state (user_id, review_words, points, daily_target, goal_wpm, updated_at) VALUES ($1, $2::jsonb, $3, $4::jsonb, $5, NOW()) ON CONFLICT (user_id) DO UPDATE SET review_words = EXCLUDED.review_words, points = EXCLUDED.points, daily_target = EXCLUDED.daily_target, goal_wpm = EXCLUDED.goal_wpm, updated_at = NOW() RETURNING review_words, points, daily_target, goal_wpm, updated_at`, [user.id, JSON.stringify(reviewWords), points, JSON.stringify(dailyTarget), goalWpm])).rows[0];
+      const input = await body(req, 6_000_000);
+      const client = await pool.connect();
+      let state;
+      let transactionStarted = false;
+      try {
+        await client.query('BEGIN');
+        transactionStarted = true;
+        await client.query('INSERT INTO learning_state (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [user.id]);
+        const current = (await client.query('SELECT review_words, points, daily_target, goal_wpm, learner_level, coach_state, practice_notes FROM learning_state WHERE user_id = $1 FOR UPDATE', [user.id])).rows[0];
+        const merged = mergeAccountLearningState(current, input);
+        state = (await client.query(`INSERT INTO learning_state (user_id, review_words, points, daily_target, goal_wpm, learner_level, coach_state, practice_notes, updated_at)
+          VALUES ($1, $2::jsonb, $3, $4::jsonb, $5, $6, $7::jsonb, $8::jsonb, NOW())
+          ON CONFLICT (user_id) DO UPDATE SET
+            review_words = EXCLUDED.review_words,
+            points = EXCLUDED.points,
+            daily_target = EXCLUDED.daily_target,
+            goal_wpm = EXCLUDED.goal_wpm,
+            learner_level = EXCLUDED.learner_level,
+            coach_state = EXCLUDED.coach_state,
+            practice_notes = EXCLUDED.practice_notes,
+            updated_at = NOW()
+          RETURNING review_words, points, daily_target, goal_wpm, learner_level, coach_state, practice_notes, updated_at`,
+        [user.id, JSON.stringify(merged.reviewWords), merged.points, JSON.stringify(merged.dailyTarget), merged.goalWpm, merged.learnerLevel, JSON.stringify(merged.coachState), JSON.stringify(merged.practiceNotes)])).rows[0];
+        await client.query('COMMIT');
+        transactionStarted = false;
+      } catch (error) {
+        if (transactionStarted) await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
       return send(res, 200, { state });
     }
 
