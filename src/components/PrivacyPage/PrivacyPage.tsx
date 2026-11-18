@@ -49,11 +49,11 @@ export default function PrivacyPage() {
           <ul>
             <li><strong>Tài khoản:</strong> email, mã tài khoản, ngày đăng ký và trạng thái Premium. Khi bạn nhập mật khẩu, hệ thống dùng mật khẩu để kiểm tra đăng nhập. Bản mật khẩu được lưu là một chuỗi kiểm tra đặc biệt, không phải nguyên văn mật khẩu bạn nhập.</li>
             <li><strong>Email truy cập:</strong> địa chỉ email và thời điểm gửi khi bạn mở ứng dụng lần đầu; được lưu trên máy chủ để ghi nhận quyền truy cập. Nếu bạn chọn nhận mã Premium, chúng tôi cũng lưu lựa chọn và thời điểm đồng ý để gửi một email chào mừng kèm mã kích hoạt; không gửi email quảng cáo nào khác.</li>
-            <li><strong>Việc học:</strong> ngày luyện tập, cấp độ, tốc độ gõ, độ chính xác, từ cần ôn, ghi chú, điểm và mục tiêu học. Một phần được lưu trên thiết bị; khi đăng nhập, lịch sử và tiến độ được lưu thêm vào tài khoản.</li>
+            <li><strong>Việc học:</strong> ngày luyện tập, cấp độ, tốc độ gõ, độ chính xác, từ cần ôn, ghi chú, điểm và mục tiêu học. Khi đăng nhập, kết quả bài kiểm tra đầu vào (điểm tổng và điểm theo kỹ năng) cũng được lưu vào tài khoản. Một phần tiến độ được lưu trên thiết bị.</li>
             <li><strong>Mua Premium:</strong> mã đơn hàng, số tiền, thời điểm và kết quả thanh toán, mã kích hoạt và email nếu bạn cung cấp. Ứng dụng cũng tạo một mã ngẫu nhiên để nhận ra trình duyệt đã kích hoạt Premium; đây không phải số định danh phần cứng của điện thoại.</li>
             <li><strong>Khi cần hỗ trợ:</strong> những gì bạn gửi qua Telegram. Hệ thống chạy ứng dụng cũng có thể ghi lại địa chỉ kết nối Internet (IP), các lần truy cập và lỗi gặp phải để giữ dịch vụ hoạt động và ngăn lạm dụng.</li>
           </ul>
-          <p>Tính năng luyện nghe hiện tại đọc câu cho bạn nghe. Ứng dụng không cần bật micro hoặc ghi âm giọng nói của bạn.</p>
+          <p>Bài kiểm tra đầu vào có thể dùng nhận dạng giọng nói của trình duyệt khi bạn chủ động bật micro. Âm thanh được xử lý bởi dịch vụ nhận dạng của trình duyệt; ứng dụng chỉ dùng phần văn bản nhận dạng để chấm điểm và không lưu bản ghi âm.</p>
         </section>
         <section id="purpose">
           <h2>03. Thông tin được dùng để làm gì?</h2>

@@ -8,7 +8,7 @@ export default function LanguageSwitcher() {
   return <div className="site-footer-controls">
     <a href={`${import.meta.env.BASE_URL}privacy.html`} target="_blank" rel="noopener noreferrer">{isVietnamese ? 'Chính sách quyền riêng tư ↗' : 'Privacy Policy ↗'}</a>
     <label className="language-switcher">
-      {/* <span>{isVietnamese ? 'Ngôn ngữ' : 'Language'}</span> */}
+      <span>{isVietnamese ? 'Ngôn ngữ' : 'Language'}</span>
       <div className="language-switcher-options" role="group" aria-label={isVietnamese ? 'Chọn ngôn ngữ' : 'Choose language'}>
         <button
           type="button"

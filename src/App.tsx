@@ -22,6 +22,7 @@ import { getPremiumStatus } from './services/premiumAccess';
 import { fetchSentencePack, getCachedSentencePack, type DatabaseSentence } from './services/sentenceApi';
 import { getAccountLearningState, getCurrentAccount, saveAccountLearningState, saveAccountSession, syncAccountSessions, type AccountUser } from './services/accountService';
 import Header from './components/Header/Header';
+import { getTelegramContactUrl } from './services/telegramService';
 import LearningCoach from './components/LearningCoach/LearningCoach';
 import YoutubeImport from './components/YoutubeImport/YoutubeImport';
 import YoutubeVideo, { type YoutubeVideoHandle } from './components/YoutubeImport/YoutubeVideo';
@@ -1118,7 +1119,6 @@ function App() {
     isPremiumOpen={isPremiumOpen}
     isSettingsOpen={isSettingsOpen}
     isReviewOpen={isReviewOpen}
-    isSupportOpen={isSupportOpen}
     onAccountToggle={() => setIsAccountOpen(open => !open)}
     onAuthenticated={user => { setAccountUser(user); setIsAccountOpen(false); }}
     onLoggedOut={() => {
@@ -1154,8 +1154,20 @@ function App() {
       setIsSettingsOpen(open => !open);
     }}
     onReviewOpen={() => openReviewPage()}
-    onSupportOpen={openSupportPage}
   />;
+
+  const contactUrl = getTelegramContactUrl(import.meta.env.VITE_TELEGRAM_URL);
+  const footerLinks = <div className="app-footer-links">
+    {contactUrl && <a href={contactUrl} target="_blank" rel="noopener noreferrer">{isVietnamese ? 'Liên hệ' : 'Contact'}</a>}
+    <a href="#support" aria-current={isSupportOpen ? 'page' : undefined} onClick={event => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      if (!isSupportOpen) {
+        openSupportPage();
+        window.scrollTo(0, 0);
+      }
+    }}>{isVietnamese ? 'Ủng hộ' : 'Support'}</a>
+  </div>;
 
   if (isReviewOpen) {
     return <Suspense fallback={<div className="screen-loading" role="status">{isVietnamese ? 'Đang tải mục ôn tập…' : 'Loading review…'}</div>}><>
@@ -1252,7 +1264,7 @@ function App() {
         {achievementToastNode}
         {appHeader}
         <main className="app-content support-content"><SupportPage /></main>
-        <footer className="app-footer"><span>Zentation · {isVietnamese ? 'Luyện nghe tiếng Anh' : 'English listening practice'}</span></footer>
+        <footer className="app-footer"><span>Zentation · {isVietnamese ? 'Luyện nghe tiếng Anh' : 'English listening practice'}</span>{footerLinks}</footer>
       </div>
       <LanguageSwitcher />
       </>
@@ -1577,7 +1589,7 @@ function App() {
         </>}
         
       </main>
-      {!isFocusMode && <footer className="app-footer"><p> <i> {isVietnamese ? 'Mẹo: Tập trung nghe âm thanh, rồi đến chữ cái. Lặp lại ba lần để đạt kết quả tốt nhất.' : 'Tip: Focus on the sounds, then the letters. Repeat three times for best results.'} </i> </p></footer>}
+      {!isFocusMode && <footer className="app-footer"><p> <i> {isVietnamese ? 'Mẹo: Tập trung nghe âm thanh, rồi đến chữ cái. Lặp lại ba lần để đạt kết quả tốt nhất.' : 'Tip: Focus on the sounds, then the letters. Repeat three times for best results.'} </i> </p>{footerLinks}</footer>}
     </div>
     {!isFocusMode && <LanguageSwitcher />}
     </>

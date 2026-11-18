@@ -36,7 +36,19 @@ CREATE TABLE IF NOT EXISTS sentence_packs (id TEXT PRIMARY KEY, name TEXT NOT NU
 CREATE TABLE IF NOT EXISTS sentences (id TEXT PRIMARY KEY, pack_id TEXT NOT NULL REFERENCES sentence_packs(id) ON DELETE CASCADE, text TEXT NOT NULL, difficulty TEXT NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard')), topic TEXT NOT NULL DEFAULT 'general', source TEXT NOT NULL DEFAULT 'custom', license TEXT, sort_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE INDEX IF NOT EXISTS sentences_pack_difficulty_idx ON sentences(pack_id, difficulty, sort_order);
 CREATE TABLE IF NOT EXISTS learning_state (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, review_words JSONB NOT NULL DEFAULT '[]'::jsonb, points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0), daily_target JSONB, goal_wpm INTEGER NOT NULL DEFAULT 40 CHECK (goal_wpm BETWEEN 10 AND 200), learner_level TEXT CHECK (learner_level IN ('beginner', 'intermediate', 'advanced')), coach_state JSONB NOT NULL DEFAULT '{"attempts":[],"reviews":[]}'::jsonb, practice_notes JSONB NOT NULL DEFAULT '[]'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-CREATE INDEX IF NOT EXISTS learning_state_updated_at_idx ON learning_state(updated_at DESC);`);
+CREATE INDEX IF NOT EXISTS learning_state_updated_at_idx ON learning_state(updated_at DESC);
+CREATE TABLE IF NOT EXISTS placement_results (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  total_score SMALLINT NOT NULL CHECK (total_score BETWEEN 0 AND 100),
+  listening_score SMALLINT NOT NULL CHECK (listening_score BETWEEN 0 AND 100),
+  speaking_score SMALLINT NOT NULL CHECK (speaking_score BETWEEN 0 AND 100),
+  writing_score SMALLINT NOT NULL CHECK (writing_score BETWEEN 0 AND 100),
+  answered_count SMALLINT NOT NULL CHECK (answered_count BETWEEN 0 AND 15),
+  question_count SMALLINT NOT NULL CHECK (question_count = 15),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS placement_results_user_date_idx ON placement_results(user_id, created_at DESC);`);
 await query('ALTER TABLE licenses ADD COLUMN IF NOT EXISTS activated_user_id TEXT REFERENCES users(id) ON DELETE SET NULL');
 await query('CREATE INDEX IF NOT EXISTS licenses_activated_user_idx ON licenses(activated_user_id) WHERE activated_user_id IS NOT NULL');
 await query("ALTER TABLE learning_state ADD COLUMN IF NOT EXISTS learner_level TEXT CHECK (learner_level IN ('beginner', 'intermediate', 'advanced'))");
@@ -305,7 +317,7 @@ const getClientIp = req => {
 };
 const isRateLimited = (req, pathname) => {
   if (pathname === '/api/health' || pathname === '/api/payments/paypal/webhook') return false;
-  const isSensitive = pathname.includes('/auth/') || pathname === '/api/access-email' || pathname === '/api/learning-state' || pathname.includes('/premium/activate') || pathname.includes('/payments/paypal/create-order');
+  const isSensitive = pathname.includes('/auth/') || pathname === '/api/access-email' || pathname === '/api/learning-state' || pathname === '/api/placement-results' || pathname.includes('/premium/activate') || pathname.includes('/payments/paypal/create-order');
   const limit = isSensitive ? 12 : 120;
   const key = `${getClientIp(req)}:${pathname}`;
   const now = Date.now();
@@ -628,6 +640,30 @@ const server = createServer(async (req, res) => {
       await query('INSERT INTO practice_sessions (id, user_id, date, difficulty, wpm, accuracy) VALUES ($1, $2, $3, $4, $5, $6)', [session.id, session.userId, session.date, session.difficulty, session.wpm, session.accuracy]);
       await query('DELETE FROM practice_sessions WHERE user_id = $1 AND id NOT IN (SELECT id FROM practice_sessions WHERE user_id = $1 ORDER BY date DESC LIMIT 30)', [user.id]);
       return send(res, 201, { session });
+    }
+
+    if (url.pathname === '/api/placement-results' && req.method === 'POST') {
+      const input = await body(req);
+      if (!input || !Array.isArray(input.questionScores) || input.questionScores.length !== 15
+        || input.questionScores.some(score => score !== null && (!Number.isInteger(score) || score < 0 || score > 100))) {
+        return send(res, 400, { error: 'A score for each of the 15 questions is required' });
+      }
+      const questionScores = input.questionScores;
+      const average = scores => Math.round(scores.reduce((sum, score) => sum + (score ?? 0), 0) / scores.length);
+      const result = (await query(`INSERT INTO placement_results
+        (id, user_id, total_score, listening_score, speaking_score, writing_score, answered_count, question_count)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 15)
+        RETURNING id, total_score, listening_score, speaking_score, writing_score, answered_count, question_count, created_at`,
+      [
+        randomUUID(),
+        user.id,
+        average(questionScores),
+        average(questionScores.slice(0, 5)),
+        average(questionScores.slice(5, 10)),
+        average(questionScores.slice(10, 15)),
+        questionScores.filter(score => score !== null).length,
+      ])).rows[0];
+      return send(res, 201, { result, user: { email: user.email } });
     }
 
     if (url.pathname === '/api/learning-state' && req.method === 'GET') {

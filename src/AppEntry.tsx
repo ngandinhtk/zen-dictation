@@ -2,6 +2,7 @@ import { useState } from 'react';
 import App from './App';
 import EmailAccessGate from './components/EmailAccessGate/EmailAccessGate';
 import PasswordResetScreen from './components/PasswordResetScreen/PasswordResetScreen';
+import PlacementTest from './components/PlacementTest/PlacementTest';
 
 const hasEmailAccess = () => {
   try {
@@ -26,5 +27,7 @@ export default function AppEntry() {
       setHasAccess(true);
     }} />;
   }
-  return <App />;
+  return new URLSearchParams(window.location.search).get('page') === 'placement'
+    ? <PlacementTest />
+    : <App />;
 }

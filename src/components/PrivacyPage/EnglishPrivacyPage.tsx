@@ -46,11 +46,11 @@ export default function EnglishPrivacyPage() {
           <ul>
             <li><strong>Account:</strong> your email address, account ID, registration date and Premium status. Your password is used to verify sign-in. The stored password is a special verification string, rather than the original password you enter.</li>
             <li><strong>Access email:</strong> your email address and submission time when you first open the app; stored on our server to record access. If you opt in to receive a Premium code, we also store your choice and consent time to send one welcome email with an activation code; we will not send other marketing emails.</li>
-            <li><strong>Learning:</strong> practice dates, level, typing speed, accuracy, words to review, notes, scores and learning goals. Some information is stored on your device; when you sign in, history and progress are also saved to your account.</li>
+            <li><strong>Learning:</strong> practice dates, level, typing speed, accuracy, words to review, notes, scores and learning goals. When you sign in, placement-test results (overall and per-skill scores) are also saved to your account. Some learning progress is stored on your device.</li>
             <li><strong>Premium purchases:</strong> order ID, amount, payment time and result, activation code and email address if you provide one. The app also generates a random identifier to recognise a browser with Premium activated; this is not your phone’s hardware identifier.</li>
             <li><strong>Support:</strong> information you send through Telegram. The systems running the app may also log Internet Protocol (IP) addresses, visits and errors to keep the service working and prevent abuse.</li>
           </ul>
-          <p>The current listening practice feature reads sentences aloud. The app does not need to turn on your microphone or record your voice.</p>
+          <p>The placement test may use your browser's speech recognition when you choose to turn on the microphone. The browser's speech recognition service processes the audio; the app uses only the recognized text for scoring and does not store an audio recording.</p>
         </section>
         <section id="purpose">
           <h2>03. How is your information used?</h2>

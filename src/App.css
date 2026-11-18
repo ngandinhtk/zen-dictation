@@ -1,5 +1,7 @@
 /* Minimalist App Styles */
 .app-footer a { display: inline-block; padding: .5rem; color: var(--accent-color); font-size: .75rem; text-underline-offset: .2em; }
+.app-footer-links { display: flex; justify-content: center; flex-wrap: wrap; gap: .25rem .65rem; margin-top: .35rem; }
+.app-footer-links a { color: var(--text-color); }
 .app-layout {
   max-width: 800px;
   width: 100%;

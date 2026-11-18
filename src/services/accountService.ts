@@ -26,6 +26,17 @@ export interface AccountLearningState {
   updated_at?: string;
 }
 
+export interface PlacementTestResult {
+  id: string;
+  total_score: number;
+  listening_score: number;
+  speaking_score: number;
+  writing_score: number;
+  answered_count: number;
+  question_count: number;
+  created_at: string;
+}
+
 const request = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
   const response = await fetch(apiUrl(path), {
     ...options,
@@ -90,3 +101,8 @@ export const saveAccountLearningState = async (state: {
   coachState: unknown;
   practiceNotes: unknown[];
 }) => request<{ state: AccountLearningState }>('/api/learning-state', { method: 'PUT', body: JSON.stringify(state) });
+
+export const savePlacementResult = async (questionScores: Array<number | null>) => request<{
+  result: PlacementTestResult;
+  user: { email: string };
+}>('/api/placement-results', { method: 'POST', body: JSON.stringify({ questionScores }) });
