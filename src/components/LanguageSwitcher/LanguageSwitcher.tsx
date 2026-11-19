@@ -1,12 +1,14 @@
+import type { ReactNode } from 'react';
 import { useAppLanguage } from '../../context/useAppLanguage';
 import './LanguageSwitcher.css';
 
-export default function LanguageSwitcher() {
+export default function LanguageSwitcher({ showPrivacyLink = true, links }: { showPrivacyLink?: boolean; links?: ReactNode }) {
   const { language, setLanguage } = useAppLanguage();
   const isVietnamese = language === 'vi';
 
   return <div className="site-footer-controls">
-    <a href={`${import.meta.env.BASE_URL}privacy.html`} target="_blank" rel="noopener noreferrer">{isVietnamese ? 'Chính sách quyền riêng tư ↗' : 'Privacy Policy ↗'}</a>
+    {links}
+    {showPrivacyLink && <a href={`${import.meta.env.BASE_URL}privacy.html`} target="_blank" rel="noopener noreferrer">{isVietnamese ? 'Chính sách quyền riêng tư ↗' : 'Privacy Policy ↗'}</a>}
     <label className="language-switcher">
       <span>{isVietnamese ? 'Ngôn ngữ' : 'Language'}</span>
       <div className="language-switcher-options" role="group" aria-label={isVietnamese ? 'Chọn ngôn ngữ' : 'Choose language'}>

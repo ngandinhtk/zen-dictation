@@ -29,7 +29,7 @@ import YoutubeVideo, { type YoutubeVideoHandle } from './components/YoutubeImpor
 import type { YoutubeCaption } from './services/youtubeApi';
 import { buildDailyLesson, clearLearningState, mergeLearningStates, readLearningState, recordLearningAttempt, replaceLearningState, type LearningFocus, type LearningState } from './services/learningCoach';
 import { clearPracticeNotes, mergePracticeNotes, readPracticeNotes, replacePracticeNotes, type PracticeNote } from './services/practiceNotesService';
-import { getVerifiedSentenceTranslation } from './utils/sentenceTranslations';
+// import { getVerifiedSentenceTranslation } from './utils/sentenceTranslations';
 import { findReviewSentence } from './services/reviewSentence';
 import { chooseRandomSentenceIndex, isRecentlyUsedSentence, loadRecentSentenceHistory, rememberRecentSentence, saveRecentSentenceHistory } from './services/sentenceRotation';
 import { useAppLanguage } from './context/useAppLanguage';
@@ -190,6 +190,7 @@ function App() {
   const [reviewNoteError, setReviewNoteError] = useState('');
   const [isReviewNoteSaved, setIsReviewNoteSaved] = useState(false);
   const [isReviewNoteEditorOpen, setIsReviewNoteEditorOpen] = useState(false);
+  const [isStreakReminderOpen, setIsStreakReminderOpen] = useState(false);
   const [points, setPoints] = useState(getPoints);
   const [dailyTarget, setDailyTarget] = useState(() => getDailyTarget());
   const [key, setKey] = useState(0);
@@ -790,6 +791,7 @@ function App() {
       if (!recordedAttemptRef.current || lesson.completed) return;
       if (lesson.index + 1 >= lesson.texts.length) {
         setLesson({ ...lesson, completed: true });
+        if (!lesson.videoId && lesson.texts.length === 5) setIsStreakReminderOpen(true);
         return;
       }
     }
@@ -1167,6 +1169,7 @@ function App() {
         window.scrollTo(0, 0);
       }
     }}>{isVietnamese ? 'Ủng hộ' : 'Support'}</a>
+    <a href={`${import.meta.env.BASE_URL}privacy.html`} target="_blank" rel="noopener noreferrer">{isVietnamese ? 'Chính sách quyền riêng tư' : 'Privacy Policy'}</a>
   </div>;
 
   if (isReviewOpen) {
@@ -1208,7 +1211,7 @@ function App() {
         onBack={closePremiumDashboard}
       />
       <footer className="app-footer"><span>Zentation</span></footer>
-      <LanguageSwitcher />
+      <LanguageSwitcher showPrivacyLink={false} links={footerLinks} />
     </></Suspense>;
   }
 
@@ -1218,7 +1221,7 @@ function App() {
       {achievementToastNode}
       <PaymentResultPage onBack={closePaymentResult} onActivated={() => { setIsPaymentResultOpen(false); openPremiumDashboard(); }} />
       <footer className="app-footer"><span>Zentation</span></footer>
-      <LanguageSwitcher />
+      <LanguageSwitcher showPrivacyLink={false} links={footerLinks} />
     </></Suspense>;
   }
 
@@ -1243,7 +1246,7 @@ function App() {
           onBack={closePaymentPage}
         />
         <footer className="app-footer"><span>Zentation</span></footer>
-        <LanguageSwitcher />
+        <LanguageSwitcher showPrivacyLink={false} links={footerLinks} />
       </></Suspense>;
     }
 
@@ -1252,7 +1255,7 @@ function App() {
       {achievementToastNode}
       <PaymentPage onBack={closePaymentPage} onLicenseClick={() => { closePaymentPage(); openPremiumDashboard(); }} />
       <footer className="app-footer"><span>Zentation</span></footer>
-      <LanguageSwitcher />
+      <LanguageSwitcher showPrivacyLink={false} links={footerLinks} />
     </></Suspense>;
   }
 
@@ -1264,9 +1267,9 @@ function App() {
         {achievementToastNode}
         {appHeader}
         <main className="app-content support-content"><SupportPage /></main>
-        <footer className="app-footer"><span>Zentation · {isVietnamese ? 'Luyện nghe tiếng Anh' : 'English listening practice'}</span>{footerLinks}</footer>
+        <footer className="app-footer"><span>Zentation · {isVietnamese ? 'Luyện nghe tiếng Anh' : 'English listening practice'}</span></footer>
       </div>
-      <LanguageSwitcher />
+      <LanguageSwitcher showPrivacyLink={false} links={footerLinks} />
       </>
     </Suspense>;
   }
@@ -1520,6 +1523,25 @@ function App() {
                 </section>
               </div>
             )}
+            {isStreakReminderOpen && (
+              <div className="practice-note-modal-backdrop" onClick={event => {
+                if (event.target === event.currentTarget) setIsStreakReminderOpen(false);
+              }}>
+                <section className="practice-note-modal streak-reminder-modal" role="dialog" aria-modal="true" aria-labelledby="streak-reminder-title">
+                  <header className="practice-note-modal-header">
+                    <div>
+                      <h2 id="streak-reminder-title">{isVietnamese ? '🎉 Hoàn thành 5 câu!' : '🎉 Five sentences complete!'}</h2>
+                      <p>{isPremium
+                        ? (isVietnamese ? 'Bạn đã hoàn thành bài học hôm nay. Quay lại vào ngày mai để tiếp tục giữ chuỗi nhé!' : 'You finished today’s lesson. Come back tomorrow to keep your learning streak going!')
+                        : (isVietnamese ? 'Quay lại vào ngày mai để giữ chuỗi. Mở khóa Premium để theo dõi tiến độ và luyện tập tập trung.' : 'Come back tomorrow to keep your streak. Unlock Premium to track your progress and practise with Focus sessions.')}</p>
+                    </div>
+                    <button type="button" className="practice-note-modal-close" onClick={() => setIsStreakReminderOpen(false)} aria-label={isVietnamese ? 'Đóng lời nhắc' : 'Close reminder'}>×</button>
+                  </header>
+                  {!isPremium && <button type="button" className="streak-reminder-premium" onClick={() => { setIsStreakReminderOpen(false); openPaymentPage(); }}>{isVietnamese ? 'Khám phá Premium' : 'Explore Premium'}</button>}
+                  <button type="button" className="streak-reminder-dismiss" onClick={() => setIsStreakReminderOpen(false)}>{isVietnamese ? 'Tiếp tục' : 'Keep going'}</button>
+                </section>
+              </div>
+            )}
           </>
         )}
 
@@ -1556,28 +1578,36 @@ function App() {
 
         {!isFocusMode && lastAttempt && (
           <div className="attempt-summary" role="status" aria-live="polite">
-            <strong>{isVietnamese ? `Độ chính xác ${lastAttempt.accuracy}%` : `${lastAttempt.accuracy}% accuracy`}</strong>
-            {lastAttempt.incorrectWords.length > 0 && <div className="incorrect-details" aria-label="Incorrect words">
-              {/* <span>Words */}
-              <div className="incorrect-details-list">
-                {lastAttempt.incorrectWords.map((detail, index) => <span className="incorrect-word" key={`${detail.actual}-${detail.expected}-${index}`}><b>{detail.actual}</b><i>→</i><strong>{detail.expected}</strong></span>)}
-              </div>
-            </div>}
-            {lastAttempt.missingWords.length > 0 && <div className="word-difference missing-words"><span>{isVietnamese ? 'Thiếu' : 'Missing'}</span><strong>{lastAttempt.missingWords.join(', ')}</strong></div>}
-            {lastAttempt.extraWords.length > 0 && <div className="word-difference extra-words"><span>{isVietnamese ? 'Thừa' : 'Extra'}</span><strong>{lastAttempt.extraWords.join(', ')}</strong></div>}
+            {/* <strong>{isVietnamese ? `Độ chính xác ${lastAttempt.accuracy}%` : `${lastAttempt.accuracy}% accuracy`}</strong> */}
+            {
+            // lastAttempt.incorrectWords.length > 0 && <div className="incorrect-details" aria-label="Incorrect words">
+            //   {/* <span>Words */}
+            //   <div className="incorrect-details-list">
+            //     {lastAttempt.incorrectWords.map((detail, index) => <span className="incorrect-word" key={`${detail.actual}-${detail.expected}-${index}`}><b>{detail.actual}</b><i>→</i><strong>{detail.expected}</strong></span>)}
+            //   </div>
+            // </div>
+            }
+            {/* {lastAttempt.missingWords.length > 0 && <div className="word-difference missing-words"><span>{isVietnamese ? 'Thiếu' : 'Missing'}</span><strong>{lastAttempt.missingWords.join(', ')}</strong></div>}
+            {lastAttempt.extraWords.length > 0 && <div className="word-difference extra-words"><span>{isVietnamese ? 'Thừa' : 'Extra'}</span><strong>{lastAttempt.extraWords.join(', ')}</strong></div>} */}
             <div className="error-coaching">
               <strong className="error-coaching-title">{lastAttempt.accuracy === 100 ? (isVietnamese ? 'Làm tốt lắm' : 'Well done') : (isVietnamese ? 'Nghe và cải thiện' : 'Listen & improve')}</strong>
               {[...new Set([...lastAttempt.incorrectWords.map(item => item.expected), ...lastAttempt.missingWords])].slice(0, 6).map(word => <button type="button" key={word} aria-label={isVietnamese ? `Nghe từ đúng: ${word}` : `Listen to the correct word: ${word}`} disabled={voiceStatus === 'unsupported'} onClick={() => replayMistake(word)}><span aria-hidden="true">▷</span> {word}</button>)}
-              <details><summary>{isVietnamese ? 'Giải thích và ý nghĩa' : 'Explanation & meaning'}</summary>
-            {getVerifiedSentenceTranslation(lastAttemptTargetText) && <p lang="vi">   <i> <strong> {getVerifiedSentenceTranslation(lastAttemptTargetText)}</strong> </i> </p>}
-              {lastAttempt.incorrectWords.length > 0 && <p>{isVietnamese ? 'Bạn đã nhập từ khác hoặc sai chính tả. Nghe lại từ đúng thật chậm rồi đối chiếu các chữ cái.' : 'A different word or spelling was entered. Listen to the correct word slowly, then compare the letters.'}</p>}
-              {lastAttempt.missingWords.length > 0 && <p>{isVietnamese ? 'Bạn còn thiếu từ. Hãy chú ý các từ nối ngắn và đuôi từ.' : 'Words are missing. Listen for short connecting words and word endings.'}</p>}
-              {lastAttempt.extraWords.length > 0 && <p>{isVietnamese ? 'Bạn đã nhập thừa từ. Nghe lại câu và xác định chính xác những từ được đọc.' : 'Extra words were entered. Replay the sentence and check exactly which words you hear.'}</p>}
-              {!lastAttempt.incorrectWords.length && !lastAttempt.missingWords.length && !lastAttempt.extraWords.length && <p>{lastAttempt.accuracy === 100 ? (isVietnamese ? 'Chính xác! Hãy tiếp tục luyện tập để thành thạo hơn.' : 'All correct. Keep practising to make this feel natural.') : (isVietnamese ? 'Các từ đã khớp. Kiểm tra dấu câu và khoảng trắng để hoàn thành chính xác.' : 'The words match. Check punctuation and spacing for a perfect answer.')}</p>}
-              {/* <p><small>Grammar focus: {lastAttempt.grammarTip}</small></p> */}
-              </details>
               {/* {lastAttempt.accuracy < 100 && <small>This sentence is saved for review tomorrow.</small>} */}
             </div>
+            {/* {[...new Set([...lastAttempt.incorrectWords.map(item => item.expected), ...lastAttempt.missingWords])].length > 0 && <section className="word-flashcards" aria-label={isVietnamese ? 'Thẻ học từ cần ôn' : 'Vocabulary flashcards'}>
+              <strong>{isVietnamese ? 'Thẻ học từ cần ôn' : 'Study these words'}</strong>
+              <div className="word-flashcard-list">
+                {[...new Set([...lastAttempt.incorrectWords.map(item => item.expected), ...lastAttempt.missingWords])].slice(0, 6).map(word => {
+                  const typedWord = lastAttempt.incorrectWords.find(item => item.expected === word)?.actual;
+                  return <article className="word-flashcard" key={word}>
+                    <div className="word-flashcard-heading"><strong>{word}</strong><button type="button" aria-label={isVietnamese ? `Nghe phát âm ${word}` : `Hear ${word} pronounced`} disabled={voiceStatus === 'unsupported'} onClick={() => replayMistake(word)}>▷</button></div>
+                    {typedWord && <small>{isVietnamese ? `Bạn đã gõ: ${typedWord}` : `You typed: ${typedWord}`}</small>}
+                    <p>{lastAttemptTargetText}</p>
+                    {getVerifiedSentenceTranslation(lastAttemptTargetText) && <small lang="vi">{getVerifiedSentenceTranslation(lastAttemptTargetText)}</small>}
+                  </article>;
+                })}
+              </div>
+            </section>} */}
             <button type="button" className="retry-attempt-button" onClick={handleRetry}>{isVietnamese ? 'Thử lại' : 'Try again'}</button>
           </div>
         )}
@@ -1589,9 +1619,9 @@ function App() {
         </>}
         
       </main>
-      {!isFocusMode && <footer className="app-footer"><p> <i> {isVietnamese ? 'Mẹo: Tập trung nghe âm thanh, rồi đến chữ cái. Lặp lại ba lần để đạt kết quả tốt nhất.' : 'Tip: Focus on the sounds, then the letters. Repeat three times for best results.'} </i> </p>{footerLinks}</footer>}
+      {!isFocusMode && <footer className="app-footer"><p> <i> {isVietnamese ? 'Mẹo: Tập trung nghe âm thanh, rồi đến chữ cái. Lặp lại ba lần để đạt kết quả tốt nhất.' : 'Tip: Focus on the sounds, then the letters. Repeat three times for best results.'} </i> </p></footer>}
     </div>
-    {!isFocusMode && <LanguageSwitcher />}
+    {!isFocusMode && <LanguageSwitcher showPrivacyLink={false} links={footerLinks} />}
     </>
   );
 }

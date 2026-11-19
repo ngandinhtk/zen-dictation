@@ -838,6 +838,10 @@ details.review-note-editor[open] > button { margin-top: .35rem; }
   color: var(--correct-color);
 }
 
+.streak-reminder-modal { width: min(24rem, 100%); }
+.streak-reminder-premium { margin: 0 .45rem .25rem 0; padding: .55rem .9rem; border: 0; border-radius: 9px; background: var(--accent-color); color: var(--bg-color); font: inherit; font-size: .75rem; font-weight: 600; cursor: pointer; }
+.streak-reminder-dismiss { padding: .55rem .9rem; border: 1px solid var(--border-color); border-radius: 9px; background: var(--hover-bg); color: var(--text-color); font: inherit; font-size: .75rem; cursor: pointer; }
+
 .status-error {
   background: rgba(201, 92, 92, .08);
   color: var(--incorrect-color);

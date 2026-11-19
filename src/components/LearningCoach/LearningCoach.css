@@ -53,6 +53,15 @@
 .error-coaching button { display: inline-flex; align-items: center; gap: 5px; margin: 3px 5px 3px 0; padding: 6px 9px; border-radius: 7px; border: 1px solid var(--border-color); background: var(--hover-bg); color: var(--text-color); font: inherit; cursor: pointer; }
 .error-coaching button:hover:not(:disabled) { border-color: var(--accent-color); color: var(--accent-color); }
 .error-coaching button:disabled { opacity: .45; cursor: default; }
+.word-flashcards { width: 100%; margin-top: 10px; }
+.word-flashcards > strong { display: block; margin-bottom: 6px; color: var(--text-color); font-size: .68rem; }
+.word-flashcard-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: 7px; }
+.word-flashcard { min-width: 0; padding: 9px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--hover-bg); }
+.word-flashcard-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.word-flashcard-heading > strong { color: var(--accent-color); font-family: var(--font-mono); font-size: .78rem; }
+.error-coaching .word-flashcard-heading button { flex: 0 0 auto; margin: 0; padding: 3px 7px; }
+.word-flashcard > small { display: block; margin-top: 4px; color: var(--text-muted); font-size: .6rem; }
+.word-flashcard > p { margin: 7px 0 0; color: var(--text-color); font-size: .65rem; line-height: 1.5; }
 .error-coaching details { margin-top: 7px; }
 .error-coaching summary, .review-note-editor > summary { cursor: pointer; font-size: .62rem; color: var(--text-muted); }
 .error-coaching p { margin-top: 6px; line-height: 1.6; }
