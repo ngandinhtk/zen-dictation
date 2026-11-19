@@ -3,6 +3,7 @@ import './PaymentPage.css';
 import PrivacyNotice from '../PrivacyPage/PrivacyNotice';
 import { activatePremiumLicense, capturePayPalOrder, createPayPalOrder, getPayPalPaymentStatus } from '../../services/premiumAccess';
 import { useAppLanguage } from '../../context/useAppLanguage';
+import BankQrPayment from '../SupportPage/BankQrPayment';
 
 const paymentMessageTranslations: Record<string, [string, string]> = {
   'Waiting for PayPal confirmation…': ['Đang chờ PayPal xác nhận…', 'Waiting for PayPal confirmation…'],
@@ -121,6 +122,7 @@ export const PaymentResultPage = ({ onBack, onActivated }: PaymentResultPageProp
 
 const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
   const isVietnamese = useAppLanguage().language === 'vi';
+  const [paymentMethod, setPaymentMethod] = useState<'bank' | 'paypal'>('bank');
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
@@ -173,13 +175,7 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
         <span className="premium-kicker">{isVietnamese ? 'Quyền truy cập Premium' : 'Premium access'}</span>
         <h1>{isVietnamese ? 'Tận dụng tối đa mỗi phiên luyện tập.' : 'Make every practice session count.'}</h1>
         <p>{isVietnamese ? 'Mở khóa công cụ giúp theo dõi tiến độ, duy trì thói quen và thử sức với câu khó hơn.' : 'Unlock the tools that help you see progress, build consistency, and take on harder sentences.'}</p>
-      </div>
-      <section className="price-card" aria-label={isVietnamese ? 'Giá Premium' : 'Premium pricing'}>
-        <div className="price-card-top"><span className="premium-kicker">{isVietnamese ? 'Truy cập trọn đời' : 'Lifetime access'}</span><span className="price-badge">{isVietnamese ? 'Thanh toán một lần' : 'One-time payment'}</span></div>
-        <h2>Zen Dictation Premium</h2>
-        <div className="price"><del>$20</del><strong>$4</strong><span>{isVietnamese ? 'một lần' : 'one-time'}</span></div>
-        <span className="discount-badge">{isVietnamese ? 'Tiết kiệm $16 · Ưu đãi có hạn' : 'Save $16 · Limited offer'}</span>
-        <ul className="price-features">
+      <ul className="price-features">
           <li>{isVietnamese ? 'Mở khóa trình độ Trung bình và Khó' : 'Unlock Medium and Hard level'}</li>
           <li>{isVietnamese ? 'Bảng theo dõi tiến độ cá nhân' : 'Personal progress dashboard'}</li>
           <li>{isVietnamese ? 'Lịch sử luyện tập và theo dõi độ chính xác' : 'Practice history and accuracy tracking'}</li>
@@ -187,7 +183,18 @@ const PaymentFlow = ({ onBack, onLicenseClick }: PaymentPageProps) => {
           <li>{isVietnamese ? 'Không gia hạn định kỳ' : 'No recurring subscription'}</li>
           <li>{isVietnamese ? 'Có chế độ tập trung' : 'Focus mode included'}</li>
         </ul>
-        <button type="button" className="checkout-button" onClick={() => setIsCheckoutOpen(true)}>{isVietnamese ? 'Tiếp tục thanh toán' : 'Continue to checkout'}</button>
+      </div>
+      <section className="price-card" aria-label={isVietnamese ? 'Giá Premium' : 'Premium pricing'}>
+        <div className="price-card-top"><span className="premium-kicker">{isVietnamese ? 'Truy cập trọn đời' : 'Lifetime access'}</span><span className="price-badge">{isVietnamese ? 'Thanh toán một lần' : 'One-time payment'}</span></div>
+        {/* <h2>Zen Dictation Premium</h2> */}
+        <div className="price"><strong>{isVietnamese ? '100.000vnđ' : '$4'}</strong><span>{isVietnamese ? 'một lần' : 'one-time'}</span></div>
+        <span className="discount-badge">{isVietnamese ? 'Tiết kiệm $16 · Ưu đãi có hạn' : 'Save $16 · Limited offer'}</span>
+        
+        <div className="payment-method-tabs" role="tablist" aria-label={isVietnamese ? 'Chọn phương thức thanh toán' : 'Choose a payment method'}>
+          <button type="button" role="tab" id="payment-tab-bank" aria-selected={paymentMethod === 'bank'} aria-controls="payment-panel-bank" className={paymentMethod === 'bank' ? 'active' : ''} onClick={() => setPaymentMethod('bank')}><span aria-hidden="true">▦</span>{isVietnamese ? 'Chuyển khoản QR' : 'QR transfer'}</button>
+          <button type="button" role="tab" id="payment-tab-paypal" aria-selected={paymentMethod === 'paypal'} aria-controls="payment-panel-paypal" className={paymentMethod === 'paypal' ? 'active' : ''} onClick={() => setPaymentMethod('paypal')}><span aria-hidden="true">◎</span>PayPal</button>
+        </div>
+        {paymentMethod === 'bank' ? <section className="payment-method-panel" role="tabpanel" id="payment-panel-bank" aria-labelledby="payment-tab-bank"><BankQrPayment mode="premium" /></section> : <section className="payment-method-panel paypal-option" role="tabpanel" id="payment-panel-paypal" aria-labelledby="payment-tab-paypal"><p>{isVietnamese ? 'Thanh toán an toàn qua PayPal bằng thẻ hoặc tài khoản PayPal.' : 'Pay securely with a card or PayPal account.'}</p><button type="button" className="checkout-button" onClick={() => setIsCheckoutOpen(true)}>{isVietnamese ? 'Tiếp tục với PayPal' : 'Continue with PayPal'}</button></section>}
         <button type="button" className="license-button" onClick={onLicenseClick}>{isVietnamese ? 'Bạn đã có CODE premium?' : 'Already have a license key?'}</button>
       </section>
       {/* <p className="payment-note">Your Premium license will work without creating an account. An account is optional for syncing your progress across devices.</p> */}

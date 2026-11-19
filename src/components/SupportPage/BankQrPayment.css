@@ -1,6 +1,6 @@
-.bank-qr-payment { text-align: center; }
-.bank-qr-image { display: block; width: min(100%, 240px); aspect-ratio: 1; margin: 1.1rem auto; border: 1px solid rgba(141, 110, 161, .25); border-radius: 10px; background: #fff; object-fit: contain; box-shadow: 0 12px 28px rgba(31, 41, 55, .08); }
-.bank-qr-title { margin: .7rem 0 1rem; font-size: .8rem; font-weight: 600; }
+.bank-qr-payment { text-align: left; }
+.bank-qr-image { display: block; width: min(100%, 240px); aspect-ratio: 1; margin: .25rem auto .75rem; border: 1px solid rgba(141, 110, 161, .25); border-radius: 10px; background: #fff; object-fit: contain; box-shadow: 0 12px 28px rgba(31, 41, 55, .08); }
+.bank-qr-title { margin: .7rem 0 1rem; font-size: .8rem; font-weight: 600; text-align: center; }
 .bank-details { display: grid; gap: .45rem; margin: 0; text-align: left; font-size: .68rem; }
 .bank-details div { display: flex; justify-content: space-between; gap: 1rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border-color); }
 .bank-details dt { color: var(--text-muted); }
